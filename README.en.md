@@ -95,6 +95,18 @@ Per-domain mastery score (0-100), LLM-generated training review (progress trajec
 
 Each domain maintains its own core knowledge base and frequently asked questions, with Markdown editing support.
 
+### Mobile Responsive
+
+Fully responsive design for seamless training on mobile devices.
+
+<p align="center">
+  <img src="images/mobile-home.png" alt="Mobile home" width="200" />
+  <img src="images/mobile-profile.png" alt="Mobile profile" width="200" />
+  <img src="images/mobile-history.png" alt="Mobile history" width="200" />
+</p>
+
+Hamburger menu navigation, adaptive card stacking, collapsible sidebar, and more — built with Tailwind CSS v4 mobile-first responsive layout.
+
 ## Architecture
 
 ### Three-Layer Information Fusion for Question Generation
@@ -260,7 +272,7 @@ TechSpar/
 
 **Backend**: FastAPI · LangChain · LangGraph · LlamaIndex · SQLite · sentence-transformers (bge-m3)
 
-**Frontend**: React 19 · React Router v7 · Vite
+**Frontend**: React 19 · React Router v7 · Vite · Tailwind CSS v4 (responsive mobile-first design)
 
 **LLM**: Any OpenAI-compatible endpoint (local deployment or cloud API)
 

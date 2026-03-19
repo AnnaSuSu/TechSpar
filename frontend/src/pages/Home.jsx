@@ -5,167 +5,13 @@ import { getTopics, startInterview, getResumeStatus, uploadResume } from "../api
 
 const API_BASE = "/api";
 
-const styles = {
-  page: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    padding: "60px 24px",
-  },
-  hero: {
-    textAlign: "center",
-    marginBottom: 48,
-  },
-  h1: {
-    fontSize: 40,
-    fontWeight: 700,
-    marginBottom: 12,
-    background: "linear-gradient(135deg, var(--accent-light), var(--accent))",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "var(--text-dim)",
-    maxWidth: 500,
-  },
-  modeSection: {
-    display: "flex",
-    gap: 24,
-    marginBottom: 48,
-    flexWrap: "wrap",
-    justifyContent: "center",
-  },
-  modeCard: {
-    width: 320,
-    padding: "28px 24px",
-    background: "var(--bg-card)",
-    border: "2px solid var(--border)",
-    borderRadius: 16,
-    cursor: "pointer",
-    transition: "all 0.2s",
-    textAlign: "left",
-  },
-  modeTitle: {
-    fontSize: 20,
-    fontWeight: 600,
-    marginBottom: 8,
-  },
-  modeDesc: {
-    fontSize: 14,
-    color: "var(--text-dim)",
-    lineHeight: 1.6,
-  },
-  modeTag: {
-    display: "inline-block",
-    padding: "4px 10px",
-    borderRadius: 6,
-    fontSize: 12,
-    fontWeight: 500,
-    marginBottom: 12,
-  },
-  topicSection: {
-    width: "100%",
-    maxWidth: 700,
-  },
-  topicTitle: {
-    fontSize: 18,
-    fontWeight: 600,
-    marginBottom: 16,
-    textAlign: "left",
-  },
-  topicGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-    gap: 12,
-    marginBottom: 32,
-  },
-  startBtn: {
-    width: "100%",
-    padding: "14px",
-    borderRadius: "var(--radius)",
-    background: "linear-gradient(135deg, var(--accent), var(--accent-light))",
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: 600,
-    border: "none",
-    transition: "opacity 0.2s",
-  },
-  startBtnDisabled: {
-    opacity: 0.4,
-    cursor: "not-allowed",
-  },
-  loading: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: 20,
-    color: "var(--text-dim)",
-  },
-  resumeSection: {
-    width: "100%",
-    maxWidth: 700,
-    marginBottom: 32,
-  },
-  resumeBox: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "16px 20px",
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: 12,
-  },
-  resumeInfo: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    fontSize: 14,
-    color: "var(--text)",
-  },
-  resumeFileName: {
-    fontWeight: 500,
-  },
-  resumeSize: {
-    fontSize: 12,
-    color: "var(--text-dim)",
-  },
-  uploadBtn: {
-    padding: "8px 16px",
-    borderRadius: 8,
-    background: "rgba(108,92,231,0.12)",
-    color: "var(--accent-light)",
-    fontSize: 13,
-    fontWeight: 500,
-    border: "none",
-    cursor: "pointer",
-    transition: "opacity 0.2s",
-  },
-  uploadLabel: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 8,
-    padding: "28px 20px",
-    background: "var(--bg-card)",
-    border: "2px dashed var(--border)",
-    borderRadius: 12,
-    cursor: "pointer",
-    transition: "border-color 0.2s",
-    fontSize: 14,
-    color: "var(--text-dim)",
-  },
-};
-
 export default function Home() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState(null); // "resume" | "topic_drill"
+  const [mode, setMode] = useState(null);
   const [topics, setTopics] = useState({});
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [resumeFile, setResumeFile] = useState(null); // {filename, size} or null
+  const [resumeFile, setResumeFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [profile, setProfile] = useState(null);
 
@@ -195,7 +41,6 @@ export default function Home() {
   const handleStart = async () => {
     if (!mode) return;
     if (mode === "topic_drill" && !selectedTopic) return;
-
     setLoading(true);
     try {
       const data = await startInterview(mode, selectedTopic);
@@ -210,46 +55,43 @@ export default function Home() {
   const canStart = (mode === "resume" && resumeFile) || (mode === "topic_drill" && selectedTopic);
 
   return (
-    <div style={styles.page}>
-      <div style={styles.hero}>
-        <h1 style={styles.h1}>TechSpar</h1>
-        <p style={styles.subtitle}>
+    <div className="flex-1 flex flex-col items-center px-4 pt-8 pb-10 md:px-6 md:pt-15">
+      {/* Hero */}
+      <div className="text-center mb-10 md:mb-12">
+        <h1 className="text-3xl md:text-[40px] font-bold mb-3 bg-gradient-to-br from-accent-light to-accent bg-clip-text text-transparent">
+          TechSpar
+        </h1>
+        <p className="text-base text-dim max-w-[500px]">
           越练越懂你的 AI 面试教练——追踪你的成长轨迹，精准命中薄弱点
         </p>
       </div>
 
-      <div style={styles.modeSection}>
+      {/* Mode cards */}
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 mb-10 md:mb-12 w-full md:w-auto md:justify-center">
         <div
-          style={{
-            ...styles.modeCard,
-            borderColor: mode === "resume" ? "var(--accent)" : "var(--border)",
-            background: mode === "resume" ? "var(--bg-hover)" : "var(--bg-card)",
-          }}
+          className={`w-full md:w-80 px-6 py-7 rounded-2xl cursor-pointer transition-all text-left border-2
+            ${mode === "resume" ? "border-accent bg-hover" : "border-border bg-card hover:border-accent/50"}`}
           onClick={() => { setMode("resume"); setSelectedTopic(null); }}
         >
-          <div style={{ ...styles.modeTag, background: "rgba(108,92,231,0.15)", color: "var(--accent-light)" }}>
+          <div className="inline-block px-2.5 py-1 rounded-md text-xs font-medium mb-3 bg-accent/15 text-accent-light">
             全流程模拟
           </div>
-          <div style={styles.modeTitle}>简历模拟面试</div>
-          <div style={styles.modeDesc}>
-            AI 读取你的简历，模拟真实面试官。
-            从自我介绍到项目深挖，完整走一遍面试流程。
+          <div className="text-xl font-semibold mb-2">简历模拟面试</div>
+          <div className="text-sm text-dim leading-relaxed">
+            AI 读取你的简历，模拟真实面试官。从自我介绍到项目深挖，完整走一遍面试流程。
           </div>
         </div>
 
         <div
-          style={{
-            ...styles.modeCard,
-            borderColor: mode === "topic_drill" ? "var(--green)" : "var(--border)",
-            background: mode === "topic_drill" ? "var(--bg-hover)" : "var(--bg-card)",
-          }}
+          className={`w-full md:w-80 px-6 py-7 rounded-2xl cursor-pointer transition-all text-left border-2
+            ${mode === "topic_drill" ? "border-green bg-hover" : "border-border bg-card hover:border-green/50"}`}
           onClick={() => setMode("topic_drill")}
         >
-          <div style={{ ...styles.modeTag, background: "rgba(0,184,148,0.15)", color: "var(--green)" }}>
+          <div className="inline-block px-2.5 py-1 rounded-md text-xs font-medium mb-3 bg-green/15 text-green">
             针对强化
           </div>
-          <div style={styles.modeTitle}>专项强化训练</div>
-          <div style={styles.modeDesc}>
+          <div className="text-xl font-semibold mb-2">专项强化训练</div>
+          <div className="text-sm text-dim leading-relaxed">
             选一个领域集中刷题，AI 根据你的回答动态调整难度，精准定位薄弱点。
           </div>
         </div>
@@ -264,49 +106,45 @@ export default function Home() {
           .sort((a, b) => (b[1].score || 0) - (a[1].score || 0))
           .slice(0, 3);
         return (
-          <div style={{
-            width: "100%", maxWidth: 700, marginBottom: 40,
-            background: "var(--bg-card)", border: "1px solid var(--border)",
-            borderRadius: 12, padding: "20px 24px",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>训练概览</span>
+          <div className="w-full max-w-[700px] mb-10 bg-card border border-border rounded-xl px-5 py-5 md:px-6">
+            <div className="flex justify-between items-center mb-3.5">
+              <span className="text-[15px] font-semibold">训练概览</span>
               <span
-                style={{ fontSize: 13, color: "var(--accent-light)", cursor: "pointer" }}
+                className="text-[13px] text-accent-light cursor-pointer"
                 onClick={() => navigate("/profile")}
               >
                 查看画像 &rsaquo;
               </span>
             </div>
-            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-              <div style={{ textAlign: "center", minWidth: 60 }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: "var(--accent-light)" }}>{s.total_sessions}</div>
-                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>总练习</div>
+            <div className="flex flex-wrap gap-4 md:gap-6">
+              <div className="text-center min-w-[60px]">
+                <div className="text-2xl font-bold text-accent-light">{s.total_sessions}</div>
+                <div className="text-[11px] text-dim mt-0.5">总练习</div>
               </div>
-              <div style={{ textAlign: "center", minWidth: 60 }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: "var(--green)" }}>{s.avg_score || "-"}</div>
-                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>综合平均</div>
+              <div className="text-center min-w-[60px]">
+                <div className="text-2xl font-bold text-green">{s.avg_score || "-"}</div>
+                <div className="text-[11px] text-dim mt-0.5">综合平均</div>
               </div>
               {topTopics.length > 0 && (
-                <div style={{ flex: 1, minWidth: 120 }}>
-                  <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 6 }}>领域掌握</div>
+                <div className="flex-1 min-w-[120px]">
+                  <div className="text-[11px] text-dim mb-1.5">领域掌握</div>
                   {topTopics.map(([t, d]) => (
-                    <div key={t} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, width: 70, color: "var(--text)" }}>{t}</span>
-                      <div style={{ flex: 1, height: 4, borderRadius: 2, background: "var(--border)", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${d.score || 0}%`, borderRadius: 2, background: "var(--accent-light)" }} />
+                    <div key={t} className="flex items-center gap-2 mb-1">
+                      <span className="text-xs w-[70px] text-text">{t}</span>
+                      <div className="flex-1 h-1 rounded-sm bg-border overflow-hidden">
+                        <div className="h-full rounded-sm bg-accent-light" style={{ width: `${d.score || 0}%` }} />
                       </div>
-                      <span style={{ fontSize: 11, color: "var(--text-dim)", width: 28 }}>{d.score || 0}</span>
+                      <span className="text-[11px] text-dim w-7">{d.score || 0}</span>
                     </div>
                   ))}
                 </div>
               )}
               {lastEntry && (
-                <div style={{ textAlign: "center", minWidth: 80 }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: lastEntry.avg_score >= 6 ? "var(--green)" : "#e2b93b" }}>
+                <div className="text-center min-w-[80px]">
+                  <div className={`text-2xl font-bold ${lastEntry.avg_score >= 6 ? "text-green" : "text-orange"}`}>
                     {lastEntry.avg_score}
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>上次得分</div>
+                  <div className="text-[11px] text-dim mt-0.5">上次得分</div>
                 </div>
               )}
             </div>
@@ -314,48 +152,38 @@ export default function Home() {
         );
       })()}
 
+      {/* Resume upload */}
       {mode === "resume" && (
-        <div style={styles.resumeSection}>
+        <div className="w-full max-w-[700px] mb-8">
           {resumeFile ? (
-            <div style={styles.resumeBox}>
-              <div style={styles.resumeInfo}>
+            <div className="flex items-center justify-between px-4 py-4 md:px-5 bg-card border border-border rounded-xl">
+              <div className="flex items-center gap-2.5 text-sm text-text">
                 <span>📄</span>
-                <span style={styles.resumeFileName}>{resumeFile.filename}</span>
-                <span style={styles.resumeSize}>
+                <span className="font-medium">{resumeFile.filename}</span>
+                <span className="text-xs text-dim">
                   ({(resumeFile.size / 1024).toFixed(0)} KB)
                 </span>
               </div>
-              <label style={{ ...styles.uploadBtn, opacity: uploading ? 0.4 : 1 }}>
+              <label className={`px-4 py-2 rounded-lg bg-accent/12 text-accent-light text-[13px] font-medium cursor-pointer transition-opacity ${uploading ? "opacity-40" : ""}`}>
                 {uploading ? "上传中..." : "重新上传"}
-                <input
-                  type="file"
-                  accept=".pdf"
-                  style={{ display: "none" }}
-                  onChange={handleUpload}
-                  disabled={uploading}
-                />
+                <input type="file" accept=".pdf" className="hidden" onChange={handleUpload} disabled={uploading} />
               </label>
             </div>
           ) : (
-            <label style={{ ...styles.uploadLabel, opacity: uploading ? 0.5 : 1 }}>
-              <span style={{ fontSize: 28 }}>📄</span>
+            <label className={`flex flex-col items-center gap-2 px-5 py-7 bg-card border-2 border-dashed border-border rounded-xl cursor-pointer transition-colors text-sm text-dim hover:border-accent/50 ${uploading ? "opacity-50" : ""}`}>
+              <span className="text-[28px]">📄</span>
               <span>{uploading ? "正在上传..." : "点击上传简历（PDF）"}</span>
-              <input
-                type="file"
-                accept=".pdf"
-                style={{ display: "none" }}
-                onChange={handleUpload}
-                disabled={uploading}
-              />
+              <input type="file" accept=".pdf" className="hidden" onChange={handleUpload} disabled={uploading} />
             </label>
           )}
         </div>
       )}
 
+      {/* Topic selection */}
       {mode === "topic_drill" && (
-        <div style={styles.topicSection}>
-          <div style={styles.topicTitle}>选择训练领域</div>
-          <div style={styles.topicGrid}>
+        <div className="w-full max-w-[700px]">
+          <div className="text-lg font-semibold mb-4 text-left">选择训练领域</div>
+          <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3 mb-8">
             {Object.entries(topics).map(([key, info]) => (
               <TopicCard
                 key={key}
@@ -370,13 +198,11 @@ export default function Home() {
         </div>
       )}
 
+      {/* Start button */}
       {mode && (
-        <div style={{ width: "100%", maxWidth: 700 }}>
+        <div className="w-full max-w-[700px]">
           <button
-            style={{
-              ...styles.startBtn,
-              ...(!canStart || loading ? styles.startBtnDisabled : {}),
-            }}
+            className={`w-full py-3.5 rounded-box bg-gradient-to-br from-accent to-accent-light text-white text-base font-semibold transition-opacity ${!canStart || loading ? "opacity-40 cursor-not-allowed" : ""}`}
             disabled={!canStart || loading}
             onClick={handleStart}
           >

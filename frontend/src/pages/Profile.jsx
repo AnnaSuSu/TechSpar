@@ -3,194 +3,18 @@ import { useNavigate } from "react-router-dom";
 
 const API_BASE = "/api";
 
-const styles = {
-  page: {
-    flex: 1,
-    padding: "40px 24px",
-    maxWidth: 800,
-    margin: "0 auto",
-    width: "100%",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 700,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "var(--text-dim)",
-    marginBottom: 32,
-  },
-  section: {
-    marginBottom: 28,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 600,
-    marginBottom: 12,
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-  },
-  card: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius)",
-    padding: "20px",
-  },
-  statGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-    gap: 12,
-  },
-  statItem: {
-    background: "var(--bg-hover)",
-    borderRadius: 8,
-    padding: "16px",
-    textAlign: "center",
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 700,
-    color: "var(--accent-light)",
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "var(--text-dim)",
-    marginTop: 4,
-  },
-  weakList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-  },
-  weakItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "10px 14px",
-    borderRadius: 8,
-    background: "var(--bg-hover)",
-    fontSize: 14,
-  },
-  weakText: {
-    flex: 1,
-  },
-  weakMeta: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    fontSize: 12,
-    color: "var(--text-dim)",
-    flexShrink: 0,
-  },
-  badge: {
-    padding: "2px 8px",
-    borderRadius: 4,
-    fontSize: 11,
-    fontWeight: 500,
-  },
-  improvedBadge: {
-    background: "rgba(0,184,148,0.15)",
-    color: "var(--green)",
-  },
-  activeBadge: {
-    background: "rgba(225,112,85,0.15)",
-    color: "var(--red)",
-  },
-  topicBadge: {
-    background: "rgba(108,92,231,0.15)",
-    color: "var(--accent-light)",
-  },
-  masteryGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-    gap: 10,
-  },
-  masteryItem: {
-    padding: "12px 16px",
-    borderRadius: 8,
-    background: "var(--bg-hover)",
-    border: "1px solid transparent",
-    cursor: "pointer",
-    transition: "all 0.2s",
-  },
-  masteryHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  masteryName: {
-    fontSize: 14,
-    fontWeight: 500,
-  },
-  masteryBar: {
-    height: 6,
-    borderRadius: 3,
-    background: "var(--border)",
-    overflow: "hidden",
-  },
-  masteryFill: {
-    height: "100%",
-    borderRadius: 3,
-    background: "linear-gradient(90deg, var(--accent), var(--accent-light))",
-    transition: "width 0.5s ease",
-  },
-  commSection: {
-    padding: "16px",
-    background: "var(--bg-hover)",
-    borderRadius: 8,
-    fontSize: 14,
-    lineHeight: 1.8,
-  },
-  thinkingItem: {
-    padding: "8px 12px",
-    borderRadius: 8,
-    fontSize: 14,
-    marginBottom: 6,
-  },
-  thinkingStrength: {
-    background: "rgba(0,184,148,0.08)",
-    borderLeft: "3px solid var(--green)",
-  },
-  thinkingGap: {
-    background: "rgba(225,112,85,0.08)",
-    borderLeft: "3px solid var(--red)",
-  },
-  empty: {
-    textAlign: "center",
-    padding: 60,
-    color: "var(--text-dim)",
-  },
-  loading: {
-    textAlign: "center",
-    padding: 60,
-    color: "var(--text-dim)",
-  },
-  chartCard: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius)",
-    padding: "20px 24px",
-  },
-};
-
 function CollapsibleList({ items, limit, renderItem }) {
   const [expanded, setExpanded] = useState(false);
   const show = expanded ? items : items.slice(0, limit);
   const hasMore = items.length > limit;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div className="flex flex-col gap-2">
       {show.map((item, i) => renderItem(item, i))}
       {hasMore && (
         <button
           onClick={() => setExpanded(!expanded)}
-          style={{
-            background: "none", border: "none", color: "var(--accent-light)",
-            fontSize: 13, cursor: "pointer", padding: "4px 0", textAlign: "left",
-          }}
+          className="bg-transparent border-none text-accent-light text-[13px] cursor-pointer py-1 text-left"
         >
           {expanded ? "收起" : `展开更多 (+${items.length - limit})`}
         </button>
@@ -226,17 +50,13 @@ function ScoreChart({ history }) {
   const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
   const areaPath = `${linePath} L${points[points.length - 1].x},${PAD.top + innerH} L${points[0].x},${PAD.top + innerH} Z`;
 
-  // Y-axis labels: 0, 5, 10
   const yLabels = [0, 5, 10];
-
-  // X-axis: show first, middle, last date
   const xIndices = history.length <= 5
     ? history.map((_, i) => i)
     : [0, Math.floor(history.length / 2), history.length - 1];
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
-      {/* Grid lines */}
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
       {yLabels.map((v) => {
         const y = PAD.top + innerH - (v / 10) * innerH;
         return (
@@ -246,33 +66,19 @@ function ScoreChart({ history }) {
           </g>
         );
       })}
-
-      {/* X labels */}
       {xIndices.map((i) => (
         <text key={i} x={points[i].x} y={H - 6} textAnchor="middle" fill="var(--text-dim)" fontSize={11}>
           {history[i].date?.slice(5)}
         </text>
       ))}
-
-      {/* Area fill */}
       <path d={areaPath} fill="url(#chartGrad)" opacity={0.2} />
-
-      {/* Line */}
       <path d={linePath} fill="none" stroke="var(--accent-light)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-
-      {/* Dots — green for drill, purple for resume */}
       {points.map((p, i) => (
         <g key={i}>
-          <circle
-            cx={p.x} cy={p.y} r={4}
-            fill={p.mode === "resume" ? "var(--accent-light)" : "var(--green)"}
-            stroke="var(--bg-card)" strokeWidth={2}
-          />
+          <circle cx={p.x} cy={p.y} r={4} fill={p.mode === "resume" ? "var(--accent-light)" : "var(--green)"} stroke="var(--bg-card)" strokeWidth={2} />
           <title>{`${p.date} ${p.mode === "resume" ? "简历面试" : p.topic}: ${p.score}/10`}</title>
         </g>
       ))}
-
-      {/* Gradient definition */}
       <defs>
         <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="var(--accent-light)" />
@@ -296,7 +102,7 @@ export default function Profile() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={styles.loading}>加载中...</div>;
+  if (loading) return <div className="text-center py-15 text-dim">加载中...</div>;
 
   const hasData = profile && (
     profile.stats?.total_sessions > 0 ||
@@ -307,24 +113,12 @@ export default function Profile() {
 
   if (!hasData) {
     return (
-      <div style={styles.page}>
-        <div style={styles.title}>个人画像</div>
-        <div style={styles.empty}>
+      <div className="flex-1 px-4 py-8 md:px-6 md:py-10 max-w-3xl mx-auto w-full">
+        <div className="text-2xl md:text-[28px] font-bold mb-2">个人画像</div>
+        <div className="text-center py-15 text-dim">
           <p>还没有面试数据</p>
-          <p style={{ marginTop: 12, fontSize: 14 }}>
-            开始面试后，系统会实时分析你的每个回答，自动构建你的能力画像
-          </p>
-          <button
-            style={{
-              marginTop: 20,
-              padding: "10px 24px",
-              borderRadius: 8,
-              background: "var(--accent)",
-              color: "#fff",
-              fontSize: 14,
-            }}
-            onClick={() => navigate("/")}
-          >
+          <p className="mt-3 text-sm">开始面试后，系统会实时分析你的每个回答，自动构建你的能力画像</p>
+          <button className="mt-5 px-6 py-2.5 rounded-lg bg-accent text-white text-sm" onClick={() => navigate("/")}>
             开始第一场面试
           </button>
         </div>
@@ -337,53 +131,51 @@ export default function Profile() {
   const weakImproved = (profile.weak_points || []).filter((w) => w.improved);
 
   return (
-    <div style={styles.page}>
-      <div style={styles.title}>个人画像</div>
-      <div style={styles.subtitle}>
+    <div className="flex-1 px-4 py-8 md:px-6 md:py-10 max-w-3xl mx-auto w-full">
+      <div className="text-2xl md:text-[28px] font-bold mb-2">个人画像</div>
+      <div className="text-sm text-dim mb-8">
         {stats.total_answers || 0} 次回答分析{stats.total_sessions ? ` | ${stats.total_sessions} 次完整面试` : ""} | 上次更新: {profile.updated_at?.slice(0, 16)}
       </div>
 
       {/* Stats */}
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>练习统计</div>
+      <div className="mb-7">
+        <div className="text-base font-semibold mb-3 flex items-center gap-2">练习统计</div>
         {/* Overview row */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-          <div style={{ ...styles.statItem, flex: 1 }}>
-            <div style={styles.statValue}>{stats.total_sessions}</div>
-            <div style={styles.statLabel}>总练习次数</div>
+        <div className="flex gap-3 mb-3">
+          <div className="flex-1 bg-hover rounded-lg p-4 text-center">
+            <div className="text-[28px] font-bold text-accent-light">{stats.total_sessions}</div>
+            <div className="text-xs text-dim mt-1">总练习次数</div>
           </div>
-          <div style={{ ...styles.statItem, flex: 1 }}>
-            <div style={{ ...styles.statValue, fontSize: 32, color: "var(--green)" }}>
-              {stats.avg_score || "-"}
-            </div>
-            <div style={styles.statLabel}>综合平均分</div>
+          <div className="flex-1 bg-hover rounded-lg p-4 text-center">
+            <div className="text-[32px] font-bold text-green">{stats.avg_score || "-"}</div>
+            <div className="text-xs text-dim mt-1">综合平均分</div>
           </div>
         </div>
         {/* Two mode columns */}
-        <div style={{ display: "flex", gap: 12 }}>
-          <div style={{ flex: 1, background: "var(--bg-hover)", borderRadius: 8, padding: 14, borderLeft: "3px solid var(--accent-light)" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--accent-light)", marginBottom: 10 }}>简历面试</div>
-            <div style={{ display: "flex", gap: 12 }}>
-              <div style={{ flex: 1, textAlign: "center" }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "var(--accent-light)" }}>{stats.resume_sessions || 0}</div>
-                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>次数</div>
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex-1 bg-hover rounded-lg p-3.5 border-l-[3px] border-l-accent-light">
+            <div className="text-[13px] font-semibold text-accent-light mb-2.5">简历面试</div>
+            <div className="flex gap-3">
+              <div className="flex-1 text-center">
+                <div className="text-[22px] font-bold text-accent-light">{stats.resume_sessions || 0}</div>
+                <div className="text-[11px] text-dim mt-0.5">次数</div>
               </div>
-              <div style={{ flex: 1, textAlign: "center" }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "var(--accent-light)" }}>{stats.resume_avg_score ?? "-"}</div>
-                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>平均分</div>
+              <div className="flex-1 text-center">
+                <div className="text-[22px] font-bold text-accent-light">{stats.resume_avg_score ?? "-"}</div>
+                <div className="text-[11px] text-dim mt-0.5">平均分</div>
               </div>
             </div>
           </div>
-          <div style={{ flex: 1, background: "var(--bg-hover)", borderRadius: 8, padding: 14, borderLeft: "3px solid var(--green)" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--green)", marginBottom: 10 }}>专项训练</div>
-            <div style={{ display: "flex", gap: 12 }}>
-              <div style={{ flex: 1, textAlign: "center" }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "var(--green)" }}>{stats.drill_sessions || 0}</div>
-                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>次数</div>
+          <div className="flex-1 bg-hover rounded-lg p-3.5 border-l-[3px] border-l-green">
+            <div className="text-[13px] font-semibold text-green mb-2.5">专项训练</div>
+            <div className="flex gap-3">
+              <div className="flex-1 text-center">
+                <div className="text-[22px] font-bold text-green">{stats.drill_sessions || 0}</div>
+                <div className="text-[11px] text-dim mt-0.5">次数</div>
               </div>
-              <div style={{ flex: 1, textAlign: "center" }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "var(--green)" }}>{stats.drill_avg_score ?? "-"}</div>
-                <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>平均分</div>
+              <div className="flex-1 text-center">
+                <div className="text-[22px] font-bold text-green">{stats.drill_avg_score ?? "-"}</div>
+                <div className="text-[11px] text-dim mt-0.5">平均分</div>
               </div>
             </div>
           </div>
@@ -392,9 +184,9 @@ export default function Profile() {
 
       {/* Score Trend */}
       {(stats.score_history || []).length >= 2 && (
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>成长趋势</div>
-          <div style={styles.chartCard}>
+        <div className="mb-7">
+          <div className="text-base font-semibold mb-3 flex items-center gap-2">成长趋势</div>
+          <div className="bg-card border border-border rounded-box px-4 py-5 md:px-6">
             <ScoreChart history={stats.score_history} />
           </div>
         </div>
@@ -402,33 +194,26 @@ export default function Profile() {
 
       {/* Topic Mastery */}
       {Object.keys(profile.topic_mastery || {}).length > 0 && (
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>领域掌握度</div>
-          <div style={styles.masteryGrid}>
+        <div className="mb-7">
+          <div className="text-base font-semibold mb-3 flex items-center gap-2">领域掌握度</div>
+          <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2.5">
             {Object.entries(profile.topic_mastery).map(([topic, data]) => (
               <div
                 key={topic}
-                style={styles.masteryItem}
+                className="px-4 py-3 rounded-lg bg-hover border border-transparent cursor-pointer transition-all hover:border-accent"
                 onClick={() => navigate(`/profile/topic/${topic}`)}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "transparent")}
               >
-                <div style={styles.masteryHeader}>
-                  <span style={styles.masteryName}>{topic}</span>
-                  <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
-                    {data.score ?? (data.level ? data.level * 20 : 0)}/100 &rsaquo;
-                  </span>
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-sm font-medium">{topic}</span>
+                  <span className="text-xs text-dim">{data.score ?? (data.level ? data.level * 20 : 0)}/100 &rsaquo;</span>
                 </div>
-                <div style={styles.masteryBar}>
+                <div className="h-1.5 rounded-sm bg-border overflow-hidden">
                   <div
-                    style={{ ...styles.masteryFill, width: `${data.score ?? (data.level ? data.level * 20 : 0)}%` }}
+                    className="h-full rounded-sm bg-gradient-to-r from-accent to-accent-light transition-[width] duration-500 ease-in-out"
+                    style={{ width: `${data.score ?? (data.level ? data.level * 20 : 0)}%` }}
                   />
                 </div>
-                {data.notes && (
-                  <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>
-                    {data.notes}
-                  </div>
-                )}
+                {data.notes && <div className="text-xs text-dim mt-1.5">{data.notes}</div>}
               </div>
             ))}
           </div>
@@ -437,32 +222,30 @@ export default function Profile() {
 
       {/* Weak & Strong side by side */}
       {(weakActive.length > 0 || (profile.strong_points || []).length > 0) && (
-        <div style={{ display: "flex", gap: 12, marginBottom: 28 }}>
-          {/* Weak points column */}
+        <div className="flex flex-col md:flex-row gap-3 mb-7">
           {weakActive.length > 0 && (
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={styles.sectionTitle}>
-                待改进 <span style={{ ...styles.badge, ...styles.activeBadge }}>{weakActive.length}</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-base font-semibold mb-3 flex items-center gap-2">
+                待改进 <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red/15 text-red">{weakActive.length}</span>
               </div>
               <CollapsibleList items={weakActive} limit={3} renderItem={(w, i) => (
-                <div key={i} style={styles.weakItem}>
-                  <span style={styles.weakText}>{w.point}</span>
-                  <div style={styles.weakMeta}>
-                    {w.topic && <span style={{ ...styles.badge, ...styles.topicBadge }}>{w.topic}</span>}
+                <div key={i} className="flex justify-between items-center px-3.5 py-2.5 rounded-lg bg-hover text-sm">
+                  <span className="flex-1">{w.point}</span>
+                  <div className="flex items-center gap-2 text-xs text-dim shrink-0">
+                    {w.topic && <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-accent/15 text-accent-light">{w.topic}</span>}
                     <span>出现 {w.times_seen} 次</span>
                   </div>
                 </div>
               )} />
             </div>
           )}
-          {/* Strong points column */}
           {(profile.strong_points || []).length > 0 && (
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={styles.sectionTitle}>强项</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-base font-semibold mb-3 flex items-center gap-2">强项</div>
               <CollapsibleList items={profile.strong_points} limit={3} renderItem={(s, i) => (
-                <div key={i} style={{ ...styles.weakItem, borderLeft: "3px solid var(--green)" }}>
+                <div key={i} className="flex justify-between items-center px-3.5 py-2.5 rounded-lg bg-hover text-sm border-l-[3px] border-l-green">
                   <span>{s.point}</span>
-                  {s.topic && <span style={{ ...styles.badge, ...styles.topicBadge }}>{s.topic}</span>}
+                  {s.topic && <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-accent/15 text-accent-light">{s.topic}</span>}
                 </div>
               )} />
             </div>
@@ -472,40 +255,40 @@ export default function Profile() {
 
       {/* Improved Points */}
       {weakImproved.length > 0 && (
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>
-            已改善 <span style={{ ...styles.badge, ...styles.improvedBadge }}>{weakImproved.length}</span>
+        <div className="mb-7">
+          <div className="text-base font-semibold mb-3 flex items-center gap-2">
+            已改善 <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-green/15 text-green">{weakImproved.length}</span>
           </div>
-          <div style={styles.weakList}>
+          <div className="flex flex-col gap-2">
             {weakImproved.map((w, i) => (
-              <div key={i} style={{ ...styles.weakItem, opacity: 0.7 }}>
-                <span style={{ ...styles.weakText, textDecoration: "line-through" }}>{w.point}</span>
-                <span style={{ ...styles.badge, ...styles.improvedBadge }}>已改善</span>
+              <div key={i} className="flex justify-between items-center px-3.5 py-2.5 rounded-lg bg-hover text-sm opacity-70">
+                <span className="flex-1 line-through">{w.point}</span>
+                <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-green/15 text-green">已改善</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Thinking Patterns — two columns */}
+      {/* Thinking Patterns */}
       {((profile.thinking_patterns?.strengths || []).length > 0 ||
         (profile.thinking_patterns?.gaps || []).length > 0) && (
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>思维模式</div>
-          <div style={{ display: "flex", gap: 12 }}>
+        <div className="mb-7">
+          <div className="text-base font-semibold mb-3 flex items-center gap-2">思维模式</div>
+          <div className="flex flex-col md:flex-row gap-3">
             {(profile.thinking_patterns.strengths || []).length > 0 && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: "var(--green)", fontWeight: 600, marginBottom: 6 }}>优势</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-green mb-1.5">优势</div>
                 <CollapsibleList items={profile.thinking_patterns.strengths} limit={3} renderItem={(s, i) => (
-                  <div key={i} style={{ ...styles.thinkingItem, ...styles.thinkingStrength }}>{s}</div>
+                  <div key={i} className="px-3 py-2 rounded-lg text-sm bg-green/8 border-l-[3px] border-l-green mb-1.5">{s}</div>
                 )} />
               </div>
             )}
             {(profile.thinking_patterns.gaps || []).length > 0 && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: "var(--red)", fontWeight: 600, marginBottom: 6 }}>短板</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-red mb-1.5">短板</div>
                 <CollapsibleList items={profile.thinking_patterns.gaps} limit={3} renderItem={(g, i) => (
-                  <div key={i} style={{ ...styles.thinkingItem, ...styles.thinkingGap }}>{g}</div>
+                  <div key={i} className="px-3 py-2 rounded-lg text-sm bg-red/8 border-l-[3px] border-l-red mb-1.5">{g}</div>
                 )} />
               </div>
             )}
@@ -515,22 +298,22 @@ export default function Profile() {
 
       {/* Communication */}
       {profile.communication?.style && (
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>沟通风格分析</div>
-          <div style={styles.commSection}>
+        <div className="mb-7">
+          <div className="text-base font-semibold mb-3 flex items-center gap-2">沟通风格分析</div>
+          <div className="p-4 bg-hover rounded-lg text-sm leading-[1.8]">
             <div>{profile.communication.style}</div>
             {(profile.communication.habits || []).length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <strong style={{ fontSize: 13 }}>习惯</strong>
-                <ul style={{ margin: "6px 0 0", paddingLeft: 18, lineHeight: 1.8 }}>
+              <div className="mt-3">
+                <strong className="text-[13px]">习惯</strong>
+                <ul className="mt-1.5 pl-4.5 leading-[1.8]">
                   {profile.communication.habits.map((h, i) => <li key={i}>{h}</li>)}
                 </ul>
               </div>
             )}
             {(profile.communication.suggestions || []).length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <strong style={{ fontSize: 13 }}>建议</strong>
-                <ul style={{ margin: "6px 0 0", paddingLeft: 18, lineHeight: 1.8 }}>
+              <div className="mt-3">
+                <strong className="text-[13px]">建议</strong>
+                <ul className="mt-1.5 pl-4.5 leading-[1.8]">
                   {profile.communication.suggestions.map((s, i) => <li key={i}>{s}</li>)}
                 </ul>
               </div>

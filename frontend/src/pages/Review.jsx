@@ -3,272 +3,6 @@ import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { getReview } from "../api/interview";
 
-const styles = {
-  page: {
-    flex: 1,
-    padding: "40px 24px",
-    maxWidth: 800,
-    margin: "0 auto",
-    width: "100%",
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 700,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "var(--text-dim)",
-  },
-  // Drill review styles
-  overallCard: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: 16,
-    padding: "28px 32px",
-    marginBottom: 24,
-  },
-  overallTitle: {
-    fontSize: 18,
-    fontWeight: 600,
-    marginBottom: 12,
-  },
-  overallScore: {
-    display: "inline-block",
-    fontSize: 32,
-    fontWeight: 700,
-    marginRight: 8,
-  },
-  overallMax: {
-    fontSize: 16,
-    color: "var(--text-dim)",
-  },
-  overallSummary: {
-    marginTop: 16,
-    fontSize: 15,
-    lineHeight: 1.8,
-    color: "var(--text)",
-  },
-  statsRow: {
-    display: "flex",
-    gap: 16,
-    marginTop: 16,
-    flexWrap: "wrap",
-  },
-  statBadge: {
-    padding: "6px 14px",
-    borderRadius: 8,
-    fontSize: 13,
-    fontWeight: 500,
-    background: "var(--bg-hover)",
-    color: "var(--text-dim)",
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 600,
-    marginBottom: 16,
-    marginTop: 8,
-    color: "var(--text)",
-  },
-  questionScoreCard: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: 12,
-    padding: "20px 24px",
-    marginBottom: 16,
-    animation: "fadeIn 0.3s ease",
-  },
-  qHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  qLabel: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: "var(--accent-light)",
-    background: "rgba(108,92,231,0.12)",
-    padding: "3px 10px",
-    borderRadius: 6,
-  },
-  qFocus: {
-    fontSize: 12,
-    color: "var(--text-dim)",
-    background: "var(--bg-hover)",
-    padding: "3px 8px",
-    borderRadius: 4,
-  },
-  scoreBadge: {
-    fontSize: 14,
-    fontWeight: 700,
-    padding: "4px 12px",
-    borderRadius: 8,
-  },
-  qQuestion: {
-    fontSize: 15,
-    fontWeight: 500,
-    lineHeight: 1.6,
-    marginBottom: 12,
-  },
-  qAnswerSection: {
-    background: "var(--bg-hover)",
-    borderRadius: 8,
-    padding: "12px 16px",
-    marginBottom: 12,
-  },
-  qAnswerLabel: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: "var(--text-dim)",
-    marginBottom: 6,
-    opacity: 0.7,
-  },
-  qAnswerText: {
-    fontSize: 14,
-    lineHeight: 1.6,
-    whiteSpace: "pre-wrap",
-  },
-  qAssessment: {
-    fontSize: 14,
-    lineHeight: 1.7,
-    color: "var(--text)",
-    marginBottom: 8,
-  },
-  qMissing: {
-    fontSize: 13,
-    color: "var(--red)",
-    lineHeight: 1.5,
-  },
-  qUnderstanding: {
-    fontSize: 13,
-    color: "var(--text-dim)",
-    fontStyle: "italic",
-    marginTop: 4,
-  },
-  weakPointsList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-    marginBottom: 16,
-  },
-  weakPoint: {
-    padding: "8px 12px",
-    borderRadius: 8,
-    background: "rgba(225,112,85,0.08)",
-    border: "1px solid rgba(225,112,85,0.2)",
-    fontSize: 13,
-    color: "var(--text)",
-  },
-  strongPoint: {
-    padding: "8px 12px",
-    borderRadius: 8,
-    background: "rgba(0,184,148,0.08)",
-    border: "1px solid rgba(0,184,148,0.2)",
-    fontSize: 13,
-    color: "var(--text)",
-  },
-  // Dimension scores card (resume interview)
-  dimensionCard: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: 16,
-    padding: "24px 28px",
-    marginBottom: 24,
-  },
-  dimensionTitle: {
-    fontSize: 18,
-    fontWeight: 600,
-    marginBottom: 16,
-  },
-  dimensionRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 10,
-  },
-  dimensionLabel: {
-    width: 100,
-    fontSize: 13,
-    color: "var(--text-dim)",
-    flexShrink: 0,
-    textAlign: "right",
-  },
-  dimensionBarBg: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    background: "var(--border)",
-    overflow: "hidden",
-  },
-  dimensionBarFill: {
-    height: "100%",
-    borderRadius: 4,
-    transition: "width 0.5s ease",
-  },
-  dimensionScore: {
-    width: 36,
-    fontSize: 14,
-    fontWeight: 600,
-    textAlign: "right",
-    flexShrink: 0,
-  },
-  // Resume review (plain markdown)
-  reviewContent: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius)",
-    padding: "32px",
-    lineHeight: 1.8,
-    fontSize: 15,
-  },
-  backBtn: {
-    display: "inline-block",
-    marginTop: 24,
-    padding: "10px 24px",
-    borderRadius: "var(--radius)",
-    background: "var(--bg-hover)",
-    color: "var(--text)",
-    fontSize: 14,
-    border: "1px solid var(--border)",
-    cursor: "pointer",
-  },
-  transcriptToggle: {
-    marginTop: 24,
-    marginRight: 12,
-    padding: "10px 20px",
-    borderRadius: "var(--radius)",
-    background: "transparent",
-    color: "var(--accent-light)",
-    fontSize: 14,
-    border: "1px solid var(--border)",
-    cursor: "pointer",
-  },
-  transcript: {
-    marginTop: 16,
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius)",
-    padding: "24px",
-    maxHeight: 500,
-    overflowY: "auto",
-  },
-  msgLine: {
-    padding: "8px 0",
-    borderBottom: "1px solid var(--border)",
-    fontSize: 14,
-    lineHeight: 1.6,
-  },
-  loading: {
-    textAlign: "center",
-    padding: 60,
-    color: "var(--text-dim)",
-  },
-};
-
 function getScoreColor(score) {
   if (score >= 8) return { bg: "rgba(0,184,148,0.15)", color: "var(--green)" };
   if (score >= 6) return { bg: "rgba(108,92,231,0.15)", color: "var(--accent-light)" };
@@ -289,25 +23,23 @@ function DimensionScores({ dimensionScores, avgScore }) {
   if (!entries.length) return null;
 
   return (
-    <div style={styles.dimensionCard}>
-      <div style={styles.dimensionTitle}>
+    <div className="bg-card border border-border rounded-2xl px-5 py-6 md:px-7 mb-6">
+      <div className="text-lg font-semibold mb-4">
         维度评分
         {avgScore != null && (
-          <span style={{ fontSize: 14, fontWeight: 400, color: "var(--text-dim)", marginLeft: 12 }}>
-            综合 {avgScore}/10
-          </span>
+          <span className="text-sm font-normal text-dim ml-3">综合 {avgScore}/10</span>
         )}
       </div>
       {entries.map(([key, label]) => {
         const score = dimensionScores[key];
         const color = score >= 8 ? "var(--green)" : score >= 6 ? "var(--accent-light)" : score >= 4 ? "#e2b93b" : "var(--red)";
         return (
-          <div key={key} style={styles.dimensionRow}>
-            <div style={styles.dimensionLabel}>{label}</div>
-            <div style={styles.dimensionBarBg}>
-              <div style={{ ...styles.dimensionBarFill, width: `${score * 10}%`, background: color }} />
+          <div key={key} className="flex items-center gap-3 mb-2.5">
+            <div className="w-[80px] md:w-[100px] text-[13px] text-dim text-right shrink-0">{label}</div>
+            <div className="flex-1 h-2 rounded bg-border overflow-hidden">
+              <div className="h-full rounded transition-[width] duration-500 ease-in-out" style={{ width: `${score * 10}%`, background: color }} />
             </div>
-            <div style={{ ...styles.dimensionScore, color }}>{score}</div>
+            <div className="w-9 text-sm font-semibold text-right shrink-0" style={{ color }}>{score}</div>
           </div>
         );
       })}
@@ -315,56 +47,45 @@ function DimensionScores({ dimensionScores, avgScore }) {
   );
 }
 
-function DrillReview({ scores, overall, questions, answers, sessionId }) {
+function DrillReview({ scores, overall, questions, answers }) {
   const answerMap = {};
-  for (const a of (answers || [])) {
-    answerMap[a.question_id] = a.answer;
-  }
+  for (const a of (answers || [])) answerMap[a.question_id] = a.answer;
   const scoreMap = {};
-  for (const s of (scores || [])) {
-    scoreMap[s.question_id] = s;
-  }
-  const questionMap = {};
-  for (const q of (questions || [])) {
-    questionMap[q.id] = q;
-  }
+  for (const s of (scores || [])) scoreMap[s.question_id] = s;
 
   const avgScore = overall?.avg_score || "-";
 
   return (
     <>
       {/* Overall summary */}
-      <div style={styles.overallCard}>
-        <div style={styles.overallTitle}>整体评价</div>
+      <div className="bg-card border border-border rounded-2xl px-5 py-6 md:px-8 md:py-7 mb-6">
+        <div className="text-lg font-semibold mb-3">整体评价</div>
         <div>
-          <span style={{
-            ...styles.overallScore,
-            color: typeof avgScore === "number" ? getScoreColor(avgScore).color : "var(--text)",
-          }}>
+          <span className="inline-block text-[32px] font-bold mr-2" style={{ color: typeof avgScore === "number" ? getScoreColor(avgScore).color : "var(--text)" }}>
             {avgScore}
           </span>
-          <span style={styles.overallMax}>/10</span>
+          <span className="text-base text-dim">/10</span>
         </div>
         {overall?.summary && (
-          <div style={styles.overallSummary}>{overall.summary}</div>
+          <div className="mt-4 text-[15px] leading-[1.8] text-text">{overall.summary}</div>
         )}
-        <div style={styles.statsRow}>
-          <span style={styles.statBadge}>
+        <div className="flex flex-wrap gap-4 mt-4">
+          <span className="px-3.5 py-1.5 rounded-lg text-[13px] font-medium bg-hover text-dim">
             共 {questions?.length || 0} 题
           </span>
-          <span style={styles.statBadge}>
+          <span className="px-3.5 py-1.5 rounded-lg text-[13px] font-medium bg-hover text-dim">
             已答 {answers?.filter((a) => a.answer).length || 0} 题
           </span>
         </div>
       </div>
 
-      {/* Weak/strong points */}
+      {/* Weak points */}
       {overall?.new_weak_points?.length > 0 && (
         <>
-          <div style={styles.sectionTitle}>薄弱点</div>
-          <div style={styles.weakPointsList}>
+          <div className="text-base font-semibold mb-4 mt-2 text-text">薄弱点</div>
+          <div className="flex flex-col gap-1.5 mb-4">
             {overall.new_weak_points.map((wp, i) => (
-              <div key={i} style={styles.weakPoint}>
+              <div key={i} className="px-3 py-2 rounded-lg text-[13px] text-text bg-red/8 border border-red/20">
                 {typeof wp === "string" ? wp : wp.point || JSON.stringify(wp)}
               </div>
             ))}
@@ -372,12 +93,13 @@ function DrillReview({ scores, overall, questions, answers, sessionId }) {
         </>
       )}
 
+      {/* Strong points */}
       {overall?.new_strong_points?.length > 0 && (
         <>
-          <div style={styles.sectionTitle}>亮点</div>
-          <div style={styles.weakPointsList}>
+          <div className="text-base font-semibold mb-4 mt-2 text-text">亮点</div>
+          <div className="flex flex-col gap-1.5 mb-4">
             {overall.new_strong_points.map((sp, i) => (
-              <div key={i} style={styles.strongPoint}>
+              <div key={i} className="px-3 py-2 rounded-lg text-[13px] text-text bg-green/8 border border-green/20">
                 {typeof sp === "string" ? sp : sp.point || JSON.stringify(sp)}
               </div>
             ))}
@@ -386,7 +108,7 @@ function DrillReview({ scores, overall, questions, answers, sessionId }) {
       )}
 
       {/* Per-question cards */}
-      <div style={styles.sectionTitle}>逐题复盘</div>
+      <div className="text-base font-semibold mb-4 mt-2 text-text">逐题复盘</div>
       {(questions || []).map((q) => {
         const s = scoreMap[q.id] || {};
         const answer = answerMap[q.id];
@@ -394,75 +116,55 @@ function DrillReview({ scores, overall, questions, answers, sessionId }) {
         const score = s.score;
         const sc = typeof score === "number" ? getScoreColor(score) : { bg: "var(--bg-hover)", color: "var(--text-dim)" };
 
-        // Unanswered: compact one-line display
         if (isSkipped) {
           return (
-            <div key={q.id} style={{
-              ...styles.questionScoreCard,
-              padding: "12px 24px",
-              opacity: 0.5,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={styles.qLabel}>Q{q.id}</span>
-                <span style={{ fontSize: 14, color: "var(--text-dim)" }}>
-                  {q.question.slice(0, 50)}{q.question.length > 50 ? "..." : ""}
-                </span>
+            <div key={q.id} className="bg-card border border-border rounded-xl px-4 py-3 md:px-6 mb-4 opacity-50 flex items-center justify-between animate-fade-in">
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-semibold text-accent-light bg-accent/12 px-2.5 py-0.5 rounded-md">Q{q.id}</span>
+                <span className="text-sm text-dim">{q.question.slice(0, 50)}{q.question.length > 50 ? "..." : ""}</span>
               </div>
-              <span style={{ fontSize: 13, color: "var(--text-dim)" }}>未作答</span>
+              <span className="text-[13px] text-dim">未作答</span>
             </div>
           );
         }
 
         return (
-          <div key={q.id} style={styles.questionScoreCard}>
-            <div style={styles.qHeader}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={styles.qLabel}>Q{q.id}</span>
-                {q.focus_area && <span style={styles.qFocus}>{q.focus_area}</span>}
+          <div key={q.id} className="bg-card border border-border rounded-xl px-4 py-5 md:px-6 mb-4 animate-fade-in">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-semibold text-accent-light bg-accent/12 px-2.5 py-0.5 rounded-md">Q{q.id}</span>
+                {q.focus_area && <span className="text-xs text-dim bg-hover px-2 py-0.5 rounded">{q.focus_area}</span>}
               </div>
-              <span style={{ ...styles.scoreBadge, background: sc.bg, color: sc.color }}>
+              <span className="text-sm font-bold px-3 py-1 rounded-lg" style={{ background: sc.bg, color: sc.color }}>
                 {score ?? "-"}/10
               </span>
             </div>
 
-            <div style={styles.qQuestion}>{q.question}</div>
+            <div className="text-[15px] font-medium leading-relaxed mb-3">{q.question}</div>
 
-            <div style={styles.qAnswerSection}>
-              <div style={styles.qAnswerLabel}>你的回答</div>
-              <div style={styles.qAnswerText}>{answer}</div>
+            <div className="bg-hover rounded-lg px-3 py-3 md:px-4 mb-3">
+              <div className="text-xs font-semibold text-dim mb-1.5 opacity-70">你的回答</div>
+              <div className="text-sm leading-relaxed whitespace-pre-wrap">{answer}</div>
             </div>
 
             {s.assessment && s.assessment !== "未作答" && (
-              <div style={styles.qAssessment}>
-                <strong style={{ fontSize: 12, opacity: 0.6 }}>点评: </strong>
-                {s.assessment}
+              <div className="text-sm leading-[1.7] text-text mb-2">
+                <strong className="text-xs opacity-60">点评: </strong>{s.assessment}
               </div>
             )}
 
             {s.improvement && (
-              <div style={{
-                fontSize: 14, lineHeight: 1.7, color: "var(--accent-light)",
-                background: "rgba(108,92,231,0.08)", borderRadius: 8,
-                padding: "10px 14px", marginBottom: 8,
-              }}>
-                <strong style={{ fontSize: 12, opacity: 0.7 }}>改进建议: </strong>
-                {s.improvement}
+              <div className="text-sm leading-[1.7] text-accent-light bg-accent/8 rounded-lg px-3 py-2.5 md:px-3.5 mb-2">
+                <strong className="text-xs opacity-70">改进建议: </strong>{s.improvement}
               </div>
             )}
 
             {s.understanding && s.understanding !== "未作答" && (
-              <div style={styles.qUnderstanding}>
-                理解程度: {s.understanding}
-              </div>
+              <div className="text-[13px] text-dim italic mt-1">理解程度: {s.understanding}</div>
             )}
 
             {s.key_missing?.length > 0 && (
-              <div style={styles.qMissing}>
-                遗漏关键点: {s.key_missing.join("、")}
-              </div>
+              <div className="text-[13px] text-red leading-normal">遗漏关键点: {s.key_missing.join("、")}</div>
             )}
           </div>
         );
@@ -499,14 +201,9 @@ export default function Review() {
           if (data.questions) setQuestions(data.questions);
           if (data.transcript) {
             setMessages(data.transcript);
-            // Reconstruct answers from transcript for drill
-            // Transcript is stored as alternating Q(assistant)/A(user) pairs per question
             if (data.mode === "topic_drill" && data.questions) {
               const userMsgs = data.transcript.filter((m) => m.role === "user");
-              const ans = data.questions.map((q, i) => ({
-                question_id: q.id,
-                answer: userMsgs[i]?.content || "",
-              }));
+              const ans = data.questions.map((q, i) => ({ question_id: q.id, answer: userMsgs[i]?.content || "" }));
               setAnswers(ans);
             }
           }
@@ -515,9 +212,7 @@ export default function Review() {
             setOverall(data.overall);
           } else if (data.weak_points) {
             const wp = Array.isArray(data.weak_points) ? data.weak_points : [];
-            if (wp.length) {
-              setOverall((prev) => ({ ...prev, new_weak_points: wp }));
-            }
+            if (wp.length) setOverall((prev) => ({ ...prev, new_weak_points: wp }));
           }
         })
         .catch((err) => setReview("加载失败: " + err.message))
@@ -526,35 +221,27 @@ export default function Review() {
   }, [sessionId]);
 
   if (loading) {
-    return <div style={styles.loading}>加载复盘报告中...</div>;
+    return <div className="text-center py-15 text-dim">加载复盘报告中...</div>;
   }
 
   const showDrill = isDrill || (mode === "topic_drill" && (scores || questions.length > 0));
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <div style={styles.title}>
-          {showDrill ? "训练复盘" : "面试复盘"}
-        </div>
-        <div style={styles.subtitle}>Session: {sessionId}</div>
+    <div className="flex-1 px-4 py-8 md:px-6 md:py-10 max-w-3xl mx-auto w-full">
+      <div className="mb-8">
+        <div className="text-2xl md:text-[28px] font-bold mb-2">{showDrill ? "训练复盘" : "面试复盘"}</div>
+        <div className="text-sm text-dim">Session: {sessionId}</div>
       </div>
 
       {showDrill ? (
-        <DrillReview
-          scores={scores}
-          overall={overall}
-          questions={questions}
-          answers={answers}
-          sessionId={sessionId}
-        />
+        <DrillReview scores={scores} overall={overall} questions={questions} answers={answers} />
       ) : (
         <>
           <DimensionScores
             dimensionScores={stateData.dimension_scores || overall?.dimension_scores}
             avgScore={stateData.avg_score ?? overall?.avg_score}
           />
-          <div style={styles.reviewContent}>
+          <div className="bg-card border border-border rounded-box px-5 py-6 md:px-8 leading-[1.8] text-[15px]">
             <div className="md-content">
               <ReactMarkdown>{review || ""}</ReactMarkdown>
             </div>
@@ -563,15 +250,15 @@ export default function Review() {
           {messages.length > 0 && (
             <>
               <button
-                style={styles.transcriptToggle}
+                className="mt-6 mr-3 px-5 py-2.5 rounded-box bg-transparent text-accent-light text-sm border border-border cursor-pointer"
                 onClick={() => setShowTranscript(!showTranscript)}
               >
                 {showTranscript ? "收起面试记录" : "查看面试记录"}
               </button>
               {showTranscript && (
-                <div style={styles.transcript}>
+                <div className="mt-4 bg-card border border-border rounded-box px-4 py-5 md:px-6 max-h-[500px] overflow-y-auto">
                   {messages.map((msg, i) => (
-                    <div key={i} style={styles.msgLine}>
+                    <div key={i} className="py-2 border-b border-border text-sm leading-relaxed">
                       <strong style={{ color: msg.role === "user" ? "var(--accent-light)" : "var(--green)" }}>
                         {msg.role === "user" ? "你" : "面试官"}:
                       </strong>{" "}
@@ -585,7 +272,10 @@ export default function Review() {
         </>
       )}
 
-      <button style={styles.backBtn} onClick={() => navigate("/")}>
+      <button
+        className="inline-block mt-6 px-6 py-2.5 rounded-box bg-hover text-text text-sm border border-border cursor-pointer"
+        onClick={() => navigate("/")}
+      >
         返回首页
       </button>
     </div>

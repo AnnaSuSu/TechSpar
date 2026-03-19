@@ -11,264 +11,24 @@ import {
   deleteTopic,
 } from "../api/interview";
 
-const styles = {
-  page: {
-    display: "flex",
-    flex: 1,
-    overflow: "hidden",
-    height: "calc(100vh - 65px)",
-  },
-  sidebar: {
-    width: 200,
-    borderRight: "1px solid var(--border)",
-    padding: "16px 12px",
-    overflowY: "auto",
-    flexShrink: 0,
-    display: "flex",
-    flexDirection: "column",
-  },
-  sidebarHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-    padding: "0 8px",
-  },
-  sidebarTitle: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: "var(--text-dim)",
-  },
-  sidebarAddBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    border: "1px solid var(--border)",
-    background: "transparent",
-    color: "var(--text-dim)",
-    fontSize: 16,
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all 0.15s",
-    lineHeight: 1,
-  },
-  topicList: {
-    flex: 1,
-    overflowY: "auto",
-  },
-  topicItem: {
-    position: "relative",
-    marginBottom: 2,
-  },
-  topicBtn: {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 8,
-    border: "none",
-    background: "transparent",
-    color: "var(--text-dim)",
-    fontSize: 14,
-    textAlign: "left",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    transition: "all 0.15s",
-  },
-  topicBtnActive: {
-    background: "var(--bg-hover)",
-    color: "var(--text)",
-  },
-  // Modal overlay
-  modalOverlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.5)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000,
-  },
-  modal: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: 16,
-    padding: "28px 32px",
-    width: 380,
-    maxWidth: "90vw",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 600,
-    marginBottom: 20,
-  },
-  modalField: {
-    marginBottom: 14,
-  },
-  modalLabel: {
-    fontSize: 13,
-    color: "var(--text-dim)",
-    marginBottom: 6,
-    display: "block",
-  },
-  modalInput: {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 8,
-    border: "1px solid var(--border)",
-    background: "var(--bg)",
-    color: "var(--text)",
-    fontSize: 14,
-    boxSizing: "border-box",
-  },
-  modalBtnRow: {
-    display: "flex",
-    gap: 10,
-    justifyContent: "flex-end",
-    marginTop: 24,
-  },
-  main: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden",
-  },
-  tabs: {
-    display: "flex",
-    gap: 0,
-    borderBottom: "1px solid var(--border)",
-    padding: "0 24px",
-    background: "var(--bg-card)",
-  },
-  tab: {
-    padding: "12px 20px",
-    fontSize: 14,
-    background: "transparent",
-    color: "var(--text-dim)",
-    border: "none",
-    borderBottom: "2px solid transparent",
-    cursor: "pointer",
-    transition: "all 0.15s",
-  },
-  tabActive: {
-    color: "var(--text)",
-    borderBottom: "2px solid var(--accent)",
-  },
-  content: {
-    flex: 1,
-    overflowY: "auto",
-    padding: 24,
-  },
-  fileList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-  },
-  fileCard: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius)",
-    overflow: "hidden",
-  },
-  fileHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "12px 16px",
-    cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 500,
-  },
-  fileContent: {
-    borderTop: "1px solid var(--border)",
-    padding: 16,
-  },
-  textarea: {
-    width: "100%",
-    minHeight: 300,
-    padding: 12,
-    borderRadius: 8,
-    border: "1px solid var(--border)",
-    background: "var(--bg)",
-    color: "var(--text)",
-    fontSize: 13,
-    fontFamily: "monospace",
-    lineHeight: 1.6,
-    resize: "vertical",
-    boxSizing: "border-box",
-  },
-  btnRow: {
-    display: "flex",
-    gap: 8,
-    marginTop: 12,
-    justifyContent: "flex-end",
-  },
-  btn: {
-    padding: "8px 20px",
-    borderRadius: 8,
-    border: "1px solid var(--border)",
-    background: "var(--bg-hover)",
-    color: "var(--text)",
-    fontSize: 13,
-    cursor: "pointer",
-    transition: "all 0.15s",
-  },
-  btnPrimary: {
-    background: "var(--accent)",
-    color: "#fff",
-    border: "none",
-  },
-  empty: {
-    textAlign: "center",
-    padding: 60,
-    color: "var(--text-dim)",
-    fontSize: 14,
-  },
-  saving: {
-    fontSize: 12,
-    color: "var(--green)",
-    marginRight: 12,
-    alignSelf: "center",
-  },
-  addBar: {
-    display: "flex",
-    gap: 8,
-    marginBottom: 16,
-  },
-  input: {
-    flex: 1,
-    padding: "8px 12px",
-    borderRadius: 8,
-    border: "1px solid var(--border)",
-    background: "var(--bg)",
-    color: "var(--text)",
-    fontSize: 13,
-  },
-};
-
 export default function Knowledge() {
   const [topics, setTopics] = useState({});
   const [selected, setSelected] = useState(null);
   const [tab, setTab] = useState("core");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Core knowledge state
   const [coreFiles, setCoreFiles] = useState([]);
   const [expandedFile, setExpandedFile] = useState(null);
   const [editContent, setEditContent] = useState({});
   const [coreSaving, setCoreSaving] = useState(null);
 
-  // High freq state
   const [highFreq, setHighFreq] = useState("");
   const [highFreqDraft, setHighFreqDraft] = useState("");
   const [hfSaving, setHfSaving] = useState(false);
 
-  // New file
   const [newFileName, setNewFileName] = useState("");
   const [showNewFile, setShowNewFile] = useState(false);
 
-  // Add topic
   const [showAddTopic, setShowAddTopic] = useState(false);
   const [newTopicKey, setNewTopicKey] = useState("");
   const [newTopicName, setNewTopicName] = useState("");
@@ -316,12 +76,8 @@ export default function Knowledge() {
     setCoreSaving(filename);
     try {
       await updateCoreKnowledge(selected, filename, editContent[filename] || "");
-      setCoreFiles((prev) =>
-        prev.map((f) => f.filename === filename ? { ...f, content: editContent[filename] } : f)
-      );
-    } catch (e) {
-      alert("保存失败: " + e.message);
-    }
+      setCoreFiles((prev) => prev.map((f) => f.filename === filename ? { ...f, content: editContent[filename] } : f));
+    } catch (e) { alert("保存失败: " + e.message); }
     setTimeout(() => setCoreSaving(null), 1500);
   };
 
@@ -330,9 +86,7 @@ export default function Knowledge() {
     try {
       await updateHighFreq(selected, highFreqDraft);
       setHighFreq(highFreqDraft);
-    } catch (e) {
-      alert("保存失败: " + e.message);
-    }
+    } catch (e) { alert("保存失败: " + e.message); }
     setTimeout(() => setHfSaving(false), 1500);
   };
 
@@ -345,9 +99,7 @@ export default function Knowledge() {
       setNewFileName("");
       setShowNewFile(false);
       loadCore(selected);
-    } catch (e) {
-      alert("创建失败: " + e.message);
-    }
+    } catch (e) { alert("创建失败: " + e.message); }
   };
 
   const handleDeleteFile = async (filename) => {
@@ -356,9 +108,7 @@ export default function Knowledge() {
       await deleteCoreKnowledge(selected, filename);
       setCoreFiles((prev) => prev.filter((f) => f.filename !== filename));
       if (expandedFile === filename) setExpandedFile(null);
-    } catch (e) {
-      alert("删除失败: " + e.message);
-    }
+    } catch (e) { alert("删除失败: " + e.message); }
   };
 
   const handleAddTopic = async () => {
@@ -367,15 +117,11 @@ export default function Knowledge() {
     if (!key || !name) return;
     try {
       await createTopic(key, name, newTopicIcon);
-      setNewTopicKey("");
-      setNewTopicName("");
-      setNewTopicIcon("📝");
+      setNewTopicKey(""); setNewTopicName(""); setNewTopicIcon("📝");
       setShowAddTopic(false);
-      const t = await refreshTopics();
+      await refreshTopics();
       setSelected(key);
-    } catch (e) {
-      alert("添加失败: " + e.message);
-    }
+    } catch (e) { alert("添加失败: " + e.message); }
   };
 
   const handleDeleteTopic = async (key) => {
@@ -384,221 +130,157 @@ export default function Knowledge() {
       await deleteTopic(key);
       const t = await refreshTopics();
       const keys = Object.keys(t);
-      if (selected === key) {
-        setSelected(keys.length > 0 ? keys[0] : null);
-      }
-    } catch (e) {
-      alert("删除失败: " + e.message);
-    }
+      if (selected === key) setSelected(keys.length > 0 ? keys[0] : null);
+    } catch (e) { alert("删除失败: " + e.message); }
   };
 
   const topicKeys = Object.keys(topics);
 
+  const selectTopic = (key) => {
+    setSelected(key);
+    setSidebarOpen(false);
+  };
+
   return (
-    <div style={styles.page}>
+    <div className="flex flex-1 overflow-hidden h-[calc(100vh-65px)]">
+      {/* Mobile sidebar toggle */}
+      <button
+        className="fixed bottom-4 right-4 z-40 md:hidden w-12 h-12 rounded-full bg-accent text-white text-xl flex items-center justify-center shadow-lg"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        {sidebarOpen ? "×" : "☰"}
+      </button>
+
       {/* Sidebar */}
-      <div style={styles.sidebar}>
-        <div style={styles.sidebarHeader}>
-          <div style={styles.sidebarTitle}>专项领域</div>
+      <div className={`
+        fixed inset-y-0 left-0 z-30 w-[200px] border-r border-border bg-bg p-4 flex flex-col transition-transform duration-200
+        md:static md:translate-x-0 md:shrink-0
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+      `}>
+        <div className="flex justify-between items-center mb-3 px-2">
+          <div className="text-[13px] font-semibold text-dim">专项领域</div>
           <button
-            style={styles.sidebarAddBtn}
+            className="w-6 h-6 rounded-md border border-border bg-transparent text-dim text-base flex items-center justify-center transition-all hover:bg-hover hover:text-text leading-none"
             title="新增领域"
             onClick={() => setShowAddTopic(true)}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-dim)"; }}
           >+</button>
         </div>
-        <div style={styles.topicList}>
+        <div className="flex-1 overflow-y-auto">
           {topicKeys.map((key) => (
-            <div
-              key={key}
-              className="topic-item"
-              style={styles.topicItem}
-              onMouseEnter={(e) => { const d = e.currentTarget.querySelector(".del-btn"); if (d) d.style.opacity = 1; }}
-              onMouseLeave={(e) => { const d = e.currentTarget.querySelector(".del-btn"); if (d) d.style.opacity = 0; }}
-            >
-              <div
-                style={{
-                  ...styles.topicBtn,
-                  ...(selected === key ? styles.topicBtnActive : {}),
-                }}
-                onClick={() => setSelected(key)}
+            <div key={key} className="relative mb-0.5 group">
+              <button
+                className={`w-full px-3 py-2.5 rounded-lg border-none text-sm text-left cursor-pointer flex items-center gap-2 transition-all
+                  ${selected === key ? "bg-hover text-text" : "bg-transparent text-dim hover:bg-hover"}`}
+                onClick={() => selectTopic(key)}
               >
                 <span>{topics[key]?.icon || "📝"}</span>
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {topics[key]?.name || key}
-                </span>
-              </div>
-              <button
-                className="del-btn"
-                title="删除领域"
-                style={{
-                  position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-                  background: "none", border: "none", color: "var(--text-dim)",
-                  cursor: "pointer", fontSize: 14, padding: "4px 6px", borderRadius: 4,
-                  opacity: 0, transition: "all 0.15s",
-                }}
-                onClick={() => handleDeleteTopic(key)}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "#e74c3c"; e.currentTarget.style.background = "rgba(231,76,60,0.1)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.background = "none"; }}
-              >
-                ×
+                <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{topics[key]?.name || key}</span>
               </button>
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent border-none text-dim cursor-pointer text-sm px-1.5 py-1 rounded opacity-0 group-hover:opacity-100 transition-all hover:text-red hover:bg-red/10"
+                title="删除领域"
+                onClick={() => handleDeleteTopic(key)}
+              >×</button>
             </div>
           ))}
         </div>
       </div>
 
+      {/* Backdrop for mobile sidebar */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-20 bg-black/40 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Add topic modal */}
       {showAddTopic && (
-        <div style={styles.modalOverlay} onClick={() => setShowAddTopic(false)}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalTitle}>新增训练领域</div>
-            <div style={styles.modalField}>
-              <label style={styles.modalLabel}>标识（英文，用于 API 路径）</label>
-              <input
-                style={styles.modalInput}
-                placeholder="docker"
-                value={newTopicKey}
-                onChange={(e) => setNewTopicKey(e.target.value)}
-                autoFocus
-              />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAddTopic(false)}>
+          <div className="bg-card border border-border rounded-2xl px-6 py-7 md:px-8 w-[380px] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <div className="text-lg font-semibold mb-5">新增训练领域</div>
+            <div className="mb-3.5">
+              <label className="text-[13px] text-dim mb-1.5 block">标识（英文，用于 API 路径）</label>
+              <input className="w-full px-3 py-2.5 rounded-lg border border-border bg-bg text-text text-sm" placeholder="docker" value={newTopicKey} onChange={(e) => setNewTopicKey(e.target.value)} autoFocus />
             </div>
-            <div style={styles.modalField}>
-              <label style={styles.modalLabel}>显示名称</label>
-              <input
-                style={styles.modalInput}
-                placeholder="Docker 容器化"
-                value={newTopicName}
-                onChange={(e) => setNewTopicName(e.target.value)}
-              />
+            <div className="mb-3.5">
+              <label className="text-[13px] text-dim mb-1.5 block">显示名称</label>
+              <input className="w-full px-3 py-2.5 rounded-lg border border-border bg-bg text-text text-sm" placeholder="Docker 容器化" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} />
             </div>
-            <div style={styles.modalField}>
-              <label style={styles.modalLabel}>图标 Emoji</label>
-              <input
-                style={{ ...styles.modalInput, width: 80 }}
-                value={newTopicIcon}
-                onChange={(e) => setNewTopicIcon(e.target.value)}
-                maxLength={4}
-              />
+            <div className="mb-3.5">
+              <label className="text-[13px] text-dim mb-1.5 block">图标 Emoji</label>
+              <input className="w-20 px-3 py-2.5 rounded-lg border border-border bg-bg text-text text-sm" value={newTopicIcon} onChange={(e) => setNewTopicIcon(e.target.value)} maxLength={4} />
             </div>
-            <div style={styles.modalBtnRow}>
-              <button
-                style={styles.btn}
-                onClick={() => { setShowAddTopic(false); setNewTopicKey(""); setNewTopicName(""); setNewTopicIcon("📝"); }}
-              >
-                取消
-              </button>
-              <button
-                style={{ ...styles.btn, ...styles.btnPrimary }}
-                onClick={handleAddTopic}
-                disabled={!newTopicKey.trim() || !newTopicName.trim()}
-              >
-                添加
-              </button>
+            <div className="flex gap-2.5 justify-end mt-6">
+              <button className="px-5 py-2 rounded-lg border border-border bg-hover text-text text-[13px] cursor-pointer" onClick={() => { setShowAddTopic(false); setNewTopicKey(""); setNewTopicName(""); setNewTopicIcon("📝"); }}>取消</button>
+              <button className="px-5 py-2 rounded-lg bg-accent text-white text-[13px] cursor-pointer disabled:opacity-40" onClick={handleAddTopic} disabled={!newTopicKey.trim() || !newTopicName.trim()}>添加</button>
             </div>
           </div>
         </div>
       )}
 
       {/* Main area */}
-      <div style={styles.main}>
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Tabs */}
-        <div style={styles.tabs}>
+        <div className="flex border-b border-border px-4 md:px-6 bg-card">
           <button
-            style={{ ...styles.tab, ...(tab === "core" ? styles.tabActive : {}) }}
+            className={`px-4 py-3 md:px-5 text-sm border-b-2 transition-all cursor-pointer ${tab === "core" ? "text-text border-b-accent" : "text-dim border-b-transparent bg-transparent"}`}
             onClick={() => setTab("core")}
-          >
-            核心知识库
-          </button>
+          >核心知识库</button>
           <button
-            style={{ ...styles.tab, ...(tab === "high_freq" ? styles.tabActive : {}) }}
+            className={`px-4 py-3 md:px-5 text-sm border-b-2 transition-all cursor-pointer ${tab === "high_freq" ? "text-text border-b-accent" : "text-dim border-b-transparent bg-transparent"}`}
             onClick={() => setTab("high_freq")}
-          >
-            高频题库
-          </button>
+          >高频题库</button>
         </div>
 
         {/* Content */}
-        <div style={styles.content}>
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {!selected ? (
-            <div style={styles.empty}>选择一个领域</div>
+            <div className="text-center py-15 text-dim text-sm">选择一个领域</div>
           ) : tab === "core" ? (
             <div>
-              <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 12 }}>
+              <div className="text-[13px] text-dim mb-3">
                 AI 出题和评分的参考依据，编辑后影响该领域的题目质量。支持 Markdown 格式。
               </div>
-              <div style={styles.addBar}>
+              <div className="flex gap-2 mb-4">
                 {showNewFile ? (
                   <>
-                    <input
-                      style={styles.input}
-                      placeholder="文件名 (例: 装饰器.md)"
-                      value={newFileName}
-                      onChange={(e) => setNewFileName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleCreateFile()}
-                    />
-                    <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={handleCreateFile}>
-                      创建
-                    </button>
-                    <button style={styles.btn} onClick={() => { setShowNewFile(false); setNewFileName(""); }}>
-                      取消
-                    </button>
+                    <input className="flex-1 px-3 py-2 rounded-lg border border-border bg-bg text-text text-[13px]" placeholder="文件名 (例: 装饰器.md)" value={newFileName} onChange={(e) => setNewFileName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCreateFile()} />
+                    <button className="px-5 py-2 rounded-lg bg-accent text-white text-[13px] cursor-pointer" onClick={handleCreateFile}>创建</button>
+                    <button className="px-5 py-2 rounded-lg border border-border bg-hover text-text text-[13px] cursor-pointer" onClick={() => { setShowNewFile(false); setNewFileName(""); }}>取消</button>
                   </>
                 ) : (
-                  <button style={styles.btn} onClick={() => setShowNewFile(true)}>
-                    + 新增文件
-                  </button>
+                  <button className="px-5 py-2 rounded-lg border border-border bg-hover text-text text-[13px] cursor-pointer" onClick={() => setShowNewFile(true)}>+ 新增文件</button>
                 )}
               </div>
 
               {coreFiles.length === 0 ? (
-                <div style={styles.empty}>该领域暂无知识文件</div>
+                <div className="text-center py-15 text-dim text-sm">该领域暂无知识文件</div>
               ) : (
-                <div style={styles.fileList}>
+                <div className="flex flex-col gap-3">
                   {coreFiles.map((f) => (
-                    <div key={f.filename} style={styles.fileCard}>
+                    <div key={f.filename} className="bg-card border border-border rounded-box overflow-hidden">
                       <div
-                        style={styles.fileHeader}
+                        className="flex justify-between items-center px-4 py-3 cursor-pointer text-sm font-medium"
                         onClick={() => setExpandedFile(expandedFile === f.filename ? null : f.filename)}
                       >
                         <span>{f.filename}</span>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
-                            {expandedFile === f.filename ? "▼" : "▶"} {(f.content?.length || 0)} 字
-                          </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-dim">{expandedFile === f.filename ? "▼" : "▶"} {(f.content?.length || 0)} 字</span>
                           <button
+                            className="bg-transparent border-none text-dim cursor-pointer text-sm px-1.5 py-0.5 rounded opacity-50 transition-all hover:text-red hover:opacity-100"
                             title="删除文件"
-                            style={{
-                              background: "none", border: "none", color: "var(--text-dim)",
-                              cursor: "pointer", fontSize: 14, padding: "2px 6px", borderRadius: 4,
-                              opacity: 0.5, transition: "all 0.15s",
-                            }}
                             onClick={(e) => { e.stopPropagation(); handleDeleteFile(f.filename); }}
-                            onMouseEnter={(e) => { e.currentTarget.style.color = "#e74c3c"; e.currentTarget.style.opacity = 1; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-dim)"; e.currentTarget.style.opacity = 0.5; }}
-                          >
-                            &#x2715;
-                          </button>
+                          >&#x2715;</button>
                         </div>
                       </div>
                       {expandedFile === f.filename && (
-                        <div style={styles.fileContent}>
+                        <div className="border-t border-border p-4">
                           <textarea
-                            style={styles.textarea}
+                            className="w-full min-h-[300px] p-3 rounded-lg border border-border bg-bg text-text text-[13px] font-mono leading-relaxed resize-y"
                             value={editContent[f.filename] ?? f.content}
-                            onChange={(e) =>
-                              setEditContent((prev) => ({ ...prev, [f.filename]: e.target.value }))
-                            }
+                            onChange={(e) => setEditContent((prev) => ({ ...prev, [f.filename]: e.target.value }))}
                           />
-                          <div style={styles.btnRow}>
-                            {coreSaving === f.filename && <span style={styles.saving}>已保存</span>}
-                            <button
-                              style={{ ...styles.btn, ...styles.btnPrimary }}
-                              onClick={() => handleSaveCore(f.filename)}
-                            >
-                              保存
-                            </button>
+                          <div className="flex gap-2 mt-3 justify-end">
+                            {coreSaving === f.filename && <span className="text-xs text-green self-center mr-3">已保存</span>}
+                            <button className="px-5 py-2 rounded-lg bg-accent text-white text-[13px] cursor-pointer" onClick={() => handleSaveCore(f.filename)}>保存</button>
                           </div>
                         </div>
                       )}
@@ -609,29 +291,21 @@ export default function Knowledge() {
             </div>
           ) : (
             <div>
-              <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 12 }}>
+              <div className="text-[13px] text-dim mb-3">
                 标记的高频面试考点，出题时会优先覆盖。支持 Markdown 格式。
               </div>
               <textarea
-                style={{ ...styles.textarea, minHeight: 500 }}
+                className="w-full min-h-[500px] p-3 rounded-lg border border-border bg-bg text-text text-[13px] font-mono leading-relaxed resize-y"
                 value={highFreqDraft}
                 onChange={(e) => setHighFreqDraft(e.target.value)}
                 placeholder={"# 高频题\n\n## 1. xxx原理是什么？为什么这样设计？\n\n## 2. 实际项目中遇到xxx问题怎么解决？"}
               />
-              <div style={styles.btnRow}>
-                {hfSaving && <span style={styles.saving}>已保存</span>}
+              <div className="flex gap-2 mt-3 justify-end">
+                {hfSaving && <span className="text-xs text-green self-center mr-3">已保存</span>}
                 {highFreqDraft !== highFreq && (
-                  <button style={styles.btn} onClick={() => setHighFreqDraft(highFreq)}>
-                    撤销修改
-                  </button>
+                  <button className="px-5 py-2 rounded-lg border border-border bg-hover text-text text-[13px] cursor-pointer" onClick={() => setHighFreqDraft(highFreq)}>撤销修改</button>
                 )}
-                <button
-                  style={{ ...styles.btn, ...styles.btnPrimary }}
-                  onClick={handleSaveHighFreq}
-                  disabled={highFreqDraft === highFreq}
-                >
-                  保存
-                </button>
+                <button className="px-5 py-2 rounded-lg bg-accent text-white text-[13px] cursor-pointer disabled:opacity-40" onClick={handleSaveHighFreq} disabled={highFreqDraft === highFreq}>保存</button>
               </div>
             </div>
           )}

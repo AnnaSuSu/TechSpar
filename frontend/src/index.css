@@ -1,9 +1,36 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@import "tailwindcss";
+
+/* ── Tailwind theme tokens mapped to CSS variables ── */
+@theme {
+  --color-bg: var(--bg);
+  --color-card: var(--bg-card);
+  --color-hover: var(--bg-hover);
+  --color-input: var(--bg-input);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-dim: var(--text-dim);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-green: var(--green);
+  --color-red: var(--red);
+  --color-orange: var(--orange);
+  --radius-box: 12px;
+
+  --animate-fade-in: fade-in 0.3s ease;
+  --animate-pulse-dot: pulse-dot 1.4s infinite;
 }
 
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-dot {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+/* ── CSS variable definitions (dark default) ── */
 :root {
   --bg: #0a0a0f;
   --bg-card: #12121a;
@@ -17,7 +44,6 @@
   --green: #00b894;
   --red: #e17055;
   --orange: #fdcb6e;
-  --radius: 12px;
 }
 
 [data-theme="light"] {
@@ -35,6 +61,7 @@
   --orange: #e8a900;
 }
 
+/* ── Base resets ── */
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   background: var(--bg);
@@ -66,7 +93,7 @@ a {
   text-decoration: none;
 }
 
-/* Markdown in chat bubbles */
+/* ── Markdown in chat bubbles ── */
 .md-content p { margin: 0 0 8px; }
 .md-content p:last-child { margin-bottom: 0; }
 .md-content strong { color: var(--text); font-weight: 600; }
@@ -85,6 +112,10 @@ a {
   padding: 12px 16px;
   margin: 8px 0;
   overflow-x: auto;
+}
+@media (max-width: 768px) {
+  .md-content pre { padding: 8px 12px; }
+  .md-content code { font-size: 12px; }
 }
 .md-content pre code {
   background: none;

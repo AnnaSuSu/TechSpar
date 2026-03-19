@@ -4,286 +4,6 @@ import ReactMarkdown from "react-markdown";
 import ChatBubble from "../components/ChatBubble";
 import { sendMessage, endInterview } from "../api/interview";
 
-const styles = {
-  page: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    height: "calc(100vh - 65px)",
-  },
-  topBar: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "12px 24px",
-    borderBottom: "1px solid var(--border)",
-    background: "var(--bg-card)",
-  },
-  sessionInfo: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-  },
-  badge: {
-    padding: "4px 10px",
-    borderRadius: 6,
-    fontSize: 12,
-    fontWeight: 500,
-  },
-  endBtn: {
-    padding: "8px 20px",
-    borderRadius: 8,
-    background: "rgba(225,112,85,0.15)",
-    color: "var(--red)",
-    fontSize: 14,
-    fontWeight: 500,
-    transition: "all 0.2s",
-  },
-  // Chat mode styles
-  chatArea: {
-    flex: 1,
-    overflowY: "auto",
-    padding: "32px 24px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 28,
-    maxWidth: 800,
-    width: "100%",
-    margin: "0 auto",
-  },
-  inputArea: {
-    padding: "16px 24px 24px",
-    background: "transparent",
-    display: "flex",
-    justifyContent: "center",
-  },
-  inputWrapper: {
-    position: "relative",
-    width: "100%",
-    maxWidth: 800,
-  },
-  textarea: {
-    width: "100%",
-    padding: "16px 20px",
-    borderRadius: 16,
-    border: "1px solid var(--border)",
-    background: "var(--bg-card)",
-    color: "var(--text)",
-    resize: "none",
-    outline: "none",
-    minHeight: 80,
-    maxHeight: 240,
-    lineHeight: 1.5,
-    fontSize: 15,
-    boxSizing: "border-box",
-  },
-  sendBtn: {
-    position: "absolute",
-    right: 8,
-    bottom: 8,
-    width: 36,
-    height: 36,
-    borderRadius: "50%",
-    background: "var(--accent)",
-    color: "#fff",
-    fontWeight: 500,
-    fontSize: 16,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "opacity 0.2s",
-    padding: 0,
-  },
-  thinking: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "12px 16px",
-    color: "var(--text-dim)",
-    fontSize: 14,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: "50%",
-    background: "var(--accent-light)",
-    animation: "pulse 1.4s infinite",
-  },
-  progressBar: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: 13,
-    color: "var(--text-dim)",
-  },
-  // Drill card mode styles
-  drillArea: {
-    flex: 1,
-    overflowY: "auto",
-    padding: "32px 24px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 20,
-  },
-  questionCard: {
-    width: "100%",
-    maxWidth: 720,
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: 16,
-    padding: "28px 32px",
-    animation: "fadeIn 0.3s ease",
-  },
-  questionHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  questionLabel: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: "var(--accent-light)",
-    background: "rgba(108,92,231,0.12)",
-    padding: "4px 12px",
-    borderRadius: 6,
-  },
-  difficultyLabel: {
-    fontSize: 13,
-    color: "var(--text-dim)",
-  },
-  focusArea: {
-    fontSize: 12,
-    color: "var(--text-dim)",
-    background: "var(--bg-hover)",
-    padding: "3px 8px",
-    borderRadius: 4,
-  },
-  questionBody: {
-    fontSize: 16,
-    lineHeight: 1.8,
-  },
-  drillInputArea: {
-    width: "100%",
-    maxWidth: 720,
-    padding: "16px 0",
-    display: "flex",
-    gap: 12,
-  },
-  drillTextarea: {
-    flex: 1,
-    padding: "14px 18px",
-    borderRadius: "var(--radius)",
-    border: "1px solid var(--border)",
-    background: "var(--bg-input)",
-    color: "var(--text)",
-    resize: "none",
-    outline: "none",
-    minHeight: 80,
-    maxHeight: 240,
-    lineHeight: 1.6,
-    fontSize: 15,
-  },
-  drillBtnGroup: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-    alignSelf: "flex-end",
-  },
-  submitBtn: {
-    padding: "14px 28px",
-    borderRadius: "var(--radius)",
-    background: "var(--accent)",
-    color: "#fff",
-    fontWeight: 600,
-    fontSize: 15,
-    transition: "opacity 0.2s",
-  },
-  skipBtn: {
-    padding: "8px 16px",
-    borderRadius: "var(--radius)",
-    background: "transparent",
-    color: "var(--text-dim)",
-    fontSize: 13,
-    border: "1px solid var(--border)",
-    transition: "all 0.2s",
-  },
-  prevBtn: {
-    padding: "6px 0",
-    background: "transparent",
-    color: "var(--text-dim)",
-    fontSize: 13,
-    border: "none",
-    cursor: "pointer",
-    transition: "color 0.2s",
-  },
-  drillProgress: {
-    width: "100%",
-    maxWidth: 720,
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-  },
-  progressTrack: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-    background: "var(--border)",
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 2,
-    background: "var(--accent)",
-    transition: "width 0.3s ease",
-  },
-  progressText: {
-    fontSize: 13,
-    color: "var(--text-dim)",
-    whiteSpace: "nowrap",
-  },
-  // Answered list below current question
-  answeredPreview: {
-    width: "100%",
-    maxWidth: 720,
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-    marginTop: 8,
-  },
-  answeredItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "8px 12px",
-    background: "var(--bg-hover)",
-    borderRadius: 8,
-    fontSize: 13,
-    color: "var(--text-dim)",
-  },
-  answeredCheck: {
-    color: "var(--green)",
-    fontWeight: 600,
-  },
-  answeredSkip: {
-    color: "var(--text-dim)",
-    opacity: 0.5,
-  },
-  submittingOverlay: {
-    width: "100%",
-    maxWidth: 720,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-    padding: 60,
-    color: "var(--text-dim)",
-    fontSize: 16,
-  },
-};
-
 export default function Interview() {
   const { sessionId } = useParams();
   const location = useLocation();
@@ -305,11 +25,10 @@ export default function Interview() {
   // Drill mode state
   const [questions] = useState(initData.questions || []);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState({}); // {question_id: answer_text}
+  const [answers, setAnswers] = useState({});
   const [drillInput, setDrillInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Resume mode: initialize first AI message
   useEffect(() => {
     if (!isDrill && initData.message) {
       setMessages([{ role: "assistant", content: initData.message }]);
@@ -317,16 +36,11 @@ export default function Interview() {
   }, []);
 
   useEffect(() => {
-    if (!isDrill) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+    if (!isDrill) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
 
-  // Focus textarea when question changes
   useEffect(() => {
-    if (isDrill) {
-      textareaRef.current?.focus();
-    }
+    if (isDrill) textareaRef.current?.focus();
   }, [currentIndex]);
 
   // ── Drill handlers ──
@@ -337,25 +51,17 @@ export default function Interview() {
   const handleDrillSubmit = () => {
     const text = drillInput.trim();
     if (!text || !currentQ) return;
-
     setAnswers((prev) => ({ ...prev, [currentQ.id]: text }));
     setDrillInput("");
-
-    if (currentIndex < totalQ - 1) {
-      setCurrentIndex((i) => i + 1);
-    } else {
-      setFinished(true);
-    }
+    if (currentIndex < totalQ - 1) setCurrentIndex((i) => i + 1);
+    else setFinished(true);
   };
 
   const handleSkip = () => {
     if (!currentQ) return;
     setDrillInput("");
-    if (currentIndex < totalQ - 1) {
-      setCurrentIndex((i) => i + 1);
-    } else {
-      setFinished(true);
-    }
+    if (currentIndex < totalQ - 1) setCurrentIndex((i) => i + 1);
+    else setFinished(true);
   };
 
   const handlePrev = () => {
@@ -373,14 +79,7 @@ export default function Interview() {
       }));
       const data = await endInterview(sessionId, answerList);
       navigate(`/review/${sessionId}`, {
-        state: {
-          review: data.review,
-          scores: data.scores,
-          overall: data.overall,
-          questions,
-          answers: answerList,
-          mode: "topic_drill",
-        },
+        state: { review: data.review, scores: data.scores, overall: data.overall, questions, answers: answerList, mode: "topic_drill" },
       });
     } catch (err) {
       alert("评估失败: " + err.message);
@@ -393,21 +92,16 @@ export default function Interview() {
   const handleSend = async () => {
     const text = input.trim();
     if (!text || sending) return;
-
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setInput("");
     setSending(true);
-
     try {
       const data = await sendMessage(sessionId, text);
       setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
       if (data.progress) setProgress(data.progress);
       if (data.is_finished) setFinished(true);
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `[错误] ${err.message}` },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: `[错误] ${err.message}` }]);
     } finally {
       setSending(false);
       textareaRef.current?.focus();
@@ -418,9 +112,7 @@ export default function Interview() {
     setReviewing(true);
     try {
       const data = await endInterview(sessionId);
-      navigate(`/review/${sessionId}`, {
-        state: { review: data.review, messages, mode: "resume" },
-      });
+      navigate(`/review/${sessionId}`, { state: { review: data.review, messages, mode: "resume" } });
     } catch (err) {
       alert("复盘生成失败: " + err.message);
     } finally {
@@ -431,39 +123,27 @@ export default function Interview() {
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      if (isDrill) {
-        handleDrillSubmit();
-      } else {
-        handleSend();
-      }
+      isDrill ? handleDrillSubmit() : handleSend();
     }
   };
 
   const modeBadge = isDrill
-    ? { text: "专项训练", bg: "rgba(0,184,148,0.15)", color: "var(--green)" }
-    : { text: "简历面试", bg: "rgba(108,92,231,0.15)", color: "var(--accent-light)" };
+    ? { text: "专项训练", cls: "bg-green/15 text-green" }
+    : { text: "简历面试", cls: "bg-accent/15 text-accent-light" };
 
   // ── Drill card mode ──
   if (isDrill) {
     return (
-      <div style={styles.page}>
+      <div className="flex-1 flex flex-col h-[calc(100vh-65px)]">
         {/* Top bar */}
-        <div style={styles.topBar}>
-          <div style={styles.sessionInfo}>
-            <span style={{ ...styles.badge, background: modeBadge.bg, color: modeBadge.color }}>
-              {modeBadge.text}
-            </span>
-            {initData.topic && (
-              <span style={{ fontSize: 14, color: "var(--text-dim)" }}>
-                {initData.topic}
-              </span>
-            )}
-            <div style={styles.progressBar}>
-              <span>{answeredCount}/{totalQ} 已答</span>
-            </div>
+        <div className="flex items-center justify-between px-4 py-3 md:px-6 border-b border-border bg-card">
+          <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+            <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${modeBadge.cls}`}>{modeBadge.text}</span>
+            {initData.topic && <span className="text-sm text-dim">{initData.topic}</span>}
+            <div className="text-[13px] text-dim">{answeredCount}/{totalQ} 已答</div>
           </div>
           <button
-            style={{ ...styles.endBtn, opacity: submitting ? 0.4 : 1 }}
+            className={`px-4 py-2 md:px-5 rounded-lg bg-red/15 text-red text-sm font-medium transition-all ${submitting ? "opacity-40" : ""}`}
             onClick={handleEndDrill}
             disabled={submitting}
           >
@@ -471,52 +151,34 @@ export default function Interview() {
           </button>
         </div>
 
-        <div style={styles.drillArea}>
+        <div className="flex-1 overflow-y-auto px-4 py-6 md:px-6 md:py-8 flex flex-col items-center gap-5">
           {submitting ? (
-            <div style={styles.submittingOverlay}>
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ ...styles.dot, animationDelay: "0s" }} />
-                <div style={{ ...styles.dot, animationDelay: "0.2s" }} />
-                <div style={{ ...styles.dot, animationDelay: "0.4s" }} />
+            <div className="w-full max-w-[720px] flex flex-col items-center justify-center gap-4 py-15 text-dim text-base">
+              <div className="flex gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-light animate-pulse-dot" />
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-light animate-pulse-dot [animation-delay:0.2s]" />
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-light animate-pulse-dot [animation-delay:0.4s]" />
               </div>
               <span>正在批量评估你的回答...</span>
-              <span style={{ fontSize: 13, color: "var(--text-dim)", opacity: 0.6 }}>
-                AI 将对 {totalQ} 道题逐一点评
-              </span>
+              <span className="text-[13px] text-dim opacity-60">AI 将对 {totalQ} 道题逐一点评</span>
             </div>
           ) : finished ? (
-            // All questions answered, show summary before submitting
-            <div style={{ width: "100%", maxWidth: 720 }}>
-              <div style={{
-                background: "var(--bg-card)",
-                border: "1px solid var(--border)",
-                borderRadius: 16,
-                padding: "28px 32px",
-                textAlign: "center",
-              }}>
-                <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 12 }}>
-                  训练完成
-                </div>
-                <div style={{ fontSize: 15, color: "var(--text-dim)", marginBottom: 24, lineHeight: 1.6 }}>
+            <div className="w-full max-w-[720px]">
+              <div className="bg-card border border-border rounded-2xl px-6 py-7 md:px-8 text-center">
+                <div className="text-xl font-semibold mb-3">训练完成</div>
+                <div className="text-[15px] text-dim mb-6 leading-relaxed">
                   共 {totalQ} 题，已回答 {answeredCount} 题，跳过 {totalQ - answeredCount} 题
                 </div>
-                <button
-                  style={{ ...styles.submitBtn, padding: "14px 40px", fontSize: 16 }}
-                  onClick={handleEndDrill}
-                >
+                <button className="px-10 py-3.5 rounded-box bg-accent text-white font-semibold text-base" onClick={handleEndDrill}>
                   提交评估
                 </button>
               </div>
-
-              {/* Preview answered questions */}
-              <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 6 }}>
-                {questions.map((q, i) => (
-                  <div key={q.id} style={styles.answeredItem}>
-                    {answers[q.id] ? (
-                      <span style={styles.answeredCheck}>✓</span>
-                    ) : (
-                      <span style={styles.answeredSkip}>—</span>
-                    )}
+              <div className="mt-5 flex flex-col gap-1.5">
+                {questions.map((q) => (
+                  <div key={q.id} className="flex items-center gap-2 px-3 py-2 bg-hover rounded-lg text-[13px] text-dim">
+                    {answers[q.id]
+                      ? <span className="text-green font-semibold">✓</span>
+                      : <span className="text-dim opacity-50">—</span>}
                     <span>Q{q.id}: {q.question.slice(0, 60)}{q.question.length > 60 ? "..." : ""}</span>
                   </div>
                 ))}
@@ -525,70 +187,63 @@ export default function Interview() {
           ) : currentQ ? (
             <>
               {/* Progress bar */}
-              <div style={styles.drillProgress}>
-                <div style={styles.progressTrack}>
-                  <div
-                    style={{
-                      ...styles.progressFill,
-                      width: `${((currentIndex) / totalQ) * 100}%`,
-                    }}
-                  />
+              <div className="w-full max-w-[720px] flex items-center gap-2">
+                <div className="flex-1 h-1 rounded-sm bg-border overflow-hidden">
+                  <div className="h-full rounded-sm bg-accent transition-[width] duration-300 ease-in-out" style={{ width: `${(currentIndex / totalQ) * 100}%` }} />
                 </div>
-                <span style={styles.progressText}>{currentIndex + 1} / {totalQ}</span>
+                <span className="text-[13px] text-dim whitespace-nowrap">{currentIndex + 1} / {totalQ}</span>
               </div>
 
               {/* Question card */}
-              <div style={styles.questionCard}>
-                <div style={styles.questionHeader}>
-                  <span style={styles.questionLabel}>Q{currentQ.id}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="w-full max-w-[720px] bg-card border border-border rounded-2xl px-5 py-6 md:px-8 md:py-7 animate-fade-in">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[13px] font-semibold text-accent-light bg-accent/12 px-3 py-1 rounded-md">Q{currentQ.id}</span>
+                  <div className="flex items-center gap-2">
                     {currentQ.focus_area && (
-                      <span style={styles.focusArea}>{currentQ.focus_area}</span>
+                      <span className="text-xs text-dim bg-hover px-2 py-0.5 rounded">{currentQ.focus_area}</span>
                     )}
                     {currentQ.difficulty && (
-                      <span style={styles.difficultyLabel}>
+                      <span className="text-[13px] text-dim">
                         {"★".repeat(currentQ.difficulty)}{"☆".repeat(5 - currentQ.difficulty)}
                       </span>
                     )}
                   </div>
                 </div>
-                <div style={styles.questionBody}>
+                <div className="text-base leading-[1.8]">
                   <div className="md-content">
                     <ReactMarkdown>{currentQ.question}</ReactMarkdown>
                   </div>
                 </div>
               </div>
 
-              {/* Input */}
-              <div style={styles.drillInputArea}>
+              {/* Input area */}
+              <div className="w-full max-w-[720px] flex flex-col md:flex-row gap-3 py-2">
                 <textarea
                   ref={textareaRef}
-                  style={styles.drillTextarea}
+                  className="flex-1 px-4 py-3.5 rounded-box border border-border bg-input text-text resize-none outline-none min-h-[80px] max-h-[240px] leading-relaxed text-[15px]"
                   value={drillInput}
                   onChange={(e) => setDrillInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="输入你的回答... (Enter 提交, Shift+Enter 换行)"
                   rows={3}
                 />
-                <div style={styles.drillBtnGroup}>
+                <div className="flex md:flex-col gap-2 self-end md:self-end">
                   <button
-                    style={{ ...styles.submitBtn, opacity: !drillInput.trim() ? 0.4 : 1 }}
+                    className={`px-7 py-3.5 rounded-box bg-accent text-white font-semibold text-[15px] transition-opacity ${!drillInput.trim() ? "opacity-40" : ""}`}
                     onClick={handleDrillSubmit}
                     disabled={!drillInput.trim()}
                   >
                     {currentIndex < totalQ - 1 ? "下一题" : "完成"}
                   </button>
-                  <button style={styles.skipBtn} onClick={handleSkip}>
+                  <button className="px-4 py-2 rounded-box bg-transparent text-dim text-[13px] border border-border transition-all hover:bg-hover" onClick={handleSkip}>
                     跳过
                   </button>
                 </div>
               </div>
+
               {currentIndex > 0 && (
-                <div style={{ width: "100%", maxWidth: 720 }}>
-                  <button
-                    style={styles.prevBtn}
-                    onClick={handlePrev}
-                  >
+                <div className="w-full max-w-[720px]">
+                  <button className="py-1.5 bg-transparent text-dim text-[13px] border-none cursor-pointer transition-colors hover:text-text" onClick={handlePrev}>
                     ← 上一题
                   </button>
                 </div>
@@ -596,43 +251,26 @@ export default function Interview() {
             </>
           ) : null}
         </div>
-
-        <style>{`
-          @keyframes pulse {
-            0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-            40% { opacity: 1; transform: scale(1); }
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-        `}</style>
       </div>
     );
   }
 
   // ── Chat mode (resume interview) ──
   return (
-    <div style={styles.page}>
-      <div style={styles.topBar}>
-        <div style={styles.sessionInfo}>
-          <span style={{ ...styles.badge, background: modeBadge.bg, color: modeBadge.color }}>
-            {modeBadge.text}
-          </span>
-          {initData.topic && (
-            <span style={{ fontSize: 14, color: "var(--text-dim)" }}>
-              {initData.topic}
-            </span>
-          )}
+    <div className="flex-1 flex flex-col h-[calc(100vh-65px)]">
+      <div className="flex items-center justify-between px-4 py-3 md:px-6 border-b border-border bg-card">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${modeBadge.cls}`}>{modeBadge.text}</span>
+          {initData.topic && <span className="text-sm text-dim">{initData.topic}</span>}
           {progress && (
-            <div style={styles.progressBar}>
+            <div className="text-[13px] text-dim flex items-center gap-1.5">
               <span>|</span>
               <span>进度: {progress}</span>
             </div>
           )}
         </div>
         <button
-          style={styles.endBtn}
+          className="px-4 py-2 md:px-5 rounded-lg bg-red/15 text-red text-sm font-medium transition-all"
           onClick={handleEndResume}
           disabled={reviewing}
         >
@@ -640,26 +278,26 @@ export default function Interview() {
         </button>
       </div>
 
-      <div style={styles.chatArea}>
+      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-6 md:py-8 flex flex-col gap-7 max-w-3xl w-full mx-auto">
         {messages.map((msg, i) => (
           <ChatBubble key={i} role={msg.role} content={msg.content} />
         ))}
         {sending && (
-          <div style={styles.thinking}>
-            <div style={{ ...styles.dot, animationDelay: "0s" }} />
-            <div style={{ ...styles.dot, animationDelay: "0.2s" }} />
-            <div style={{ ...styles.dot, animationDelay: "0.4s" }} />
-            <span style={{ marginLeft: 4 }}>面试官思考中...</span>
+          <div className="flex items-center gap-2 px-4 py-3 text-dim text-sm">
+            <div className="w-1.5 h-1.5 rounded-full bg-accent-light animate-pulse-dot" />
+            <div className="w-1.5 h-1.5 rounded-full bg-accent-light animate-pulse-dot [animation-delay:0.2s]" />
+            <div className="w-1.5 h-1.5 rounded-full bg-accent-light animate-pulse-dot [animation-delay:0.4s]" />
+            <span className="ml-1">面试官思考中...</span>
           </div>
         )}
         <div ref={chatEndRef} />
       </div>
 
-      <div style={styles.inputArea}>
-        <div style={styles.inputWrapper}>
+      <div className="px-4 pt-4 pb-5 md:px-6 md:pb-6 flex justify-center">
+        <div className="relative w-full max-w-3xl">
           <textarea
             ref={textareaRef}
-            style={styles.textarea}
+            className="w-full px-4 py-4 md:px-5 rounded-2xl border border-border bg-card text-text resize-none outline-none min-h-[80px] max-h-[240px] leading-normal text-[15px]"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -669,17 +307,6 @@ export default function Interview() {
           />
         </div>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-          40% { opacity: 1; transform: scale(1); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }

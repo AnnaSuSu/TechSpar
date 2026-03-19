@@ -1,112 +1,99 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
-const styles = {
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "16px 24px",
-    borderBottom: "1px solid var(--border)",
-    background: "var(--bg-card)",
-  },
-  logo: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    cursor: "pointer",
-  },
-  logoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    objectFit: "contain",
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 600,
-    color: "var(--text)",
-  },
-  nav: {
-    display: "flex",
-    gap: 8,
-  },
-  navBtn: {
-    padding: "6px 16px",
-    borderRadius: 8,
-    background: "transparent",
-    color: "var(--text-dim)",
-    fontSize: 14,
-    transition: "all 0.2s",
-  },
-  navBtnActive: {
-    background: "var(--bg-hover)",
-    color: "var(--text)",
-  },
-  themeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    background: "var(--bg-hover)",
-    border: "1px solid var(--border)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 18,
-    cursor: "pointer",
-    transition: "all 0.2s",
-    marginLeft: 8,
-  },
-};
+const NAV_ITEMS = [
+  { path: "/", label: "首页" },
+  { path: "/profile", label: "我的画像" },
+  { path: "/knowledge", label: "题库" },
+  { path: "/history", label: "历史记录" },
+];
 
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
   }, [theme]);
 
+  // Close menu on route change
+  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+
   const toggleTheme = () => setTheme(t => t === "dark" ? "light" : "dark");
   const isActive = (path) => location.pathname === path;
 
   return (
-    <header style={styles.header}>
-      <div style={styles.logo} onClick={() => navigate("/")}>
-        <img src="/logo.png" alt="TechSpar" style={styles.logoIcon} />
-        <span style={styles.title}>TechSpar</span>
+    <header className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-border bg-card relative">
+      {/* Logo */}
+      <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate("/")}>
+        <img src="/logo.png" alt="TechSpar" className="w-8 h-8 rounded-lg object-contain" />
+        <span className="text-lg font-semibold text-text">TechSpar</span>
       </div>
-      <nav style={styles.nav}>
+
+      {/* Desktop nav */}
+      <nav className="hidden md:flex items-center gap-2">
+        {NAV_ITEMS.map(({ path, label }) => (
+          <button
+            key={path}
+            className={`px-4 py-1.5 rounded-lg text-sm transition-all ${
+              isActive(path) ? "bg-hover text-text" : "bg-transparent text-dim hover:text-text hover:bg-hover"
+            }`}
+            onClick={() => navigate(path)}
+          >
+            {label}
+          </button>
+        ))}
         <button
-          style={{ ...styles.navBtn, ...(isActive("/") ? styles.navBtnActive : {}) }}
-          onClick={() => navigate("/")}
+          className="w-9 h-9 rounded-lg bg-hover border border-border flex items-center justify-center text-lg ml-2 transition-all"
+          onClick={toggleTheme}
+          title={theme === "dark" ? "切换亮色" : "切换暗色"}
         >
-          首页
-        </button>
-        <button
-          style={{ ...styles.navBtn, ...(isActive("/profile") ? styles.navBtnActive : {}) }}
-          onClick={() => navigate("/profile")}
-        >
-          我的画像
-        </button>
-        <button
-          style={{ ...styles.navBtn, ...(isActive("/knowledge") ? styles.navBtnActive : {}) }}
-          onClick={() => navigate("/knowledge")}
-        >
-          题库
-        </button>
-        <button
-          style={{ ...styles.navBtn, ...(isActive("/history") ? styles.navBtnActive : {}) }}
-          onClick={() => navigate("/history")}
-        >
-          历史记录
-        </button>
-        <button style={styles.themeBtn} onClick={toggleTheme} title={theme === "dark" ? "切换亮色" : "切换暗色"}>
           {theme === "dark" ? "☀️" : "🌙"}
         </button>
       </nav>
+
+      {/* Mobile: theme + hamburger */}
+      <div className="flex md:hidden items-center gap-2">
+        <button
+          className="w-9 h-9 rounded-lg bg-hover border border-border flex items-center justify-center text-lg transition-all"
+          onClick={toggleTheme}
+        >
+          {theme === "dark" ? "☀️" : "🌙"}
+        </button>
+        <button
+          className="w-9 h-9 rounded-lg bg-hover border border-border flex items-center justify-center transition-all"
+          onClick={() => setMenuOpen(o => !o)}
+          aria-label="菜单"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            {menuOpen ? (
+              <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+            ) : (
+              <><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>
+            )}
+          </svg>
+        </button>
+      </div>
+
+      {/* Mobile dropdown */}
+      {menuOpen && (
+        <nav className="absolute top-full left-0 right-0 bg-card border-b border-border flex flex-col py-2 z-50 md:hidden animate-fade-in">
+          {NAV_ITEMS.map(({ path, label }) => (
+            <button
+              key={path}
+              className={`px-6 py-3 text-left text-sm transition-all ${
+                isActive(path) ? "bg-hover text-text font-medium" : "text-dim hover:bg-hover hover:text-text"
+              }`}
+              onClick={() => navigate(path)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
     </header>
   );
 }
