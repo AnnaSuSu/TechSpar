@@ -22,6 +22,7 @@ export default function Header() {
   }, [theme]);
 
   // Close menu on route change
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
   const toggleTheme = () => setTheme(t => t === "dark" ? "light" : "dark");

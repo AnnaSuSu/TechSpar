@@ -45,15 +45,15 @@ export default function Interview() {
     if (!isDrill && initData.message) {
       setMessages([{ role: "assistant", content: initData.message }]);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isDrill) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, sending]);
+  }, [messages, sending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isDrill) textareaRef.current?.focus();
-  }, [currentIndex]);
+  }, [currentIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Drill handlers ──
   const currentQ = questions[currentIndex];
@@ -124,7 +124,15 @@ export default function Interview() {
     setReviewing(true);
     try {
       const data = await endInterview(sessionId);
-      navigate(`/review/${sessionId}`, { state: { review: data.review, messages, mode: "resume" } });
+      navigate(`/review/${sessionId}`, {
+        state: {
+          review: data.review,
+          messages,
+          mode: "resume",
+          dimension_scores: data.dimension_scores,
+          avg_score: data.avg_score,
+        },
+      });
     } catch (err) {
       alert("复盘生成失败: " + err.message);
     } finally {

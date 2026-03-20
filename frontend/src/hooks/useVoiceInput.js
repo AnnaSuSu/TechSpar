@@ -98,7 +98,7 @@ export default function useVoiceInput({ onResult } = {}) {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (mediaRecorderRef.current?.state !== "inactive") {
-        try { mediaRecorderRef.current?.stop(); } catch {}
+        try { mediaRecorderRef.current?.stop(); } catch { /* cleanup, safe to ignore */ }
       }
     };
   }, []);

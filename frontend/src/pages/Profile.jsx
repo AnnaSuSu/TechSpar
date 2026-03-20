@@ -24,12 +24,6 @@ function CollapsibleList({ items, limit, renderItem }) {
   );
 }
 
-function getScoreColor(score) {
-  if (score >= 8) return "var(--green)";
-  if (score >= 6) return "var(--accent-light)";
-  if (score >= 4) return "#e2b93b";
-  return "var(--red)";
-}
 
 function ScoreChart({ history }) {
   if (!history || history.length < 2) return null;

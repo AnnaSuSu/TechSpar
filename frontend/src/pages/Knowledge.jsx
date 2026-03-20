@@ -45,6 +45,7 @@ export default function Knowledge() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshTopics().then((t) => {
       const keys = Object.keys(t);
       if (keys.length > 0) setSelected(keys[0]);
@@ -72,6 +73,7 @@ export default function Knowledge() {
 
   useEffect(() => {
     if (!selected) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCore(selected);
     loadHighFreq(selected);
   }, [selected, loadCore, loadHighFreq]);

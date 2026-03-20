@@ -193,7 +193,7 @@ export default function Review() {
 
   useEffect(() => {
     if (!review && !scores) {
-      setLoading(true);
+      setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
       getReview(sessionId)
         .then((data) => {
           setReview(data.review);
@@ -202,8 +202,11 @@ export default function Review() {
           if (data.transcript) {
             setMessages(data.transcript);
             if (data.mode === "topic_drill" && data.questions) {
-              const userMsgs = data.transcript.filter((m) => m.role === "user");
-              const ans = data.questions.map((q, i) => ({ question_id: q.id, answer: userMsgs[i]?.content || "" }));
+              const ans = data.questions.map((q) => {
+                const qIdx = data.transcript.findIndex(m => m.role === "assistant" && m.content === q.question);
+                const next = qIdx >= 0 ? data.transcript[qIdx + 1] : null;
+                return { question_id: q.id, answer: next?.role === "user" ? next.content : "" };
+              });
               setAnswers(ans);
             }
           }
@@ -218,7 +221,7 @@ export default function Review() {
         .catch((err) => setReview("加载失败: " + err.message))
         .finally(() => setLoading(false));
     }
-  }, [sessionId]);
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return <div className="text-center py-15 text-dim">加载复盘报告中...</div>;
