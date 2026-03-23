@@ -23,6 +23,7 @@ from backend.memory import get_profile, update_profile_after_interview, llm_upda
 from backend.storage.sessions import (
     create_session, append_message, save_review, save_drill_answers,
     get_session, list_sessions, list_sessions_by_topic,
+    save_reference_answer,
     delete_session, list_distinct_topics,
 )
 from backend.graph import build_graph
@@ -995,8 +996,20 @@ async def generate_reference_answer(body: dict, user_id: str = Depends(get_curre
     """Generate a reference answer for a specific question using LLM + knowledge base."""
     topic = body.get("topic", "").strip()
     question = body.get("question", "").strip()
+    session_id = (body.get("session_id") or "").strip()
+    question_id = body.get("question_id")
     if not topic or not question:
         raise HTTPException(400, "topic and question are required")
+
+    session = None
+    if session_id:
+        session = get_session(session_id, user_id=user_id)
+        if not session:
+            raise HTTPException(404, "Session not found.")
+        if question_id is not None:
+            cached_answer = (session.get("reference_answers") or {}).get(str(question_id))
+            if cached_answer:
+                return {"reference_answer": cached_answer}
 
     from backend.indexer import retrieve_topic_context
     from backend.llm_provider import get_langchain_llm
@@ -1017,7 +1030,12 @@ async def generate_reference_answer(body: dict, user_id: str = Depends(get_curre
 
     llm = get_langchain_llm()
     resp = llm.invoke([HumanMessage(content=prompt)])
-    return {"reference_answer": resp.content.strip()}
+    reference_answer = resp.content.strip()
+
+    if session and question_id is not None:
+        save_reference_answer(session_id, question_id, reference_answer, user_id=user_id)
+
+    return {"reference_answer": reference_answer}
 
 
 # ── History ──

@@ -23,6 +23,7 @@ def _get_conn() -> sqlite3.Connection:
             scores TEXT DEFAULT '[]',
             weak_points TEXT DEFAULT '[]',
             overall TEXT DEFAULT '{}',
+            reference_answers TEXT DEFAULT '{}',
             review TEXT,
             user_id TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -30,7 +31,7 @@ def _get_conn() -> sqlite3.Connection:
         )
     """)
     # Migrate: add columns if missing (existing DBs)
-    for col, default in [("questions", "'[]'"), ("overall", "'{}'"), ("user_id", "NULL")]:
+    for col, default in [("questions", "'[]'"), ("overall", "'{}'"), ("reference_answers", "'{}'"), ("user_id", "NULL")]:
         try:
             conn.execute(f"SELECT {col} FROM sessions LIMIT 1")
         except sqlite3.OperationalError:
@@ -112,6 +113,31 @@ def save_review(session_id: str, review: str, scores: list = None,
     conn.close()
 
 
+def save_reference_answer(session_id: str, question_id: str | int, reference_answer: str, *, user_id: str) -> bool:
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT reference_answers FROM sessions WHERE session_id = ? AND user_id = ?",
+        (session_id, user_id),
+    ).fetchone()
+    if not row:
+        conn.close()
+        return False
+
+    try:
+        reference_answers = json.loads(row["reference_answers"] or "{}")
+    except json.JSONDecodeError:
+        reference_answers = {}
+
+    reference_answers[str(question_id)] = reference_answer
+    conn.execute(
+        "UPDATE sessions SET reference_answers = ?, updated_at = CURRENT_TIMESTAMP WHERE session_id = ? AND user_id = ?",
+        (json.dumps(reference_answers, ensure_ascii=False), session_id, user_id),
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
 def get_session(session_id: str, *, user_id: str) -> dict | None:
     conn = _get_conn()
     row = conn.execute(
@@ -127,6 +153,7 @@ def get_session(session_id: str, *, user_id: str) -> dict | None:
     result["scores"] = json.loads(result["scores"])
     result["weak_points"] = json.loads(result["weak_points"])
     result["overall"] = json.loads(result.get("overall", "{}") or "{}")
+    result["reference_answers"] = json.loads(result.get("reference_answers", "{}") or "{}")
     return result
 
 

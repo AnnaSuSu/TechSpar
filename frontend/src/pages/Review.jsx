@@ -1,7 +1,7 @@
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { BookOpen } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronUp } from "lucide-react";
 import { getReview, getReferenceAnswer } from "../api/interview";
 
 function getScoreColor(score) {
@@ -120,24 +120,39 @@ function SoloRecordingReview({ topicsCovered, overall }) {
   );
 }
 
-function DrillReview({ scores, overall, questions, answers, topic }) {
+function DrillReview({ scores, overall, questions, answers, topic, sessionId, initialReferenceAnswers }) {
   const answerMap = {};
   for (const a of (answers || [])) answerMap[a.question_id] = a.answer;
   const scoreMap = {};
   for (const s of (scores || [])) scoreMap[s.question_id] = s;
-  const [refAnswers, setRefAnswers] = useState({});
+  const [refAnswers, setRefAnswers] = useState(initialReferenceAnswers || {});
   const [refLoading, setRefLoading] = useState({});
+  const [refExpanded, setRefExpanded] = useState({});
+  const [refErrors, setRefErrors] = useState({});
+
+  useEffect(() => {
+    setRefAnswers(initialReferenceAnswers || {});
+    setRefExpanded({});
+    setRefErrors({});
+  }, [initialReferenceAnswers]);
 
   const handleRefAnswer = async (qId, questionText) => {
-    if (refAnswers[qId]) return;
+    if (refAnswers[qId]) {
+      setRefExpanded((p) => ({ ...p, [qId]: !p[qId] }));
+      return;
+    }
+
+    setRefErrors((p) => ({ ...p, [qId]: "" }));
     setRefLoading((p) => ({ ...p, [qId]: true }));
     try {
-      const data = await getReferenceAnswer(topic, questionText);
+      const data = await getReferenceAnswer(topic, questionText, sessionId, qId);
       setRefAnswers((p) => ({ ...p, [qId]: data.reference_answer }));
+      setRefExpanded((p) => ({ ...p, [qId]: true }));
     } catch (e) {
-      setRefAnswers((p) => ({ ...p, [qId]: "生成失败: " + e.message }));
+      setRefErrors((p) => ({ ...p, [qId]: "生成失败: " + e.message }));
+    } finally {
+      setRefLoading((p) => ({ ...p, [qId]: false }));
     }
-    setRefLoading((p) => ({ ...p, [qId]: false }));
   };
 
   const avgScore = overall?.avg_score || "-";
@@ -202,6 +217,9 @@ function DrillReview({ scores, overall, questions, answers, topic }) {
         const isSkipped = !answer;
         const score = s.score;
         const sc = typeof score === "number" ? getScoreColor(score) : { bg: "var(--bg-hover)", color: "var(--text-dim)" };
+        const hasRefAnswer = Boolean(refAnswers[q.id]);
+        const isRefExpanded = Boolean(refExpanded[q.id]);
+        const refError = refErrors[q.id];
 
         if (isSkipped) {
           return (
@@ -256,8 +274,28 @@ function DrillReview({ scores, overall, questions, answers, topic }) {
 
             {topic && (
               <div className="mt-3 pt-3 border-t border-border">
-                {refAnswers[q.id] ? (
-                  <div className="text-sm leading-[1.8]">
+                <button
+                  className="text-[13px] text-accent-light flex items-center gap-1.5 bg-transparent border-none cursor-pointer transition-opacity disabled:opacity-50"
+                  onClick={() => handleRefAnswer(q.id, q.question)}
+                  disabled={refLoading[q.id]}
+                >
+                  <BookOpen size={13} />
+                  {hasRefAnswer ? (
+                    <>
+                      {isRefExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      {isRefExpanded ? "收起参考答案" : "展开参考答案"}
+                    </>
+                  ) : (
+                    refLoading[q.id] ? "正在生成参考答案..." : refError ? "重新生成参考答案" : "查看参考答案"
+                  )}
+                </button>
+
+                {refError && !hasRefAnswer && (
+                  <div className="mt-2 text-[13px] text-red">{refError}</div>
+                )}
+
+                {hasRefAnswer && isRefExpanded && (
+                  <div className="mt-3 text-sm leading-[1.8]">
                     <div className="text-xs font-semibold text-dim mb-2 flex items-center gap-1.5">
                       <BookOpen size={13} /> 参考答案
                     </div>
@@ -265,15 +303,6 @@ function DrillReview({ scores, overall, questions, answers, topic }) {
                       <ReactMarkdown>{refAnswers[q.id]}</ReactMarkdown>
                     </div>
                   </div>
-                ) : (
-                  <button
-                    className="text-[13px] text-accent-light flex items-center gap-1.5 bg-transparent border-none cursor-pointer transition-opacity disabled:opacity-50"
-                    onClick={() => handleRefAnswer(q.id, q.question)}
-                    disabled={refLoading[q.id]}
-                  >
-                    <BookOpen size={13} />
-                    {refLoading[q.id] ? "正在生成参考答案..." : "查看参考答案"}
-                  </button>
                 )}
               </div>
             )}
@@ -303,6 +332,7 @@ export default function Review() {
   const [mode, setMode] = useState(stateData.mode || null);
   const [topic, setTopic] = useState(stateData.topic || null);
   const [topicsCovered, setTopicsCovered] = useState(stateData.topics_covered || []);
+  const [referenceAnswers, setReferenceAnswers] = useState(stateData.reference_answers || {});
   const [showTranscript, setShowTranscript] = useState(false);
   const [loading, setLoading] = useState(!review && !scores);
 
@@ -327,6 +357,7 @@ export default function Review() {
           }
           if (data.mode) setMode(data.mode);
           if (data.topic) setTopic(data.topic);
+          setReferenceAnswers(data.reference_answers || {});
           if (data.overall && Object.keys(data.overall).length) {
             setOverall(data.overall);
           } else if (data.weak_points) {
@@ -355,7 +386,15 @@ export default function Review() {
       {isRecording && !isRecordingDual ? (
         <SoloRecordingReview topicsCovered={topicsCovered} overall={overall} />
       ) : showDrill ? (
-        <DrillReview scores={scores} overall={overall} questions={questions} answers={answers} topic={topic} />
+        <DrillReview
+          scores={scores}
+          overall={overall}
+          questions={questions}
+          answers={answers}
+          topic={topic}
+          sessionId={sessionId}
+          initialReferenceAnswers={referenceAnswers}
+        />
       ) : (
         <>
           <DimensionScores

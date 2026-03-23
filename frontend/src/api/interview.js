@@ -110,11 +110,14 @@ export async function getReview(sessionId) {
   return res.json();
 }
 
-export async function getReferenceAnswer(topic, question) {
+export async function getReferenceAnswer(topic, question, sessionId = null, questionId = null) {
+  const body = { topic, question };
+  if (sessionId) body.session_id = sessionId;
+  if (questionId != null) body.question_id = questionId;
   const res = await authFetch(`${API_BASE}/interview/reference-answer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic, question }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
