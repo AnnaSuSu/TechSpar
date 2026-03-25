@@ -231,6 +231,87 @@ DRILL_BATCH_EVAL_PROMPT = """你是「{topic_name}」领域的技术专家，正
 """
 
 
+DRILL_SCORE_EVAL_PROMPT = """你是「{topic_name}」领域的技术专家，正在评估候选人的训练回答。
+
+## 候选人的回答
+{qa_pairs}
+
+## 参考知识（仅供核心概念对比，不要求候选人原文匹配）
+{references}
+
+## 任务
+只做逐题评估，不要输出整体总结。
+
+返回 JSON（只返回 JSON，不要其他内容）：
+```json
+{{
+    "scores": [
+        {{
+            "question_id": 1,
+            "score": 7,
+            "assessment": "点评回答的优缺点，1-2句话",
+            "improvement": "具体的改进建议，1-2句话",
+            "understanding": "核心理解正确/有偏差/完全跑偏",
+            "weak_point": "暴露的薄弱点，没有则为 null",
+            "key_missing": ["遗漏的关键点"]
+        }}
+    ]
+}}
+```
+
+评分标准：
+- 0=完全跑偏 3=有印象但理解有误 5=大方向对但浅 7=理解正确有自己思考 10=深入透彻
+- 关注：是否理解本质、有没有自己的思考、能不能举例
+- assessment / improvement 尽量精炼，避免长段落
+- key_missing 最多返回 3 项
+"""
+
+
+DRILL_OVERALL_SYNTHESIS_PROMPT = """你是「{topic_name}」领域的技术专家，正在整合多批次评估结果。
+
+## 候选人回答摘要
+{qa_briefs}
+
+## 逐题评分卡
+{score_cards}
+
+## 分批整体观察
+{batch_observations}
+
+## 任务
+整合以上信息，输出 overall JSON 对象，不要输出 scores 字段。
+
+返回格式（只返回 JSON，不要其他内容）：
+```json
+{{
+    "avg_score": null,
+    "summary": "整体表现总结",
+    "new_weak_points": [{{"point": "具体薄弱点描述", "topic": "{topic_key}"}}],
+    "new_strong_points": [{{"point": "具体强项描述", "topic": "{topic_key}"}}],
+    "communication_observations": {{
+        "style_update": "回答风格观察",
+        "new_habits": ["观察到的表达习惯"],
+        "new_suggestions": ["具体改进建议"]
+    }},
+    "thinking_patterns": {{
+        "new_strengths": ["观察到的思维优势"],
+        "new_gaps": ["观察到的思维短板"]
+    }},
+    "topic_mastery": {{
+        "notes": "对该领域掌握程度的一句话描述"
+    }}
+}}
+```
+
+规则：
+- avg_score 直接返回 null，系统会自行计算
+- 只保留最重要且去重后的结论，避免重复
+- summary 用 3-4 句话概括整体水平、主要短板和下一步提升方向
+- new_weak_points / new_strong_points 最多各 3 条
+- communication_observations / thinking_patterns 必须是跨题归纳，不要简单复制单题点评
+"""
+
+
 # ── 参考答案生成 ──
 
 REFERENCE_ANSWER_PROMPT = """你是「{topic_name}」领域的资深技术面试官，请为以下面试题生成一份参考答案。

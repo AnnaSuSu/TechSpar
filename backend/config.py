@@ -7,7 +7,19 @@ class Settings(BaseSettings):
     api_base: str = ""
     api_key: str = ""
     model: str = ""
+    question_model: str = ""
+    evaluation_model: str = ""
+    reference_answer_model: str = ""
     temperature: float = 0.7
+    llm_timeout_seconds: int = 180
+    llm_max_retries: int = 1
+    evaluation_timeout_seconds: int = 180
+    evaluation_max_retries: int = 0
+    drill_eval_batch_size: int = 1
+    drill_eval_reference_top_k: int = 1
+    drill_eval_reference_max_chars: int = 300
+    drill_eval_answer_max_chars: int = 800
+    drill_eval_use_llm_synthesis: bool = False
 
     # Embedding — API mode (OpenAI-compatible, e.g. SiliconFlow) or local HuggingFace
     embedding_api_base: str = ""   # set to enable API mode, e.g. https://api.siliconflow.cn/v1

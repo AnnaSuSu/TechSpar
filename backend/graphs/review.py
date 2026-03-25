@@ -1,7 +1,7 @@
 """复盘系统：面试结束后生成复盘报告。"""
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-from backend.llm_provider import get_langchain_llm
+from backend.llm_provider import get_evaluation_llm
 from backend.prompts.reviewer import REVIEW_SYSTEM
 from backend.models import InterviewMode
 
@@ -59,7 +59,7 @@ def generate_review(
         extra_context=extra,
     )
 
-    llm = get_langchain_llm()
+    llm = get_evaluation_llm()
     response = llm.invoke([
         SystemMessage(content=prompt),
         HumanMessage(content="请生成复盘报告。"),

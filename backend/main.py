@@ -197,11 +197,12 @@ async def recording_analyze(req: RecordingAnalyzeRequest, user_id: str = Depends
 async def _analyze_dual(req: RecordingAnalyzeRequest, session_id: str, user_id: str):
     """Dual mode: structure transcript into Q&A → evaluate → update profile."""
     from backend.graphs.topic_drill import _parse_json_response
-    from backend.llm_provider import get_langchain_llm
+    from backend.llm_provider import get_langchain_llm, get_evaluation_llm
     from backend.prompts.recording import RECORDING_STRUCTURE_PROMPT, RECORDING_DUAL_EVAL_PROMPT
     from langchain_core.messages import SystemMessage
 
     llm = get_langchain_llm()
+    eval_llm = get_evaluation_llm()
 
     # Step 1: LLM structures transcript into Q&A pairs
     structure_prompt = RECORDING_STRUCTURE_PROMPT.format(
@@ -251,7 +252,7 @@ async def _analyze_dual(req: RecordingAnalyzeRequest, session_id: str, user_id: 
     eval_prompt = RECORDING_DUAL_EVAL_PROMPT.format(
         qa_pairs="\n\n".join(qa_lines),
     )
-    eval_response = llm.invoke([
+    eval_response = eval_llm.invoke([
         SystemMessage(content="你是面试评估引擎。只返回 JSON，不要其他内容。"),
         HumanMessage(content=eval_prompt),
     ])
@@ -290,13 +291,13 @@ async def _analyze_dual(req: RecordingAnalyzeRequest, session_id: str, user_id: 
 async def _analyze_solo(req: RecordingAnalyzeRequest, session_id: str, user_id: str):
     """Solo mode: holistic evaluation of candidate's technical expression."""
     from backend.graphs.topic_drill import _parse_json_response
-    from backend.llm_provider import get_langchain_llm
+    from backend.llm_provider import get_evaluation_llm
     from backend.prompts.recording import RECORDING_SOLO_EVAL_PROMPT
     from langchain_core.messages import SystemMessage
 
     create_session(session_id, mode="recording", user_id=user_id)
 
-    llm = get_langchain_llm()
+    llm = get_evaluation_llm()
     eval_prompt = RECORDING_SOLO_EVAL_PROMPT.format(
         transcript=req.transcript[:8000],
     )
@@ -1012,7 +1013,7 @@ async def generate_reference_answer(body: dict, user_id: str = Depends(get_curre
                 return {"reference_answer": cached_answer}
 
     from backend.indexer import retrieve_topic_context
-    from backend.llm_provider import get_langchain_llm
+    from backend.llm_provider import get_reference_answer_llm
     from backend.prompts.interviewer import REFERENCE_ANSWER_PROMPT
     from langchain_core.messages import HumanMessage
 
@@ -1028,7 +1029,7 @@ async def generate_reference_answer(body: dict, user_id: str = Depends(get_curre
         knowledge_context=knowledge_context,
     )
 
-    llm = get_langchain_llm()
+    llm = get_reference_answer_llm()
     resp = llm.invoke([HumanMessage(content=prompt)])
     reference_answer = resp.content.strip()
 
