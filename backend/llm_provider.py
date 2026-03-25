@@ -32,21 +32,44 @@ def get_llama_llm():
 
 
 def get_embedding():
-    """Embedding model (singleton). API mode if embedding_api_base is set, else local HuggingFace."""
+    """Embedding model (singleton)."""
     global _embedding_instance
     if _embedding_instance is None:
-        if settings.embedding_api_base:
+        if settings.embedding_backend_mode() == "api":
             from llama_index.embeddings.openai import OpenAIEmbedding
-            _embedding_instance = OpenAIEmbedding(
-                model_name=settings.embedding_model,
-                api_base=settings.embedding_api_base,
-                api_key=settings.embedding_api_key,
-            )
+
+            model_name = settings.embedding_api_model_name()
+            if not model_name:
+                raise RuntimeError("EMBEDDING_API_MODEL is required when EMBEDDING_BACKEND=api")
+
+            kwargs = {
+                "model_name": model_name,
+                "api_key": settings.embedding_api_key,
+            }
+            if settings.embedding_api_base:
+                kwargs["api_base"] = settings.embedding_api_base
+
+            _embedding_instance = OpenAIEmbedding(**kwargs)
         else:
-            from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-            local_path = settings.base_dir / "data" / "models" / "bge-m3"
-            if local_path.exists():
-                _embedding_instance = HuggingFaceEmbedding(model_name=str(local_path))
+            try:
+                from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Local embeddings require optional dependencies. "
+                    "Install `pip install -r requirements.local-embedding.txt` "
+                    "and a torch build that matches your environment."
+                ) from exc
+
+            model_path = settings.local_embedding_model_path()
+            model_name = settings.local_embedding_model_name()
+
+            if model_path is not None:
+                _embedding_instance = HuggingFaceEmbedding(model_name=str(model_path))
+            elif model_name:
+                _embedding_instance = HuggingFaceEmbedding(model_name=model_name)
             else:
-                _embedding_instance = HuggingFaceEmbedding(model_name=settings.embedding_model)
+                raise RuntimeError(
+                    "LOCAL_EMBEDDING_MODEL or LOCAL_EMBEDDING_PATH is required "
+                    "when EMBEDDING_BACKEND=local"
+                )
     return _embedding_instance

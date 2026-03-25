@@ -10,6 +10,8 @@ llama-index-llms-openai>=0.3.0
 llama-index-llms-openai-like>=0.2.0
 llama-index-embeddings-openai>=0.3.0
 
+# Optional local embedding dependencies live in requirements.local-embedding.txt
+
 # PDF reading (for resume)
 pypdf>=4.0.0
 

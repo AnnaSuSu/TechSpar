@@ -3,7 +3,7 @@
 设计哲学：
 - 文件即真相（OpenClaw）：profile.json 可人工编辑
 - 两阶段提取（Mem0）：Extract → Update，不无脑追加
-- 向量召回（bge-m3）：语义搜索历史洞察
+- 向量召回（embedding）：语义搜索历史洞察
 """
 import json
 import logging

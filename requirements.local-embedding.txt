@@ -1,0 +1,4 @@
+# Optional local embedding dependencies.
+# Install a torch build that matches your environment before using local embeddings.
+llama-index-embeddings-huggingface>=0.3.0
+sentence-transformers>=3.0.0

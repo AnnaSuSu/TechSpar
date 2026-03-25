@@ -2,6 +2,9 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 
+DEFAULT_EMBEDDING_MODEL = "BAAI/bge-m3"
+
+
 class Settings(BaseSettings):
     # LLM (OpenAI-compatible proxy)
     api_base: str = ""
@@ -9,10 +12,14 @@ class Settings(BaseSettings):
     model: str = ""
     temperature: float = 0.7
 
-    # Embedding — API mode (OpenAI-compatible, e.g. SiliconFlow) or local HuggingFace
-    embedding_api_base: str = ""   # set to enable API mode, e.g. https://api.siliconflow.cn/v1
+    # Embedding — explicit backend + separate config for API/local modes
+    embedding_backend: str = ""  # api | local; empty keeps legacy inference
+    embedding_api_base: str = ""
     embedding_api_key: str = ""
-    embedding_model: str = "BAAI/bge-m3"
+    embedding_api_model: str = ""
+    local_embedding_model: str = ""
+    local_embedding_path: str = ""
+    embedding_model: str = ""  # deprecated fallback for EMBEDDING_MODEL
 
     # DashScope ASR (speech-to-text)
     dashscope_api_key: str = ""
@@ -61,6 +68,40 @@ class Settings(BaseSettings):
 
     def user_index_cache_path(self, user_id: str) -> Path:
         return self.user_data_dir(user_id) / ".index_cache"
+
+    def embedding_backend_mode(self) -> str:
+        if self.embedding_backend:
+            backend = self.embedding_backend.strip().lower()
+            if backend in {"api", "local"}:
+                return backend
+            raise ValueError("EMBEDDING_BACKEND must be 'api' or 'local'")
+        if self.embedding_api_base or self.embedding_api_key:
+            return "api"
+        return "local"
+
+    def embedding_api_model_name(self) -> str:
+        return self.embedding_api_model or self.embedding_model or DEFAULT_EMBEDDING_MODEL
+
+    def local_embedding_model_name(self) -> str:
+        return self.local_embedding_model or self.embedding_model or DEFAULT_EMBEDDING_MODEL
+
+    def local_embedding_model_path(self) -> Path | None:
+        if self.local_embedding_path:
+            return Path(self.local_embedding_path).expanduser()
+
+        bundled_path = self.base_dir / "data" / "models" / "bge-m3"
+        if self.local_embedding_model_name() == DEFAULT_EMBEDDING_MODEL and bundled_path.exists():
+            return bundled_path
+        return None
+
+    def active_embedding_target(self) -> str:
+        if self.embedding_backend_mode() == "api":
+            return self.embedding_api_model_name()
+
+        model_path = self.local_embedding_model_path()
+        if model_path is not None:
+            return str(model_path)
+        return self.local_embedding_model_name()
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

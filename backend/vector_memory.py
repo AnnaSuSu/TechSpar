@@ -1,7 +1,7 @@
 """向量记忆系统 — 语义检索 + 时间衰减 + 薄弱点语义去重。
 
 设计：
-- SQLite BLOB 存 bge-m3 embedding (1024-dim float32)
+- SQLite BLOB 存 float32 embedding
 - numpy cosine similarity 搜索（百级向量，sub-ms）
 - profile.json 仍是真相源，向量索引是加速层
 """
@@ -18,7 +18,6 @@ from backend.llm_provider import get_embedding
 logger = logging.getLogger("uvicorn")
 
 DB_PATH = settings.db_path
-EMBEDDING_DIM = 1024
 SIMILARITY_THRESHOLD = 0.75  # weak point dedup
 TIME_DECAY_HALF_LIFE = 14.0  # days
 TIME_DECAY_WEIGHT = 0.3      # max 30% score reduction from age
@@ -63,7 +62,7 @@ def init_memory_table():
 # ── Embedding helpers ──
 
 def _embed(text: str) -> np.ndarray:
-    """Embed text using singleton bge-m3. Returns float32 array (1024,)."""
+    """Embed text and return a float32 vector."""
     embed_model = get_embedding()
     vec = embed_model.get_text_embedding(text)
     return np.array(vec, dtype=np.float32)

@@ -72,7 +72,7 @@ Try TechSpar online: **[https://aari.top/](https://aari.top/)**
 |-----------|------------|
 | Backend | FastAPI, LangChain, LangGraph, LlamaIndex |
 | Frontend | React 19, React Router v7, Vite, Tailwind CSS v4 |
-| Storage | SQLite, bge-m3 embeddings |
+| Storage | SQLite, semantic embeddings |
 | Auth | JWT, bcrypt |
 | LLM | Any OpenAI-compatible API |
 
@@ -92,10 +92,18 @@ API_BASE=https://your-llm-api-base/v1
 API_KEY=sk-your-api-key
 MODEL=your-model-name
 
-# 嵌入模型（留空则使用本地 bge-m3）
-EMBEDDING_API_BASE=
-EMBEDDING_API_KEY=
-EMBEDDING_MODEL=BAAI/bge-m3
+# Embedding 后端：api | local
+EMBEDDING_BACKEND=api
+
+# API 模式（推荐）
+# 如果你用官方 OpenAI，这里的 EMBEDDING_API_BASE 可以留空
+EMBEDDING_API_BASE=https://your-embedding-api-base/v1
+EMBEDDING_API_KEY=sk-your-embedding-key
+EMBEDDING_API_MODEL=BAAI/bge-m3
+
+# 本地模式（可选，需要额外依赖）
+LOCAL_EMBEDDING_MODEL=BAAI/bge-m3
+LOCAL_EMBEDDING_PATH=
 
 # 阿里云 DashScope ASR（录音转写，录音复盘功能需要）
 DASHSCOPE_API_KEY=
@@ -127,6 +135,11 @@ docker compose up --build
 ```bash
 # 后端
 pip install -r requirements.txt
+
+# 仅在使用本地 embedding 时安装
+pip install -r requirements.local-embedding.txt
+# 并按你的环境安装合适的 torch
+
 uvicorn backend.main:app --reload --port 8000
 
 # 前端
@@ -151,7 +164,7 @@ TechSpar/
 │   ├── main.py                 # FastAPI, 40+ API routes
 │   ├── auth.py                 # JWT auth, user management
 │   ├── memory.py               # Profile engine (Mem0-style)
-│   ├── vector_memory.py        # Vector memory (SQLite + bge-m3)
+│   ├── vector_memory.py        # Vector memory (SQLite + semantic embeddings)
 │   ├── indexer.py              # Knowledge indexing (LlamaIndex)
 │   ├── spaced_repetition.py    # SM-2 scheduler
 │   ├── migrate.py              # Database migration
@@ -171,6 +184,7 @@ TechSpar/
 │   ├── resume/
 │   ├── knowledge/
 │   └── topics.json
+├── requirements.local-embedding.txt
 ├── docker-compose.yml
 └── .env.example
 ```

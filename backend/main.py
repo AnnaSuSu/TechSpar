@@ -58,16 +58,20 @@ _job_prep_sessions: dict[str, dict] = {}
 
 @app.on_event("startup")
 def preload_models():
-    """Pre-load bge-m3 embedding model + init vector memory on startup."""
-    from backend.llm_provider import get_embedding, get_llama_llm
+    """Initialize embedding backend and vector memory on startup."""
+    from backend.llm_provider import get_embedding
     from backend.indexer import _init_llama_settings
     from backend.vector_memory import init_memory_table
     import logging
     logger = logging.getLogger("uvicorn")
-    logger.info("Pre-loading bge-m3 embedding model...")
+    logger.info(
+        "Initializing embedding backend=%s target=%s",
+        settings.embedding_backend_mode(),
+        settings.active_embedding_target(),
+    )
     get_embedding()
     _init_llama_settings()
-    logger.info("Embedding model ready.")
+    logger.info("Embedding backend ready.")
 
     # Init tables + default user
     init_memory_table()

@@ -118,7 +118,7 @@ Answer questions → Batch evaluation (per-question scoring + weakness extractio
 
 **Algorithmic Mastery Scoring** — A deterministic mastery scoring algorithm. `contribution = (difficulty/5) × (score/10)`, merged with historical scores weighted by answer coverage, ensuring assessment consistency without relying on subjective LLM judgment.
 
-**RAG-Powered Knowledge** — Dual knowledge retrieval: LlamaIndex-indexed domain knowledge documents + bge-m3 vector retrieval of historical training insights, providing factual grounding for question generation and scoring.
+**RAG-Powered Knowledge** — Dual knowledge retrieval: LlamaIndex-indexed domain knowledge documents + semantic retrieval of historical training insights, providing factual grounding for question generation and scoring.
 
 ## Two Training Modes
 
@@ -156,10 +156,18 @@ API_BASE=https://your-llm-api-base/v1
 API_KEY=sk-your-api-key
 MODEL=your-model-name
 
-# Optional: Embedding model API (leave empty to use local HuggingFace bge-m3)
-EMBEDDING_API_BASE=
-EMBEDDING_API_KEY=
-EMBEDDING_MODEL=BAAI/bge-m3
+# Embedding backend: api | local
+EMBEDDING_BACKEND=api
+
+# API mode (recommended)
+# EMBEDDING_API_BASE can be empty when using official OpenAI
+EMBEDDING_API_BASE=https://your-embedding-api-base/v1
+EMBEDDING_API_KEY=sk-your-embedding-key
+EMBEDDING_API_MODEL=BAAI/bge-m3
+
+# Local mode (optional, requires extra dependencies)
+LOCAL_EMBEDDING_MODEL=BAAI/bge-m3
+LOCAL_EMBEDDING_PATH=
 ```
 
 ### 2a. Docker (Recommended)
@@ -174,6 +182,11 @@ Visit `http://localhost` to start. API requests are automatically proxied via Ng
 
 ```bash
 pip install -r requirements.txt
+
+# Only install this if you want local embeddings
+pip install -r requirements.local-embedding.txt
+# Then install a torch build that matches your environment
+
 uvicorn backend.main:app --reload --port 8000
 ```
 
@@ -194,7 +207,7 @@ TechSpar/
 ├── backend/
 │   ├── main.py              # FastAPI entry, API routes
 │   ├── memory.py            # Profile management (Mem0-style)
-│   ├── vector_memory.py     # Vector memory (SQLite + bge-m3)
+│   ├── vector_memory.py     # Vector memory (SQLite + semantic embeddings)
 │   ├── indexer.py           # Knowledge base indexing (LlamaIndex)
 │   ├── llm_provider.py      # LLM provider layer
 │   ├── graphs/
@@ -219,12 +232,13 @@ TechSpar/
 ├── frontend/Dockerfile     # Frontend image (Node build → Nginx)
 ├── .env.example
 ├── requirements.txt
+├── requirements.local-embedding.txt
 └── clear_data.sh           # Data cleanup script
 ```
 
 ## Tech Stack
 
-**Backend**: FastAPI · LangChain · LangGraph · LlamaIndex · SQLite · sentence-transformers (bge-m3)
+**Backend**: FastAPI · LangChain · LangGraph · LlamaIndex · SQLite
 
 **Frontend**: React 19 · React Router v7 · Vite · Tailwind CSS v4 (responsive mobile-first design)
 
