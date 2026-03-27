@@ -255,6 +255,7 @@ def _analyze_recording_background(session_id: str, req_transcript: str, req_reco
             eval_result = _parse_json_response(response.content)
             topics_covered = eval_result.get("topics_covered", [])
             overall = eval_result.get("overall", {})
+            overall["topics_covered"] = topics_covered
             scores = [{"question_id": t.get("id", i + 1), "score": t.get("score"), "difficulty": 3}
                       for i, t in enumerate(topics_covered)]
 
