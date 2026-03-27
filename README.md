@@ -8,16 +8,14 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-# TechSpar
-
 **一个会持续记住你弱点和进步轨迹的 AI 面试训练系统。**
-
-不是一次性问答工具，也不是随机刷题器。  
-TechSpar 会在每轮训练后更新你的长期画像：薄弱点、强项、掌握度、思维模式、沟通风格。下一次训练时，AI 会基于这些历史信息继续追着你的短板问。
 
 [在线 Demo](https://aari.top/) · [快速开始](#快速开始) · [English](README.en.md)
 
 </div>
+
+> 不是一次性问答工具，也不是随机刷题器。  
+> TechSpar 会持续更新你的长期画像，并在下一轮训练中继续针对你的短板追问。
 
 ---
 
