@@ -95,7 +95,7 @@ def generate_drill_questions(topic: str, user_id: str) -> list[dict]:
 
     # Format past insights from vector retrieval
     past_insights_text = "\n".join(
-        f"- {ins[:500]}" for ins in drill_ctx.get("past_insights", [])
+        f"- {ins[:200]}" for ins in drill_ctx.get("past_insights", [])
     ) or "暂无历史数据"
 
     # Load high-frequency questions
@@ -189,13 +189,13 @@ def evaluate_drill_answers(topic: str, questions: list[dict], answers: list[dict
 
         refs = retrieve_topic_context(topic, q["question"], user_id, top_k=2)
         if refs:
-            ref_lines.append(f"### Q{qid} 参考\n" + "\n".join(refs)[:2000])
+            ref_lines.append(f"### Q{qid} 参考\n" + "\n".join(refs)[:800])
 
     prompt = DRILL_BATCH_EVAL_PROMPT.format(
         topic_name=topic_name,
         topic_key=topic,
         qa_pairs="\n\n".join(qa_lines),
-        references="\n\n".join(ref_lines)[:8000],
+        references="\n\n".join(ref_lines)[:4000],
     )
 
     llm = get_langchain_llm()

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTaskStatus } from "../contexts/TaskStatusContext";
 
 const MODE_CARDS = [
   {
@@ -59,11 +58,10 @@ const MODE_CARDS = [
 
 export default function Home() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState("resume");
+  const [mode, setMode] = useState(null);
   const [topics, setTopics] = useState({});
   const [selectedTopic, setSelectedTopic] = useState(null);
-  const { creatingSessionMode, setCreatingSessionMode } = useTaskStatus();
-  const loading = !!creatingSessionMode;
+  const [loading, setLoading] = useState(false);
   const [resumeFile, setResumeFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [profile, setProfile] = useState(null);
@@ -101,14 +99,14 @@ export default function Home() {
     if (mode === "job_prep") { navigate("/job-prep"); return; }
     if (mode === "recording") { navigate("/recording"); return; }
     if (mode === "topic_drill" && !selectedTopic) return;
-    setCreatingSessionMode(mode);
+    setLoading(true);
     try {
       const data = await startInterview(mode, selectedTopic);
       navigate(`/interview/${data.session_id}`, { state: data });
     } catch (err) {
       alert("启动失败: " + err.message);
     } finally {
-      setCreatingSessionMode(null);
+      setLoading(false);
     }
   };
 
@@ -212,23 +210,16 @@ export default function Home() {
             <div
               key={card.mode}
               className={cn(
-                "w-full relative overflow-hidden transition-all duration-300 text-left border-2 rounded-xl group",
-                loading ? "pointer-events-none opacity-60" : "cursor-pointer",
+                "w-full relative overflow-hidden cursor-pointer transition-all text-left border-2 rounded-xl",
                 isActive
-                  ? `border-current ${card.borderActive} bg-card shadow-lg ${loading ? "opacity-100" : ""}`
-                  : "border-border bg-card hover:border-primary/30 hover:shadow-lg hover:-translate-y-1"
+                  ? `border-current ${card.borderActive} bg-card shadow-lg`
+                  : "border-border bg-card hover:border-border hover:shadow-md hover:-translate-y-0.5"
               )}
-              onClick={() => { 
-                if (loading) return;
-                setMode(card.mode); 
-                if (card.mode !== "topic_drill") setSelectedTopic(null); 
-              }}
+              onClick={() => { setMode(card.mode); if (card.mode !== "topic_drill") setSelectedTopic(null); }}
             >
-              <div className={cn(
-                "absolute inset-0 bg-gradient-to-br pointer-events-none transition-opacity duration-500",
-                card.gradient,
-                isActive ? "opacity-50" : "opacity-0 group-hover:opacity-15"
-              )} />
+              {isActive && (
+                <div className={cn("absolute inset-0 bg-gradient-to-br opacity-50 pointer-events-none", card.gradient)} />
+              )}
               <div className="relative px-6 py-7">
                 <div className="flex items-center justify-between mb-4">
                   <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center transition-all", card.iconBg)}>
@@ -312,39 +303,15 @@ export default function Home() {
       {/* Start button */}
       {mode && (
         <div className="w-full max-w-[700px] animate-fade-in-up">
-          {loading ? (
-            <div className="w-full rounded-2xl bg-card border border-primary/20 p-6 flex flex-col items-center justify-center gap-4 relative overflow-hidden">
-              <div className="absolute inset-0 bg-primary/5 dark:bg-primary/10 animate-pulse pointer-events-none" />
-              <div className="flex items-center gap-3 relative z-10">
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                  <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse-dot" />
-                </div>
-                <div className="text-[14px] font-medium text-primary tracking-wide">
-                  {creatingSessionMode === "resume" ? "正在读取简历，构建专属面试方案..." : creatingSessionMode === "topic_drill" ? "正在智能生成专项题库..." : creatingSessionMode === "job_prep" ? "正在深度拆解描述并匹配岗位题库..." : "正在初始化环境..."}
-                </div>
-              </div>
-              <div className="flex flex-col gap-3 w-full max-w-[320px] mt-2 relative z-10 opacity-70">
-                 <Skeleton className="w-full h-2.5 rounded-full bg-primary/20" />
-                 <Skeleton className="w-[85%] h-2.5 rounded-full bg-primary/20" />
-                 <Skeleton className="w-[60%] h-2.5 rounded-full bg-primary/20" />
-              </div>
-            </div>
-          ) : (
-            <Button
-              variant="gradient"
-              size="lg"
-              className="w-full py-6 text-[15px] tracking-wide"
-              disabled={!canStart}
-              onClick={handleStart}
-            >
-              {{
-                resume: "开始模拟面试",
-                topic_drill: "开始专项训练",
-                job_prep: "开始定向备面",
-                recording: "前往录音复盘",
-              }[mode] || "开始"}
-            </Button>
-          )}
+          <Button
+            variant="gradient"
+            size="lg"
+            className="w-full"
+            disabled={!canStart || loading}
+            onClick={handleStart}
+          >
+            {loading ? "正在初始化面试..." : mode === "job_prep" ? "进入 JD 备面" : "开始面试"}
+          </Button>
         </div>
       )}
     </div>

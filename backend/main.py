@@ -213,7 +213,7 @@ def _analyze_recording_background(session_id: str, req_transcript: str, req_reco
 
         if req_recording_mode == "dual":
             # Structure transcript into Q&A
-            structure_prompt = RECORDING_STRUCTURE_PROMPT.format(transcript=req_transcript)
+            structure_prompt = RECORDING_STRUCTURE_PROMPT.format(transcript=req_transcript[:8000])
             response = llm.invoke([
                 SystemMessage(content="你是面试记录分析引擎。只返回 JSON，不要其他内容。"),
                 HumanMessage(content=structure_prompt),
@@ -247,7 +247,7 @@ def _analyze_recording_background(session_id: str, req_transcript: str, req_reco
             save_review(session_id, review, scores, overall.get("new_weak_points", []), overall, user_id=user_id)
         else:
             # Solo mode
-            eval_prompt = RECORDING_SOLO_EVAL_PROMPT.format(transcript=req_transcript)
+            eval_prompt = RECORDING_SOLO_EVAL_PROMPT.format(transcript=req_transcript[:8000])
             response = llm.invoke([
                 SystemMessage(content="你是录音评估引擎。只返回 JSON，不要其他内容。"),
                 HumanMessage(content=eval_prompt),
@@ -255,7 +255,6 @@ def _analyze_recording_background(session_id: str, req_transcript: str, req_reco
             eval_result = _parse_json_response(response.content)
             topics_covered = eval_result.get("topics_covered", [])
             overall = eval_result.get("overall", {})
-            overall["topics_covered"] = topics_covered
             scores = [{"question_id": t.get("id", i + 1), "score": t.get("score"), "difficulty": 3}
                       for i, t in enumerate(topics_covered)]
 
@@ -658,7 +657,7 @@ async def backfill_profile(
 # ── Interview ──
 
 @router.post("/job-prep/preview")
-def job_prep_preview(req: JobPrepPreviewRequest, user_id: str = Depends(get_current_user)):
+async def job_prep_preview(req: JobPrepPreviewRequest, user_id: str = Depends(get_current_user)):
     """Analyze a JD and candidate fit before starting targeted practice."""
     jd_text = req.jd_text.strip()
     if len(jd_text) < 50:
@@ -679,7 +678,7 @@ def job_prep_preview(req: JobPrepPreviewRequest, user_id: str = Depends(get_curr
 
 
 @router.post("/job-prep/start")
-def job_prep_start(req: JobPrepStartRequest, user_id: str = Depends(get_current_user)):
+async def job_prep_start(req: JobPrepStartRequest, user_id: str = Depends(get_current_user)):
     """Start a JD-targeted mock interview session."""
     jd_text = req.jd_text.strip()
     if len(jd_text) < 50:
@@ -743,7 +742,7 @@ def job_prep_start(req: JobPrepStartRequest, user_id: str = Depends(get_current_
 
 
 @router.post("/interview/start")
-def start_interview(req: StartInterviewRequest, user_id: str = Depends(get_current_user)):
+async def start_interview(req: StartInterviewRequest, user_id: str = Depends(get_current_user)):
     """Start a new interview session."""
     session_id = str(uuid.uuid4())[:8]
 
@@ -799,7 +798,7 @@ def start_interview(req: StartInterviewRequest, user_id: str = Depends(get_curre
 
 
 @router.post("/interview/chat")
-def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
+async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
     """Send user answer, get next interviewer response (resume mode only)."""
     if req.session_id not in _graphs:
         raise HTTPException(404, "Session not found. It may have expired (in-memory only).")
