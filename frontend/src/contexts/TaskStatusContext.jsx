@@ -43,8 +43,11 @@ export function TaskStatusProvider({ children }) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, [stopPolling]);
 
+  // Global state to track interview creation across route navigations
+  const [creatingSessionMode, setCreatingSessionMode] = useState(null);
+
   return (
-    <TaskStatusContext.Provider value={{ tasks, startTask, dismissTask }}>
+    <TaskStatusContext.Provider value={{ tasks, startTask, dismissTask, creatingSessionMode, setCreatingSessionMode }}>
       {children}
     </TaskStatusContext.Provider>
   );

@@ -198,7 +198,7 @@ def get_topic_context_for_drill(topic: str, user_id: str) -> dict:
         h.get("question", "")
         for h in profile.get("stats", {}).get("score_history", [])
         if h.get("topic") == topic and h.get("question")
-    ][-20:]  # last 20
+    ][-20:]
 
     # Semantic retrieval of past insights for this topic
     past_insights = []
@@ -243,7 +243,7 @@ def update_profile_realtime(
             "mode": mode,
             "topic": topic,
             "avg_score": score_entry["score"],
-            "question": score_entry.get("question", "")[:80],
+            "question": score_entry.get("question", ""),
             "assessment": score_entry.get("assessment", ""),
         })
         # Rolling average
@@ -691,10 +691,10 @@ async def update_profile_after_interview(
         )
 
     extract_msg = EXTRACT_PROMPT.format(
-        current_profile=json.dumps(profile, ensure_ascii=False)[:2000],
+        current_profile=json.dumps(profile, ensure_ascii=False),
         mode=mode,
         topic=topic or "综合",
-        transcript="\n".join(transcript_lines[-60:]),  # last 60 lines
+        transcript="\n".join(transcript_lines),
         scores=score_text or "无",
     )
 

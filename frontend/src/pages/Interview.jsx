@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Interview() {
   const { sessionId } = useParams();
@@ -346,11 +347,22 @@ export default function Interview() {
           <ChatBubble key={i} role={msg.role} content={msg.content} />
         ))}
         {sending && (
-          <div className="flex items-center gap-2 px-4 py-3 text-dim text-sm">
-            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" />
-            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot [animation-delay:0.2s]" />
-            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot [animation-delay:0.4s]" />
-            <span className="ml-1">面试官思考中...</span>
+          <div className="flex flex-col animate-fade-in mb-6 opacity-75">
+            <div className="h-px bg-border mb-6" />
+            <div className="max-w-[720px] md:max-w-[720px]">
+              <div className="flex items-center mb-5 gap-2">
+                <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" />
+                </div>
+                <span className="text-[13px] font-medium text-primary tracking-wide">AI 面试官正在思考回复中...</span>
+              </div>
+              <div className="space-y-3.5 px-1 w-full md:w-[600px]">
+                <Skeleton className="w-full h-4 rounded-md" />
+                <Skeleton className="w-[94%] h-4 rounded-md" />
+                <Skeleton className="w-[82%] h-4 rounded-md" />
+                <Skeleton className="w-[45%] h-4 rounded-md" />
+              </div>
+            </div>
           </div>
         )}
         <div ref={chatEndRef} />

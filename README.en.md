@@ -29,21 +29,13 @@ TechSpar builds a **persistent candidate profile system**. After each session, i
 
 ## Screenshots
 
-### Landing & Dashboard
+### Home & Profile
 
-| Landing | Dashboard |
+| Home | Profile |
 | --- | --- |
-| ![Landing page](images/landing.png) | ![Dashboard](images/home.png) |
+| ![Home dashboard](images/home.png) | ![Profile](images/profile.png) |
 
-The landing page introduces the product flow, while the dashboard exposes the main training modes and your current learning snapshot.
-
-### Personal Profile
-
-| Overview | Weaknesses & Strengths | Communication Style |
-| --- | --- | --- |
-| ![Profile overview](images/profile-overview.png) | ![Profile insights](images/profile-insights.png) | ![Communication style analysis](images/profile-communication.png) |
-
-The profile page tracks practice statistics, mastery by domain, weak spots, strengths, thinking patterns, and communication habits in one place.
+The home page surfaces training entry points, recent progress, and your current learning snapshot, while the profile page summarizes practice statistics, priorities, and recent signals.
 
 ### Knowledge Base & Question Graph
 
@@ -52,6 +44,14 @@ The profile page tracks practice statistics, mastery by domain, weak spots, stre
 | ![Knowledge library](images/knowledge-library.png) | ![Question graph](images/question-graph.png) |
 
 The knowledge workspace manages domain documents and FAQ content, while the graph view visualizes question clusters and mastery distribution.
+
+### History & Topic Review
+
+| History | Topic detail |
+| --- | --- |
+| ![History records](images/history.png) | ![Topic detail](images/topic-detail.png) |
+
+The history page filters past sessions by mode, while the topic detail view consolidates mastery, recent sessions, and recurring weak spots for one focus area.
 
 ### Job-Targeted Prep & Recording Review
 

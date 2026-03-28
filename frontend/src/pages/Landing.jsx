@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import Logo from "../components/Logo";
 
 const FEATURES = [
   {
@@ -51,8 +52,8 @@ export default function Landing() {
     <div className="min-h-screen bg-bg flex flex-col">
       <header className="flex items-center justify-between px-6 md:px-10 py-4">
         <div className="flex items-center gap-2.5">
-          <img src="/logo.png" alt="TechSpar" className="w-8 h-8 rounded-lg object-contain" />
-          <span className="text-lg font-display font-bold text-text">TechSpar</span>
+          <Logo className="w-7 h-7 rounded-lg drop-shadow-sm" />
+          <span className="text-lg font-display font-bold text-text translate-y-[1px]">TechSpar</span>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}>
@@ -142,7 +143,7 @@ export default function Landing() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 stagger-children">
             {FEATURES.map((f) => (
-              <Card key={f.title} className="hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
+              <Card key={f.title} className="group hover:border-primary/40 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(245,158,11,0.1)] transition-all duration-300">
                 <CardContent className="p-5">
                   <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center mb-3", f.color)}>
                     {f.icon}

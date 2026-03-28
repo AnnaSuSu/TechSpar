@@ -136,6 +136,46 @@ function SoloRecordingReview({ topicsCovered, overall }) {
           </div>
         </div>
       )}
+
+      {(overall?.communication_observations || overall?.thinking_patterns) && (
+        <Card className="mb-6">
+          <CardContent className="p-5 md:p-7">
+            {overall.communication_observations && (
+              <div className="mb-4">
+                <div className="text-base font-semibold mb-3">沟通表达</div>
+                {overall.communication_observations.style_update && (
+                  <div className="text-sm leading-[1.7] text-text mb-2">{overall.communication_observations.style_update}</div>
+                )}
+                {overall.communication_observations.new_habits?.length > 0 && (
+                  <div className="text-[13px] text-dim mb-1">表达习惯: {overall.communication_observations.new_habits.join("、")}</div>
+                )}
+                {overall.communication_observations.new_suggestions?.length > 0 && (
+                  <div className="mt-2">
+                    {overall.communication_observations.new_suggestions.map((s, i) => (
+                      <div key={i} className="px-3 py-2 rounded-lg text-[13px] text-text border bg-blue-500/8 border-blue-500/20 mb-1.5">{s}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {overall.thinking_patterns && (
+              <div>
+                <div className="text-base font-semibold mb-3">思维模式</div>
+                {overall.thinking_patterns.new_strengths?.length > 0 && (
+                  <div className="text-[13px] text-text mb-1">
+                    <span className="text-dim">优势: </span>{overall.thinking_patterns.new_strengths.join("、")}
+                  </div>
+                )}
+                {overall.thinking_patterns.new_gaps?.length > 0 && (
+                  <div className="text-[13px] text-text">
+                    <span className="text-dim">待提升: </span>{overall.thinking_patterns.new_gaps.join("、")}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 }
@@ -275,6 +315,46 @@ function DrillReview({ scores, overall, questions, answers, topic }) {
           );
         })}
       </div>
+
+      {(overall?.communication_observations || overall?.thinking_patterns) && (
+        <Card className="mb-6">
+          <CardContent className="p-5 md:p-7">
+            {overall.communication_observations && (
+              <div className="mb-4">
+                <div className="text-base font-semibold mb-3">沟通表达</div>
+                {overall.communication_observations.style_update && (
+                  <div className="text-sm leading-[1.7] text-text mb-2">{overall.communication_observations.style_update}</div>
+                )}
+                {overall.communication_observations.new_habits?.length > 0 && (
+                  <div className="text-[13px] text-dim mb-1">表达习惯: {overall.communication_observations.new_habits.join("、")}</div>
+                )}
+                {overall.communication_observations.new_suggestions?.length > 0 && (
+                  <div className="mt-2">
+                    {overall.communication_observations.new_suggestions.map((s, i) => (
+                      <div key={i} className="px-3 py-2 rounded-lg text-[13px] text-text border bg-blue-500/8 border-blue-500/20 mb-1.5">{s}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {overall.thinking_patterns && (
+              <div>
+                <div className="text-base font-semibold mb-3">思维模式</div>
+                {overall.thinking_patterns.new_strengths?.length > 0 && (
+                  <div className="text-[13px] text-text mb-1">
+                    <span className="text-dim">优势: </span>{overall.thinking_patterns.new_strengths.join("、")}
+                  </div>
+                )}
+                {overall.thinking_patterns.new_gaps?.length > 0 && (
+                  <div className="text-[13px] text-text">
+                    <span className="text-dim">待提升: </span>{overall.thinking_patterns.new_gaps.join("、")}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 }
@@ -453,7 +533,8 @@ export default function Review() {
             const wp = Array.isArray(data.weak_points) ? data.weak_points : [];
             if (wp.length) setOverall((prev) => ({ ...prev, new_weak_points: wp }));
           }
-          if (data.topics_covered) setTopicsCovered(data.topics_covered);
+          const tc = data.topics_covered || data.overall?.topics_covered;
+          if (tc) setTopicsCovered(tc);
           if (data.meta) setMeta(data.meta);
           if (data.mode === "topic_drill" || data.mode === "jd_prep") {
             setAnswers(inferAnswers(data.questions || [], data.transcript || []));

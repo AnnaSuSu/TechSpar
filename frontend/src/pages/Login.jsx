@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import Logo from "../components/Logo";
 
 export default function Login() {
   const [isRegister, setIsRegister] = useState(false);
@@ -77,7 +78,7 @@ export default function Login() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/10 to-transparent rounded-bl-full pointer-events-none" />
           <CardHeader className="relative">
             <div className="flex items-center gap-3 mb-1">
-              <img src="/logo.png" alt="TechSpar" className="w-10 h-10 rounded-xl" />
+              <Logo className="w-10 h-10 rounded-xl drop-shadow-sm" />
               <div>
                 <CardTitle>{isRegister ? "创建账号" : "欢迎回来"}</CardTitle>
                 <CardDescription className="mt-1">
