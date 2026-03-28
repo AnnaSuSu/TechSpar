@@ -210,16 +210,18 @@ export default function Home() {
             <div
               key={card.mode}
               className={cn(
-                "w-full relative overflow-hidden cursor-pointer transition-all text-left border-2 rounded-xl",
+                "w-full relative overflow-hidden cursor-pointer transition-all duration-300 text-left border-2 rounded-xl group",
                 isActive
                   ? `border-current ${card.borderActive} bg-card shadow-lg`
-                  : "border-border bg-card hover:border-border hover:shadow-md hover:-translate-y-0.5"
+                  : "border-border bg-card hover:border-primary/30 hover:shadow-lg hover:-translate-y-1"
               )}
               onClick={() => { setMode(card.mode); if (card.mode !== "topic_drill") setSelectedTopic(null); }}
             >
-              {isActive && (
-                <div className={cn("absolute inset-0 bg-gradient-to-br opacity-50 pointer-events-none", card.gradient)} />
-              )}
+              <div className={cn(
+                "absolute inset-0 bg-gradient-to-br pointer-events-none transition-opacity duration-500",
+                card.gradient,
+                isActive ? "opacity-50" : "opacity-0 group-hover:opacity-15"
+              )} />
               <div className="relative px-6 py-7">
                 <div className="flex items-center justify-between mb-4">
                   <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center transition-all", card.iconBg)}>

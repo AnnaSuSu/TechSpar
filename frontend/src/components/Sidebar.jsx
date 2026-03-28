@@ -8,6 +8,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import Logo from "./Logo";
 import {
   Tooltip,
   TooltipContent,
@@ -55,18 +56,19 @@ export default function Sidebar() {
       <button
         onClick={() => navigate(path)}
         className={cn(
-          "flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] transition-all text-left group relative",
+          "flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[13px] transition-all duration-300 text-left group relative overflow-hidden",
           active
             ? "bg-primary/12 text-primary font-medium"
             : "text-dim hover:text-text hover:bg-hover",
           collapsed && "justify-center px-0"
         )}
       >
+        {!active && <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />}
         {active && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary drop-shadow-[0_0_4px_currentColor]" />
         )}
-        <Icon size={18} className={cn("shrink-0", active ? "text-primary" : "text-dim group-hover:text-text")} />
-        {!collapsed && <span className="truncate">{label}</span>}
+        <Icon size={18} className={cn("shrink-0 relative z-10 transition-transform duration-300", active ? "text-primary" : "text-dim group-hover:text-primary group-hover:scale-[1.15]")} />
+        {!collapsed && <span className="truncate relative z-10 transition-transform duration-300 group-hover:translate-x-1">{label}</span>}
       </button>
     );
 
@@ -86,10 +88,10 @@ export default function Sidebar() {
       "flex flex-col h-full border-r border-sidebar-border bg-sidebar transition-all duration-300",
       collapsed ? "w-[68px]" : "w-[240px]"
     )}>
-      <div className={cn("flex items-center shrink-0 px-4 py-4", collapsed ? "justify-center" : "gap-2.5")}>
-        <img src="/logo.png" alt="TechSpar" className="w-8 h-8 rounded-lg object-contain shrink-0" />
+      <div className={cn("flex items-center shrink-0 py-5", collapsed ? "justify-center px-4" : "px-6 gap-2.5")}>
+        <Logo className="w-7 h-7 rounded-lg shrink-0 drop-shadow-sm" />
         {!collapsed && (
-          <span className="text-lg font-display font-bold text-sidebar-foreground">TechSpar</span>
+          <span className="text-lg font-display font-bold text-sidebar-foreground translate-y-[1px]">TechSpar</span>
         )}
       </div>
 
@@ -161,8 +163,8 @@ export default function Sidebar() {
     <>
       <div className="md:hidden flex items-center justify-between px-4 py-3 bg-card border-b border-border shrink-0">
         <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate("/")}>
-          <img src="/logo.png" alt="TechSpar" className="w-7 h-7 rounded-lg object-contain" />
-          <span className="text-base font-display font-bold text-text">TechSpar</span>
+          <Logo className="w-7 h-7 rounded-lg drop-shadow-sm" />
+          <span className="text-base font-display font-bold text-text translate-y-[1px]">TechSpar</span>
         </div>
         <Button variant="ghost" size="icon" onClick={() => setOpen(o => !o)}>
           {open ? <X size={18} /> : <Menu size={18} />}
