@@ -3,7 +3,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Check, Minus, Star } from "lucide-react";
 import ChatBubble from "../components/ChatBubble";
-import { sendMessage, endInterview } from "../api/interview";
+import { sendMessage, sendMessageStream, endInterview } from "../api/interview";
 import { useTaskStatus } from "../contexts/TaskStatusContext";
 import useVoiceInput from "../hooks/useVoiceInput";
 import { cn } from "@/lib/utils";
@@ -110,13 +110,48 @@ export default function Interview() {
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setInput("");
     setSending(true);
+
+    // Insert empty assistant message for streaming
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
     try {
-      const data = await sendMessage(sessionId, text);
-      setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
-      if (data.progress) setProgress(data.progress);
-      if (data.is_finished) setFinished(true);
-    } catch (err) {
-      setMessages((prev) => [...prev, { role: "assistant", content: `[错误] ${err.message}` }]);
+      await sendMessageStream(sessionId, text, {
+        onToken: (token) => {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            updated[updated.length - 1] = { ...last, content: last.content + token };
+            return updated;
+          });
+        },
+        onDone: (data) => {
+          if (data.is_finished) setFinished(true);
+        },
+        onError: (err) => {
+          setMessages((prev) => {
+            const updated = [...prev];
+            updated[updated.length - 1] = { role: "assistant", content: `[错误] ${err.message}` };
+            return updated;
+          });
+        },
+      });
+    } catch {
+      // SSE failed — fallback to non-streaming
+      try {
+        const data = await sendMessage(sessionId, text);
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: "assistant", content: data.message };
+          return updated;
+        });
+        if (data.is_finished) setFinished(true);
+      } catch (err) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: "assistant", content: `[错误] ${err.message}` };
+          return updated;
+        });
+      }
     } finally {
       setSending(false);
       textareaRef.current?.focus();
@@ -346,23 +381,12 @@ export default function Interview() {
         {messages.map((msg, i) => (
           <ChatBubble key={i} role={msg.role} content={msg.content} />
         ))}
-        {sending && (
-          <div className="flex flex-col animate-fade-in mb-6 opacity-75">
-            <div className="h-px bg-border mb-6" />
-            <div className="max-w-[720px] md:max-w-[720px]">
-              <div className="flex items-center mb-5 gap-2">
-                <div className="w-5 h-5 flex items-center justify-center shrink-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" />
-                </div>
-                <span className="text-[13px] font-medium text-primary tracking-wide">AI 面试官正在思考回复中...</span>
-              </div>
-              <div className="space-y-3.5 px-1 w-full md:w-[600px]">
-                <Skeleton className="w-full h-4 rounded-md" />
-                <Skeleton className="w-[94%] h-4 rounded-md" />
-                <Skeleton className="w-[82%] h-4 rounded-md" />
-                <Skeleton className="w-[45%] h-4 rounded-md" />
-              </div>
+        {sending && messages.length > 0 && messages[messages.length - 1].role === "assistant" && !messages[messages.length - 1].content && (
+          <div className="flex items-center gap-2 animate-fade-in opacity-75 -mt-4">
+            <div className="w-5 h-5 flex items-center justify-center shrink-0">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" />
             </div>
+            <span className="text-[13px] font-medium text-primary tracking-wide">AI 面试官正在思考回复中...</span>
           </div>
         )}
         <div ref={chatEndRef} />

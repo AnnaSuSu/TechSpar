@@ -113,6 +113,44 @@ export async function sendMessage(sessionId, message) {
   return res.json();
 }
 
+export async function sendMessageStream(sessionId, message, { onToken, onDone, onError }) {
+  const res = await authFetch(`${API_BASE}/interview/chat/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, message }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop(); // keep incomplete line
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      try {
+        const data = JSON.parse(line.slice(6));
+        if (data.error) {
+          onError?.(new Error(data.error));
+          return;
+        }
+        if (data.token) onToken?.(data.token);
+        if (data.done) {
+          onDone?.(data);
+          return;
+        }
+      } catch { /* ignore malformed lines */ }
+    }
+  }
+}
+
 export async function endInterview(sessionId, answers = null) {
   const options = { method: "POST" };
   if (answers) {

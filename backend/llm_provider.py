@@ -14,6 +14,7 @@ def get_langchain_llm():
         api_key=settings.api_key,
         base_url=settings.api_base,
         temperature=settings.temperature,
+        streaming=True,
     )
 
 

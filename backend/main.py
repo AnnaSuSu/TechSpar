@@ -1,5 +1,6 @@
 """FastAPI 入口 — 面试模拟系统 API."""
 import asyncio
+import json
 import logging
 import re
 import uuid
@@ -7,6 +8,7 @@ from datetime import datetime
 
 from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks, UploadFile, File, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage, AIMessage
 
 from backend.models import (
@@ -700,6 +702,92 @@ def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
         "message": ai_message,
         "is_finished": is_finished,
     }
+
+
+_EVAL_TAG_PREFIX = "<!--EVAL:"
+_EVAL_TAG_SUFFIX = "-->"
+
+
+@router.post("/interview/chat/stream")
+async def chat_stream(req: ChatRequest, user_id: str = Depends(get_current_user)):
+    """SSE streaming version of /interview/chat."""
+    if req.session_id not in _graphs:
+        raise HTTPException(404, "Session not found.")
+
+    entry = _graphs[req.session_id]
+    if entry.get("user_id") != user_id:
+        raise HTTPException(403, "Access denied.")
+
+    graph = entry["graph"]
+    config = entry["config"]
+
+    state = graph.get_state(config)
+    if not state.next:
+        async def _finished_gen():
+            yield f"data: {json.dumps({'done': True, 'is_finished': True})}\n\n"
+        return StreamingResponse(_finished_gen(), media_type="text/event-stream")
+
+    graph.update_state(config, {"messages": [HumanMessage(content=req.message)]})
+    append_message(req.session_id, "user", req.message, user_id=user_id)
+
+    async def event_generator():
+        full_text = ""
+        # Buffer for detecting <!--EVAL:...--> at the end of response
+        pending = ""
+
+        try:
+            async for event in graph.astream_events(None, config, version="v2"):
+                if event["event"] != "on_chat_model_stream":
+                    continue
+                chunk = event["data"].get("chunk")
+                if not chunk or not hasattr(chunk, "content") or not chunk.content:
+                    continue
+
+                token = chunk.content
+                pending += token
+
+                # Check if pending might contain the start of an eval tag
+                # Only hold back when we see a potential <!--EVAL: prefix
+                if _EVAL_TAG_PREFIX in pending:
+                    # Full eval tag found — strip it and stop buffering
+                    if _EVAL_TAG_SUFFIX in pending[pending.index(_EVAL_TAG_PREFIX):]:
+                        before = pending[:pending.index(_EVAL_TAG_PREFIX)]
+                        if before:
+                            full_text += before
+                            yield f"data: {json.dumps({'token': before})}\n\n"
+                        pending = ""
+                    # Else: partial eval tag, keep buffering
+                elif pending.endswith(("<", "<!", "<!-", "<!--", "<!--E", "<!--EV", "<!--EVA", "<!--EVAL", "<!--EVAL:")):
+                    # Could be start of eval tag — keep buffering
+                    pass
+                else:
+                    # Safe to flush
+                    full_text += pending
+                    yield f"data: {json.dumps({'token': pending})}\n\n"
+                    pending = ""
+
+            # Flush any remaining buffer (not part of eval tag)
+            if pending and _EVAL_TAG_PREFIX not in pending:
+                full_text += pending
+                yield f"data: {json.dumps({'token': pending})}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            return
+
+        # Read final state for is_finished
+        final_state = graph.get_state(config)
+        is_finished = False
+        if isinstance(final_state.values, dict):
+            is_finished = final_state.values.get("is_finished", False)
+            phase = final_state.values.get("phase", "")
+            if phase in (InterviewPhase.END.value, "end"):
+                is_finished = True
+
+        append_message(req.session_id, "assistant", full_text, user_id=user_id)
+        yield f"data: {json.dumps({'done': True, 'is_finished': is_finished})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 logger = logging.getLogger("uvicorn")
