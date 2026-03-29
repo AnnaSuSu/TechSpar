@@ -282,7 +282,7 @@ export default function Interview() {
                 <div className="flex-1 relative">
                   <textarea
                     ref={textareaRef}
-                    className="w-full min-h-[80px] max-h-[240px] px-4 py-3 rounded-xl border border-border bg-input text-text resize-none text-sm leading-relaxed pl-12 placeholder:text-dim/50 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
+                    className="w-full min-h-[80px] max-h-[240px] px-4 py-3 rounded-xl border border-border bg-input text-text resize-none text-sm leading-relaxed pr-12 placeholder:text-dim/50 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
                     value={drillInput}
                     onChange={(e) => setDrillInput(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -290,7 +290,7 @@ export default function Interview() {
                     rows={3}
                   />
                   {drillVoice.isSupported && (
-                    <div className="absolute bottom-3 left-3">
+                    <div className="absolute bottom-3 right-3">
                       <MicButton voice={drillVoice} />
                     </div>
                   )}
@@ -372,7 +372,7 @@ export default function Interview() {
           <div className="relative w-full max-w-3xl">
             <textarea
               ref={textareaRef}
-              className="w-full px-4 py-4 md:px-5 pl-12 min-h-[80px] max-h-[240px] rounded-2xl border border-border bg-card text-text resize-none text-[15px] leading-normal placeholder:text-dim/50 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
+              className="w-full px-4 py-4 md:px-5 pr-12 min-h-[80px] max-h-[240px] rounded-2xl border border-border bg-card text-text resize-none text-[15px] leading-normal placeholder:text-dim/50 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -381,7 +381,7 @@ export default function Interview() {
               rows={3}
             />
             {chatVoice.isSupported && !finished && (
-              <div className="absolute bottom-4 left-3">
+              <div className="absolute bottom-4 right-3">
                 <MicButton voice={chatVoice} />
               </div>
             )}
