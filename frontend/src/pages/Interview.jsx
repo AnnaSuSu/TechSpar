@@ -86,6 +86,7 @@ export default function Interview() {
   };
 
   const handleEndBatch = async () => {
+    if (submitted || submitting) return;
     setSubmitting(true);
     try {
       const answerList = questions.map((q) => ({
@@ -94,6 +95,7 @@ export default function Interview() {
       }));
       await endInterview(sessionId, answerList);
       setSubmitted(true);
+      setFinished(true);
       const label = isJobPrep ? "JD 备面复盘生成中" : "专项训练复盘生成中";
       const type = isJobPrep ? "jd_review" : "drill_review";
       startTask(sessionId, type, label);
@@ -219,7 +221,7 @@ export default function Interview() {
               : initData.topic && <span className="text-sm text-dim">{initData.topic}</span>}
             <span className="text-[13px] text-dim">{answeredCount}/{totalQ} 已答</span>
           </div>
-          <Button variant="destructive" size="sm" onClick={handleEndBatch} disabled={submitting}>
+          <Button variant="destructive" size="sm" onClick={handleEndBatch} disabled={submitting || submitted}>
             {submitting ? "评估中..." : finished ? "查看评估" : isJobPrep ? "结束备面" : "结束训练"}
           </Button>
         </div>

@@ -983,6 +983,11 @@ async def end_interview(session_id: str, background_tasks: BackgroundTasks,
 
         return {"session_id": session_id, "mode": InterviewMode.JD_PREP.value, "status": "pending"}
 
+    # ── Already ended — idempotent response ──
+    if session_id in _task_status:
+        ts = _task_status[session_id]
+        return {"session_id": session_id, "mode": ts.get("type", "unknown"), "status": ts.get("status", "pending")}
+
     # ── Resume mode: async review generation ──
     if session_id not in _graphs:
         raise HTTPException(404, "Session not found.")
