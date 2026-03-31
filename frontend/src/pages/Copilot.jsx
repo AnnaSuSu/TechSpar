@@ -530,69 +530,101 @@ function PrepResultCards({ status }) {
   const gaps = fitReport.gaps || [];
   const skills = jdAnalysis.required_skills || [];
   const dimensions = jdAnalysis.likely_question_dimensions || [];
+  const dangerNodes = riskMap.filter((r) => r.risk_level === "danger");
 
   return (
     <>
-      <Card className="overflow-hidden border-primary/15 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.08),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(242,246,255,0.92))] dark:bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_30%),linear-gradient(135deg,rgba(24,24,27,0.98),rgba(30,41,59,0.84))]">
-        <CardContent className="p-5 md:p-6 xl:p-7">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <Brain size={18} className="text-blue-400" />
-                <div className="text-xl font-semibold">
-                  {companyReport.company_name || jdAnalysis.role_title || "面试准备完成"}
-                </div>
-                <Badge variant="blue">{jdAnalysis.role_title || "技术岗位"}</Badge>
+      {/* ── 第一层：情报摘要，最醒目，第一眼看到 ── */}
+      <Card className="overflow-hidden border-primary/20 bg-[radial-gradient(ellipse_at_top_left,rgba(59,130,246,0.13),transparent_50%),linear-gradient(160deg,rgba(255,255,255,0.99),rgba(238,244,255,0.95))] dark:bg-[radial-gradient(ellipse_at_top_left,rgba(59,130,246,0.18),transparent_50%),linear-gradient(160deg,rgba(20,20,28,0.99),rgba(24,32,50,0.92))]">
+        <CardContent className="p-5 md:p-7 xl:p-8">
+          <div className="flex flex-wrap items-center gap-2 mb-5">
+            <Brain size={18} className="text-primary" />
+            <span className="text-lg font-semibold">
+              {companyReport.company_name
+                ? `${companyReport.company_name} · ${jdAnalysis.role_title || "技术岗位"}`
+                : jdAnalysis.role_title || "面试准备完成"}
+            </span>
+            <Badge variant={fitReport.overall_fit >= 0.7 ? "green" : fitReport.overall_fit >= 0.5 ? "blue" : "destructive"}>
+              匹配度 {Math.round((fitReport.overall_fit || 0) * 100)}%
+            </Badge>
+            {dangerNodes.length > 0 && (
+              <Badge variant="destructive">{dangerNodes.length} 个高危区域</Badge>
+            )}
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            {fitReport.coach_brief && (
+              <div className="rounded-2xl border border-primary/15 bg-primary/6 px-5 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.15em] text-primary/70 mb-2.5">你需要知道</div>
+                <div className="text-[15px] leading-8 text-text/95">{fitReport.coach_brief}</div>
               </div>
-              {companyReport.interview_style && (
-                <div className="mt-3 max-w-4xl text-sm leading-7 text-dim">{companyReport.interview_style}</div>
-              )}
-            </div>
-            <div className="grid min-w-[240px] gap-2 sm:grid-cols-3 xl:grid-cols-1">
-              <ResultTag label="技术栈" value={skills.length} />
-              <ResultTag label="考察维度" value={dimensions.length} />
-              <ResultTag label="高危路径" value={riskMap.length} />
-            </div>
+            )}
+            {status.risk_summary && (
+              <div className="rounded-2xl border border-red/20 bg-red/6 px-5 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.15em] text-red/70 mb-2.5">高危区域</div>
+                <div className="text-[15px] leading-8 text-text/95">{status.risk_summary}</div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
+      {/* ── 第二层：公司情报 ── */}
+      {(companyReport.interviewer_mindset || companyReport.main_business || companyReport.how_to_reference) && (
+        <Card className="border-border/80">
+          <CardContent className="p-5 md:p-6">
+            <SectionTitle icon={<Building2 size={17} className="text-blue-400" />} title="公司情报" />
+            <div className="mt-4 grid gap-5 xl:grid-cols-3">
+              {companyReport.main_business && (
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-dim/70 mb-2">主营业务</div>
+                  <div className="text-sm leading-7 text-text/90">{companyReport.main_business}</div>
+                </div>
+              )}
+              {companyReport.interviewer_mindset && (
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-dim/70 mb-2">面试官关注点</div>
+                  <div className="text-sm leading-7 text-text/90">{companyReport.interviewer_mindset}</div>
+                </div>
+              )}
+              {companyReport.how_to_reference && (
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-dim/70 mb-2">答题时怎么引用</div>
+                  <div className="text-sm leading-7 text-text/90">{companyReport.how_to_reference}</div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── 第三层：细节支撑 ── */}
       <div className="grid gap-5 xl:grid-cols-2">
         <Card className="border-border/80">
           <CardContent className="p-5 md:p-6">
-            <SectionTitle icon={<Target size={17} className="text-primary" />} title="岗位匹配度" />
-            <div className="mt-2 mb-4">
-              <Badge variant={fitReport.overall_fit >= 0.7 ? "green" : fitReport.overall_fit >= 0.5 ? "blue" : "destructive"}>
-                匹配度 {Math.round((fitReport.overall_fit || 0) * 100)}%
-              </Badge>
+            <SectionTitle icon={<Target size={17} className="text-primary" />} title="匹配亮点 / 差距" />
+            <div className="mt-4 space-y-2">
+              {highlights.map((h, i) => (
+                <div key={i} className="rounded-2xl border border-green/15 bg-green/8 px-4 py-3 text-sm leading-7">
+                  {typeof h === "string" ? h : h.point}
+                </div>
+              ))}
+              {gaps.map((g, i) => (
+                <div key={i} className="rounded-2xl border border-amber-500/15 bg-amber-500/8 px-4 py-3 text-sm leading-7">
+                  <div>{typeof g === "string" ? g : g.point}</div>
+                  {g.mitigation && <div className="mt-1 text-[13px] text-dim">{g.mitigation}</div>}
+                </div>
+              ))}
+              {highlights.length === 0 && gaps.length === 0 && (
+                <div className="text-sm text-dim py-2">暂无匹配数据</div>
+              )}
             </div>
-            {highlights.length > 0 && (
-              <div className="space-y-2 mb-4">
-                <div className="text-[13px] font-semibold text-green">亮点</div>
-                {highlights.map((h, i) => (
-                  <div key={i} className="rounded-2xl border border-green/15 bg-green/8 px-4 py-3 text-sm leading-7">
-                    {typeof h === "string" ? h : h.point}
-                  </div>
-                ))}
-              </div>
-            )}
-            {gaps.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-[13px] font-semibold text-amber-400">差距</div>
-                {gaps.map((g, i) => (
-                  <div key={i} className="rounded-2xl border border-amber-500/15 bg-amber-500/8 px-4 py-3 text-sm leading-7">
-                    <div>{typeof g === "string" ? g : g.point}</div>
-                    {g.mitigation && <div className="mt-1 text-[13px] text-dim">{g.mitigation}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
 
         <Card className="border-border/80">
           <CardContent className="p-5 md:p-6">
-            <SectionTitle icon={<ShieldAlert size={17} className="text-red" />} title="高危路径" />
+            <SectionTitle icon={<ShieldAlert size={17} className="text-red" />} title="高危路径详情" />
             <div className="mt-4 space-y-3">
               {riskMap.length > 0 ? riskMap.map((r, i) => (
                 <div key={i} className="rounded-2xl border border-red/15 bg-red/8 px-4 py-3">
@@ -605,7 +637,7 @@ function PrepResultCards({ status }) {
                 </div>
               )) : (
                 <div className="rounded-2xl border border-green/15 bg-green/8 px-4 py-3 text-sm text-green">
-                  未发现高危路径，你的准备状态良好。
+                  未发现高危路径，准备状态良好。
                 </div>
               )}
             </div>
@@ -613,6 +645,7 @@ function PrepResultCards({ status }) {
         </Card>
       </div>
 
+      {/* ── 第四层：JD 技术栈参考 ── */}
       {skills.length > 0 && (
         <Card className="border-border/80">
           <CardContent className="p-5 md:p-6">

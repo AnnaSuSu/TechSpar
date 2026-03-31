@@ -56,10 +56,13 @@ async def search_company(company: str, position: str = "") -> str:
 
     llm = get_copilot_llm()
     messages = [
-        SystemMessage(content="""你是一个面试信息分析师。根据搜索结果，整理目标公司的面试相关信息。
+        SystemMessage(content="""你是一个面试情报分析师。根据搜索结果，为候选人整理目标公司的面试情报。
 输出严格 JSON 格式：
 {
   "company_name": "公司名",
+  "main_business": "2-3句话描述公司主营业务和核心产品，要具体，不要泛泛而谈",
+  "interviewer_mindset": "基于公司业务和技术方向，面试官最关心什么、倾向于往哪个方向深挖，写成一段话",
+  "how_to_reference": "面试中如何主动引用公司业务场景来回答技术问题、让答案更有针对性，给出1-2个具体方向",
   "tech_stack": ["技术1", "技术2"],
   "interview_style": "面试风格描述（轮数、侧重点、难度）",
   "culture_notes": "工程文化特点",
@@ -70,4 +73,9 @@ async def search_company(company: str, position: str = "") -> str:
         HumanMessage(content=f"公司: {company}\n岗位: {position}\n\n搜索结果:\n{json.dumps(all_results, ensure_ascii=False)}"),
     ]
     resp = await llm.ainvoke(messages)
-    return resp.content
+    text = resp.content.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+    return text.strip()

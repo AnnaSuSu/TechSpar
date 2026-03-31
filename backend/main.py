@@ -1542,6 +1542,7 @@ async def get_copilot_prep_status(prep_id: str, user_id: str = Depends(get_curre
         resp["jd_analysis"] = result.get("jd_analysis", {})
         resp["fit_report"] = result.get("fit_report", {})
         resp["risk_map"] = result.get("risk_map", [])
+        resp["risk_summary"] = result.get("risk_summary", "")
         resp["prep_hints"] = result.get("prep_hints", [])
     return resp
 

@@ -144,10 +144,10 @@ async def _run_risk_assessor(
     ])
     try:
         result = json.loads(_strip_markdown(resp.content))
-        return result.get("risk_map", []), result.get("prep_hints", [])
+        return result.get("risk_map", []), result.get("prep_hints", []), result.get("risk_summary", "")
     except json.JSONDecodeError:
         logger.error(f"Risk assessment parse failed: {resp.content[:300]}")
-        return [], []
+        return [], [], ""
 
 
 async def run_copilot_prep(
@@ -192,7 +192,7 @@ async def run_copilot_prep(
     if on_progress:
         await on_progress("正在评估风险路径...")
 
-    risk_map, prep_hints = await _run_risk_assessor(strategy_tree, profile, fit_report)
+    risk_map, prep_hints, risk_summary = await _run_risk_assessor(strategy_tree, profile, fit_report)
 
     # 获取简历上下文用于存储
     resume_context = ""
@@ -214,6 +214,7 @@ async def run_copilot_prep(
         "fit_report": fit_report,
         "question_strategy_tree": strategy_tree,
         "risk_map": risk_map,
+        "risk_summary": risk_summary,
         "prep_hints": prep_hints,
         "status": "done",
         "progress": "准备完成",
