@@ -14,6 +14,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import useScrollReveal from "@/hooks/useScrollReveal";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -138,6 +139,33 @@ const LOOP_MODULES = [
   },
 ];
 
+const HERO_STATS = [
+  {
+    icon: Target,
+    stat: "95%",
+    title: "薄弱点精准定位",
+    desc: "长期记忆引擎追踪每次失误，精准锁定需要强化的环节。",
+    iconClass: "bg-primary/10 text-primary",
+    statClass: "text-primary",
+  },
+  {
+    icon: BarChart3,
+    stat: "3x",
+    title: "训练效率提升",
+    desc: "AI 动态调题取代随机出题，每一轮都比上一轮更有针对性。",
+    iconClass: "bg-teal/10 text-teal",
+    statClass: "text-teal",
+  },
+  {
+    icon: Sparkles,
+    stat: "40%",
+    title: "面试通过率提升",
+    desc: "闭环训练覆盖从刷题到实战全链路，不止练题更练实战。",
+    iconClass: "bg-green/10 text-green",
+    statClass: "text-green",
+  },
+];
+
 const HERO_SIGNALS = [
   {
     icon: Repeat,
@@ -192,6 +220,10 @@ export default function Landing() {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
+  const loopRef = useScrollReveal();
+  const memoryRef = useScrollReveal();
+  const ctaRef = useScrollReveal();
+
   const scrollToLoop = () => {
     document.getElementById("loop")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -226,64 +258,104 @@ export default function Landing() {
           <div className="absolute left-[8%] top-24 h-56 w-56 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
           <div className="absolute right-[10%] top-36 h-64 w-64 rounded-full bg-teal/10 blur-3xl pointer-events-none" />
 
-          <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-[0.92fr,1.08fr]">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary animate-fade-in">
-                <Sparkles size={14} className="animate-float" />
-                从刷题到实战的 AI 技术面试系统
-              </div>
+          <div className="mx-auto max-w-7xl">
+            <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(350px,430px)] lg:items-start lg:gap-8 xl:grid-cols-[minmax(0,1.02fr)_minmax(380px,450px)] xl:gap-10">
+              <div className="max-w-2xl lg:max-w-[760px] xl:max-w-[820px]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary animate-fade-in">
+                  <Sparkles size={14} className="animate-float" />
+                  从刷题到实战的 AI 技术面试系统
+                </div>
 
-              <h1 className="mt-6 text-4xl font-display font-bold leading-tight tracking-tight md:text-6xl md:leading-[1.04] animate-fade-in-up">
-                把技术面试做成
-                <span className="mt-2 block bg-gradient-to-r from-accent-light via-accent to-orange bg-clip-text text-transparent">
-                  一条持续进化的闭环
-                </span>
-              </h1>
+                <h1 className="mt-6 text-4xl font-display font-bold leading-tight tracking-tight md:text-6xl md:leading-[1.04] animate-fade-in-up">
+                  把技术面试做成
+                  <span className="mt-2 block bg-gradient-to-r from-accent-light via-accent to-orange bg-clip-text text-transparent">
+                    一条持续进化的闭环
+                  </span>
+                </h1>
 
-              <p className="mt-6 max-w-2xl text-base leading-8 text-dim md:text-lg animate-fade-in-up [animation-delay:0.08s]">
-                TechSpar 不只是生成一轮题，也不只是做一次模拟面试。它把专项训练、简历面试、JD 备面、实时
-                Copilot 和录音复盘接进同一套长期记忆里，让每一轮训练、实战辅助和复盘结果都会反哺下一轮。
-              </p>
+                <p className="mt-6 max-w-2xl text-base leading-8 text-dim md:text-lg animate-fade-in-up [animation-delay:0.08s]">
+                  TechSpar 不只是生成一轮题，也不只是做一次模拟面试。它把专项训练、简历面试、JD 备面、实时
+                  Copilot 和录音复盘接进同一套长期记忆里，让每一轮训练、实战辅助和复盘结果都会反哺下一轮。
+                </p>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row animate-fade-in-up [animation-delay:0.16s]">
-                <Button variant="gradient" size="lg" onClick={() => navigate("/login")}>
-                  在线体验
-                  <ArrowRight size={16} />
-                </Button>
-                <Button variant="outline" size="lg" onClick={scrollToLoop}>
-                  看闭环怎么运转
-                </Button>
-              </div>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row animate-fade-in-up [animation-delay:0.16s]">
+                  <Button variant="gradient" size="lg" onClick={() => navigate("/login")}>
+                    在线体验
+                    <ArrowRight size={16} />
+                  </Button>
+                  <Button variant="outline" size="lg" onClick={scrollToLoop}>
+                    看闭环怎么运转
+                  </Button>
+                </div>
 
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                {HERO_SIGNALS.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Card
-                      key={item.title}
-                      className="border-border/80 bg-card/85 shadow-[0_20px_60px_rgba(15,23,42,0.06)] backdrop-blur-sm"
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <Icon size={17} />
+                <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:max-w-[820px] lg:grid-cols-3 xl:max-w-[880px] animate-fade-in-up [animation-delay:0.18s]">
+                  {HERO_SIGNALS.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Card
+                        key={item.title}
+                        className="border-border/80 bg-card/85 shadow-[0_20px_60px_rgba(15,23,42,0.06)] backdrop-blur-sm"
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                              <Icon size={17} />
+                            </div>
+                            <div className="text-[15px] font-semibold leading-6">{item.title}</div>
                           </div>
-                          <div className="text-sm font-semibold">{item.title}</div>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-dim">{item.desc}</p>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                          <p className="mt-3 text-sm leading-6 text-dim">{item.desc}</p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="relative animate-fade-in-up [animation-delay:0.2s] lg:-mt-1 lg:self-start lg:pt-0 xl:mt-0 xl:pt-2">
+                <div className="pointer-events-none absolute inset-x-10 top-0 hidden h-32 rounded-full bg-primary/10 blur-3xl lg:block" />
+                <div className="grid gap-4 lg:ml-auto lg:max-w-[440px] xl:max-w-[450px]">
+                  {HERO_STATS.map((item, index) => {
+                    const Icon = item.icon;
+                    return (
+                      <Card
+                        key={item.title}
+                        className={cn(
+                          "rounded-[26px] border-border/80 bg-card/92 shadow-[0_24px_70px_rgba(15,23,42,0.07)] backdrop-blur-sm transition-transform duration-300 hover:-translate-y-0.5",
+                          index === 1 && "lg:translate-x-2 xl:translate-x-4",
+                          index === 2 && "lg:translate-x-4 xl:translate-x-8"
+                        )}
+                      >
+                        <CardContent className="p-5 md:p-6">
+                          <div className="flex items-start gap-4">
+                            <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", item.iconClass)}>
+                              <Icon size={20} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                                <span className={cn("text-4xl font-display font-bold tracking-tight leading-none", item.statClass)}>
+                                  {item.stat}
+                                </span>
+                                <span className="text-lg font-semibold leading-tight">{item.title}</span>
+                              </div>
+                              <p className="mt-2 text-sm leading-7 text-dim">{item.desc}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            <LoopVisual />
+            <div className="mt-12 animate-fade-in-up [animation-delay:0.24s] lg:mt-14">
+              <LoopVisual />
+            </div>
           </div>
         </section>
 
-        <section id="loop" className="px-6 pb-16 md:px-10 md:pb-24">
-          <div className="mx-auto max-w-6xl">
+        <section id="loop" ref={loopRef} className="scroll-reveal px-6 pb-16 md:px-10 md:pb-24">
+          <div className="mx-auto max-w-7xl">
             <SectionHeading
               label="面试闭环"
               title="五个模块不是五个孤岛，而是一套共享画像的系统"
@@ -339,8 +411,8 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="px-6 pb-16 md:px-10 md:pb-24">
-          <div className="mx-auto max-w-6xl">
+        <section ref={memoryRef} className="scroll-reveal px-6 pb-16 md:px-10 md:pb-24">
+          <div className="mx-auto max-w-7xl">
             <SectionHeading
               label="长期记忆"
               title="系统为什么会越练越懂你"
@@ -405,8 +477,8 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="px-6 pb-20 md:px-10 md:pb-24">
-          <div className="mx-auto max-w-6xl">
+        <section ref={ctaRef} className="scroll-reveal px-6 pb-20 md:px-10 md:pb-24">
+          <div className="mx-auto max-w-7xl">
             <Card className="overflow-hidden rounded-[30px] border-border/80 bg-card/95 shadow-[0_30px_100px_rgba(15,23,42,0.08)]">
               <CardContent className="p-6 md:p-8">
                 <div className="grid gap-8 lg:grid-cols-[1fr,0.85fr] lg:items-center">
@@ -758,7 +830,7 @@ function CenterMemoryCard({ activeModule, mobile = false }) {
 
 function SectionHeading({ label, title, desc }) {
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-4xl">
       <div className="text-sm font-medium text-primary">{label}</div>
       <h2 className="mt-3 text-2xl font-display font-bold tracking-tight md:text-4xl">{title}</h2>
       <p className="mt-4 text-sm leading-7 text-dim md:text-base">{desc}</p>
