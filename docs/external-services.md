@@ -9,9 +9,9 @@
 | 环境变量 | 用在哪里 | 不配置会怎样 |
 | --- | --- | --- |
 | `COPILOT_API_BASE` `COPILOT_API_KEY` `COPILOT_MODEL` | 给 Copilot 单独指定模型 | 回退到主 LLM |
-| `NLS_APPKEY` `NLS_ACCESS_KEY_ID` `NLS_ACCESS_KEY_SECRET` | Copilot 实时语音识别 | 只能手动输入 HR 问题 |
+| `DASHSCOPE_API_KEY` | **两件事**：①Copilot 实时语音识别（qwen3-asr-flash-realtime）②录音文件批量转写 | 只能手动输入 HR 问题；录音上传转写也不可用 |
+| `TENCENT_SECRET_ID` `TENCENT_SECRET_KEY` `TENCENT_VPR_APP_ID` | Copilot **自动区分 HR 与候选人音色**（腾讯云 VPR 声纹识别） | 实时面试时需要手动点按钮切换"HR / You"角色 |
 | `TAVILY_API_KEY` | Copilot 的公司联网搜索 | 公司情报会退化，其他分析仍可用 |
-| `DASHSCOPE_API_KEY` | 录音文件转写 | 不能自动转写，只能贴逐字稿 |
 | `QINIU_ACCESS_KEY` `QINIU_SECRET_KEY` `QINIU_BUCKET` `QINIU_DOMAIN` | 录音文件上传到公网 URL | 不能走上传录音转写链路 |
 
 ---
@@ -23,15 +23,17 @@
 | 目标功能 | 最少要配什么 | 配好后怎么验证 |
 | --- | --- | --- |
 | Copilot 文本版 | `COPILOT_*`，或者什么都不填直接复用主 LLM | 进入 Copilot，能正常完成 Prep，并能在实时阶段手动输入 HR 问题 |
-| Copilot 实时语音版 | `COPILOT_*` 可选，`NLS_*` 必填，还要装 NLS SDK | 进入 Copilot 实时阶段，点击开始录音后能看到实时字幕 |
-| Copilot 联网公司搜索 | `TAVILY_API_KEY` | Copilot Prep 结果里不再出现“未配置搜索 API” |
+| Copilot 实时语音版 | `DASHSCOPE_API_KEY`（`COPILOT_*` 可选） | 进入 Copilot 实时阶段，点击开始录音后能看到实时字幕 |
+| Copilot 自动说话人区分 | `DASHSCOPE_API_KEY` + `TENCENT_*`，并在设置页录入候选人声纹 | 实时面试时手动按钮被替换为"Auto"徽标，对话历史自动打 HR / candidate |
+| Copilot 联网公司搜索 | `TAVILY_API_KEY` | Copilot Prep 结果里不再出现"未配置搜索 API" |
 | 录音上传自动转写 | `DASHSCOPE_API_KEY` + `QINIU_*` | 录音复盘上传短音频后能拿到转写文本 |
 
 再说得更直接一点：
 
-* **只想先用 Copilot**：先不管 `NLS_*` 和 `TAVILY_API_KEY`，文本输入照样能用。
-* **只想开 Copilot 语音**：核心是 `NLS_*`，`COPILOT_*` 不是强制。
-* **只想开录音上传转写**：只看 `DASHSCOPE_API_KEY + QINIU_*`。
+* **只想先用 Copilot 文本版**：先不管 `DASHSCOPE_API_KEY`、`TENCENT_*`、`TAVILY_API_KEY`，文本输入照样能用。
+* **只想开 Copilot 语音**：核心是 `DASHSCOPE_API_KEY`，`COPILOT_*` 不是强制。
+* **想让 HR / 候选人自动区分**：在"只想开 Copilot 语音"基础上再加 `TENCENT_*`，并录入候选人声纹。
+* **只想开录音上传转写**：只看 `DASHSCOPE_API_KEY + QINIU_*`（和实时语音共用一个 key）。
 
 ---
 
@@ -53,19 +55,33 @@ COPILOT_MODEL=gpt-4o-mini
 
 #### 2. Copilot 实时语音示例
 
+实时语音识别走 DashScope `qwen3-asr-flash-realtime`，只需要一个 key：
+
 ```env
-NLS_APPKEY=your-nls-appkey
-NLS_ACCESS_KEY_ID=your-access-key-id
-NLS_ACCESS_KEY_SECRET=your-access-key-secret
+DASHSCOPE_API_KEY=sk-your-dashscope-key
 ```
 
-#### 3. Copilot 联网搜索示例
+这个 key 同时也是"录音上传转写"用的那个，**两个场景共用一个**。
+
+#### 3. Copilot 自动说话人识别（可选）
+
+想让实时面试自动区分 HR 和候选人，不用手动按按钮切换，就再加上腾讯云 VPR 凭据：
+
+```env
+TENCENT_SECRET_ID=AKIDxxxxxxxxxxxxxxxx
+TENCENT_SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TENCENT_VPR_APP_ID=
+```
+
+这 3 项也可以不放 `.env`，而是在 Copilot 设置页的"声纹识别（可选）"卡片里填写（per-user 覆盖）。
+
+#### 4. Copilot 联网搜索示例
 
 ```env
 TAVILY_API_KEY=tvly-your-api-key
 ```
 
-#### 4. 录音上传转写示例
+#### 5. 录音上传转写示例
 
 ```env
 DASHSCOPE_API_KEY=sk-your-dashscope-key
@@ -136,51 +152,73 @@ curl "$COPILOT_API_BASE/models" \
 
 ---
 
-### 2. `NLS_APPKEY` / `NLS_ACCESS_KEY_ID` / `NLS_ACCESS_KEY_SECRET`
+### 2. Copilot 实时语音识别 — 由 `DASHSCOPE_API_KEY` 驱动
 
-这组变量给 **Copilot 实时语音识别** 用，来自阿里云 **智能语音交互**。
+Copilot 的实时语音识别直接走阿里云百炼的 `qwen3-asr-flash-realtime` 模型，协议是 OpenAI Realtime 兼容的 WebSocket，服务端自带 VAD（静音自动剔除）。
 
-当前项目里这 3 个值分别承担不同职责：
+**跟"录音上传转写"共用同一个 `DASHSCOPE_API_KEY`**，不需要另外申请。拿 key 的步骤看本页的第 4 节。
 
-* `NLS_APPKEY`：识别项目的 AppKey
-* `NLS_ACCESS_KEY_ID` / `NLS_ACCESS_KEY_SECRET`：服务端动态换取 NLS Token
+配好之后，进入面试 Copilot 的实时阶段点击开始录音，如果能持续看到实时字幕，就算通了。如果 key 没配，会退化成"未配置 DashScope API Key，请使用手动输入"。
 
-也就是说，**不是让你手填 Token**。后端会自己用 AK/SK 换 Token。
+历史遗留说明：老版本曾经用阿里云 **智能语音交互 (NLS)** 的 `SpeechTranscriber`，需要单独填 `NLS_APPKEY` / `NLS_ACCESS_KEY_ID` / `NLS_ACCESS_KEY_SECRET` 并额外安装 NLS Python SDK。**现在已经完全切换到 DashScope，这组 NLS 变量和 SDK 都不再需要**。如果你是从老版本升级过来的，可以直接把它们从 `.env` 和依赖里删掉。
+
+---
+
+### 2b. `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY` / `TENCENT_VPR_APP_ID`（可选，自动说话人识别）
+
+这组值给 **Copilot 自动区分 HR 与候选人** 用，来自腾讯云 **声纹识别 (VPR)**。
+
+不配置也不影响使用——面试时依然有一个手动按钮在 "HR" 和 "You" 之间切换角色。配置后，系统会把录进来的每段语音跟候选人提前录入的声纹锚点做 1:1 比对，匹配的判给候选人，不匹配的判给 HR，手动按钮会自动变成 "Auto" 徽标。
+
+#### 为什么是腾讯云而不是阿里云
+
+阿里云智能语音交互产品线里的 `SpeakerVerification` 是**文本相关**版本（必须让用户朗读一串 8 位数字才能注册和验证），官方文档明确说"不适用于多人对话场景中识别不同的说话人"。阿里云 AnalyticDB 的声纹方案虽然支持文本无关，但要求开通数据库实例 + 邀测。**腾讯云 VPR 是主流云厂商里唯一直接提供"开箱即用的文本无关 1:1 声纹验证 REST API"的**。
 
 #### 怎么拿
 
-1. 开通阿里云 **智能语音交互** 服务。
-2. 在智能语音交互控制台里创建项目，拿到 `AppKey`。
-3. 在阿里云 AccessKey 管理里创建或使用一对 `AccessKey ID` / `AccessKey Secret`。
+1. 登录腾讯云控制台：<https://console.cloud.tencent.com/>
+2. 开通"智能语音服务 - 声纹识别 VPR"（产品入口：<https://cloud.tencent.com/product/vpr>）
+3. 在 API 密钥管理里创建或使用一对 `SecretId` / `SecretKey`：<https://console.cloud.tencent.com/cam/capi>
+4. `TENCENT_VPR_APP_ID` 目前可以留空（腾讯 VPR 的 `SpeakerNick` 字段已经足够区分不同用户）
 
-控制台入口：
+#### 怎么配置
 
-* 智能语音交互文档入口：<https://help.aliyun.com/zh/isi>
-* 阿里云 AccessKey 管理：<https://ram.console.aliyun.com/manage/ak>
+两种方式二选一：
 
-#### 额外依赖
+**A. 放全局 `.env`**——所有用户共用一对腾讯凭据：
 
-只填环境变量还不够。当前项目启用 NLS 还需要安装阿里云 NLS Python SDK。
+```env
+TENCENT_SECRET_ID=AKIDxxxxxxxxxxxxxxxx
+TENCENT_SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TENCENT_VPR_APP_ID=
+```
 
-仓库里的说明已经写在 [requirements.txt](/Users/aari/Documents/TechSpar/requirements.txt) 注释里，按那里安装即可。
+**B. 通过 Copilot 设置页填写**（推荐，per-user）——每个登录用户在"设置 → 声纹识别（可选）"卡片里自己填凭据。这种方式的凭据保存在 `data/users/{user_id}/voiceprint.json`，不写到 `.env`。
+
+#### 怎么注册声纹
+
+凭据配好后：
+
+1. 进 Copilot 设置页的"声纹识别（可选）"卡片
+2. 点"测试并保存凭据"，看到"凭据已验证并保存"即连通
+3. 点"开始录制"，连续说话 6-15 秒（建议安静环境单人说话）
+4. 点"结束并上传"
+5. 状态变成"● 已注册 (YYYY-MM-DD)"
 
 #### 怎么验证
 
-最实用的验证方式不是先写脚本，而是直接走产品路径：
+1. 注册完成后进入 Copilot 实时阶段
+2. 如果之前那个 HR / You 角色切换按钮变成了 "Auto" 徽标，说明启用成功
+3. 实测几轮对话，查看 `conversation` 历史里每条的 role 标签是否正确
 
-1. 配好 `.env`
-2. 装好 NLS SDK
-3. 重启后端
-4. 进入 **面试 Copilot** 的实时阶段
-5. 点击开始录音，看是否能持续收到实时字幕
-
-如果配错了，当前实现通常会退化成“语音识别不可用，请使用手动输入”，而不是整页直接不可用。
+如果"凭据已保存"但进入 Copilot 后按钮没变成 Auto，大概率是 `DASHSCOPE_API_KEY` 还没配——声纹识别依赖 ASR 切段，没有 ASR 就不会触发声纹验证。
 
 #### 常见坑
 
-* `NLS_APPKEY` 和 `AccessKey` 不是一回事，别填反。
-* AK/SK 必须放在服务端，不能直接暴露到前端。
-* 没装 NLS SDK 时，光填环境变量也不会生效。
+* 声纹跟 ASR **是两套独立的云服务**，VPR 只负责"这段音频是不是候选人"，转写还是 DashScope 在做。两者缺一不可。
+* 注册时的录音环境（蓝牙耳机 / 笔记本内置麦 / 手机麦）和面试时最好一致，信道不一致会让相似度分数下降。
+* 候选人感冒、情绪激动时音色会轻微漂移，可以删除重录。
+* 腾讯云 VPR 每月有免费额度，日常面试级别的调用量一般不会超（实现里对每段 1.5-3 秒音频只触发一次 verify）。
 
 ---
 
@@ -218,7 +256,12 @@ curl "$COPILOT_API_BASE/models" \
 
 ### 4. `DASHSCOPE_API_KEY`
 
-这个值给 **录音文件转写** 用，来自阿里云 **百炼 / DashScope**。
+这个 key 来自阿里云 **百炼 / DashScope**，在当前项目里**承担两个完全不同的用途，但只需要一个 key**：
+
+1. **Copilot 实时语音识别**（流式）— 通过 WebSocket 调用 `qwen3-asr-flash-realtime` 模型，OpenAI Realtime 兼容协议，服务端自带 VAD。
+2. **录音上传批量转写** — 通过 HTTP 调用 `qwen3-asr-flash-filetrans` 模型，配合七牛 OSS 先上传文件再传公网 URL。
+
+配哪个都是同一个环境变量，别重复申请。
 
 #### 怎么拿
 
@@ -233,14 +276,21 @@ curl "$COPILOT_API_BASE/models" \
 
 #### 怎么验证
 
-最直接的方式是：
+**验证实时 ASR**：
+
+1. 配好 `DASHSCOPE_API_KEY`
+2. 重启后端
+3. 进入面试 Copilot 的实时阶段，点击开始录音
+4. 如果能持续看到实时字幕，就算通了
+
+**验证批量转写**：
 
 1. 配好 `DASHSCOPE_API_KEY`
 2. 再配好下面那组 `QINIU_*`
-3. 去 **录音复盘** 上传一段很短的音频
+3. 去**录音复盘**上传一段很短的音频
 4. 看能否成功拿到转写文本
 
-因为当前代码不是直接把本地文件发给 DashScope，而是先上传到七牛，再把公网 URL 交给 DashScope。
+因为当前代码的批量转写链路不是直接把本地文件发给 DashScope，而是先上传到七牛，再把公网 URL 交给 DashScope。所以两段链路都走通才算配完整。
 
 ---
 
@@ -299,9 +349,9 @@ QINIU_DOMAIN=https://cdn.example.com
 
 1. 先只跑主 LLM + Embedding，把系统启动起来。
 2. 再决定 Copilot 要不要单独模型，最后再填 `COPILOT_*`。
-3. 需要实时语音时，再补 `NLS_*` 和 NLS SDK。
-4. 需要公司联网搜索时，再补 `TAVILY_API_KEY`。
-5. 需要上传录音自动转写时，最后补 `DASHSCOPE_API_KEY` 和整组 `QINIU_*`。
+3. 需要实时语音 / 录音上传转写时，补 `DASHSCOPE_API_KEY`（两个场景共用）。录音上传还需要一起补 `QINIU_*`。
+4. 想让实时面试自动区分 HR 与候选人，再补 `TENCENT_*` 并在设置页录入候选人声纹。
+5. 需要公司联网搜索时，再补 `TAVILY_API_KEY`。
 
 ---
 
@@ -311,11 +361,12 @@ QINIU_DOMAIN=https://cdn.example.com
 
 | 现象 / 报错 | 优先检查什么 |
 | --- | --- |
-| `语音识别不可用，请使用手动输入` | `NLS_APPKEY`、`NLS_ACCESS_KEY_ID`、`NLS_ACCESS_KEY_SECRET` 是否已填；NLS SDK 是否已安装 |
-| `NLS_APPKEY required` | 没填 `NLS_APPKEY`，或者 `.env` 没被后端读到 |
-| `NLS_ACCESS_KEY_ID and NLS_ACCESS_KEY_SECRET required` | 少了 AK/SK 其中一个，或变量名写错 |
+| `未配置 DashScope API Key，请使用手动输入` | 没填 `DASHSCOPE_API_KEY`，或者 `.env` 没被后端读到 |
+| `DASHSCOPE_API_KEY required for real-time ASR` | 同上，后端启动时报的 |
+| `语音识别不可用，请使用手动输入` | `DASHSCOPE_API_KEY` 已配但连不通（检查 key 是否在百炼控制台激活、网络是否能访问 `dashscope.aliyuncs.com`） |
+| 实时字幕出来了但 Copilot 没有 Auto 徽标 | `TENCENT_*` 没配，或候选人声纹没注册；进设置页检查声纹识别卡片状态 |
+| 声纹注册时提示"腾讯云凭据无效" | 检查 `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY` 是否填反、空格、是否已开通腾讯云 VPR 产品 |
 | `TAVILY_API_KEY not configured, skipping company search` | 没填 `TAVILY_API_KEY`；这不会让 Copilot 全挂，只会跳过公司搜索 |
-| `DASHSCOPE_API_KEY not configured` | 没填 DashScope key，录音上传转写不能用 |
 | `Qiniu upload failed` | 优先看 `QINIU_ACCESS_KEY`、`QINIU_SECRET_KEY`、`QINIU_BUCKET` |
 | 上传成功但一直拿不到转写文本 | 优先看 `DASHSCOPE_API_KEY` 和 `QINIU_DOMAIN` 是否真能公网访问 |
 | Copilot Prep 能跑，但公司情报很空 | `TAVILY_API_KEY` 没配，或目标公司本身公开信息太少 |

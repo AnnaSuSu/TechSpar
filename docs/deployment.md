@@ -134,22 +134,29 @@ http://localhost
 COPILOT_API_BASE=
 COPILOT_API_KEY=
 COPILOT_MODEL=
-NLS_APPKEY=
-NLS_ACCESS_KEY_ID=
-NLS_ACCESS_KEY_SECRET=
+DASHSCOPE_API_KEY=
 TAVILY_API_KEY=
 ```
 
 这些变量的作用分别是：
 
 * `COPILOT_API_BASE` / `COPILOT_API_KEY` / `COPILOT_MODEL`：给 Copilot 单独指定一套 OpenAI 兼容模型配置。不填时会回退到主 LLM。
-* `NLS_APPKEY` / `NLS_ACCESS_KEY_ID` / `NLS_ACCESS_KEY_SECRET`：给 Copilot 的**实时语音识别**使用。不配时，Copilot 仍可用，但只能手动输入 HR 的问题。
-* `TAVILY_API_KEY`：给 Copilot Prep 阶段的**公司联网搜索**使用。不配时不会整段报废，但公司情报会退化成“跳过联网搜索”。
+* `DASHSCOPE_API_KEY`：给 Copilot 的**实时语音识别**使用（模型 `qwen3-asr-flash-realtime`，走 OpenAI Realtime 兼容 WebSocket 协议，自带服务端 VAD）。同一个 key 也承担"录音上传批量转写"用途。不配时，Copilot 仍可用，但只能手动输入 HR 的问题。
+* `TAVILY_API_KEY`：给 Copilot Prep 阶段的**公司联网搜索**使用。不配时不会整段报废，但公司情报会退化成"跳过联网搜索"。
+
+如果你还想让 Copilot **自动区分 HR 与候选人**（无需手动按钮切换），再补上腾讯云 VPR 声纹识别（可选）：
+
+```env
+TENCENT_SECRET_ID=
+TENCENT_SECRET_KEY=
+TENCENT_VPR_APP_ID=
+```
+
+配好后进入 Copilot 设置页的"声纹识别（可选）"卡片录制 6-15 秒候选人语音完成注册，实时面试就会自动打角色标签。不配置时一切功能照旧，只是角色需要手动切换。
 
 额外注意：
 
-* 启用 `NLS_*` 不只要填环境变量，还要额外安装阿里云 NLS Python SDK。
-* 如果你只是想先用 Copilot，看 JD 分析、匹配分析和策略树，`NLS_*` 和 `TAVILY_API_KEY` 都不是强制项。
+* 如果你只是想先用 Copilot，看 JD 分析、匹配分析和策略树，`DASHSCOPE_API_KEY`、`TAVILY_API_KEY`、`TENCENT_*` 都不是强制项。
 * 这些值怎么申请、控制台里去哪里找，统一看 [外部服务配置](external-services.md)。
 
 ### 7. 录音转写的额外配置

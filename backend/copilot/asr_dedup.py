@@ -9,7 +9,7 @@ from collections import deque
 class TranscriptDeduper:
     """滑动时间窗口内的重复文本抑制。
 
-    用于 NLS interim→final 偶发重复、网络抖动导致的同句多次 final。
+    用于 DashScope qwen3-asr-flash-realtime interim→final 偶发重复、网络抖动导致的同句多次 final。
     """
 
     def __init__(self, window_seconds: float = 1.2, max_entries: int = 16):

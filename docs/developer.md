@@ -7,7 +7,7 @@
 * **前端**：React 19、React Router 7、Vite、Tailwind CSS 4、Radix UI
 * **后端**：FastAPI、LangGraph、LangChain、LlamaIndex
 * **存储**：SQLite + `data/` 目录下的用户隔离数据
-* **可选外部服务**：OpenAI 兼容 LLM / Embedding、DashScope ASR、Qiniu OSS、阿里云 NLS、Tavily
+* **可选外部服务**：OpenAI 兼容 LLM / Embedding、DashScope ASR（批量 + 实时 qwen3-asr-flash-realtime）、腾讯云 VPR（声纹识别）、Qiniu OSS、Tavily
 
 ### 目录结构
 

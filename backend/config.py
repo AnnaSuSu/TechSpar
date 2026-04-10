@@ -30,12 +30,6 @@ class Settings(BaseSettings):
     copilot_model: str = ""
     copilot_temperature: float = 0.3  # Copilot 场景偏确定性
 
-    # Copilot — 阿里云 NLS 实时语音识别
-    nls_url: str = "wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1"
-    nls_appkey: str = ""
-    nls_access_key_id: str = ""
-    nls_access_key_secret: str = ""
-
     # Copilot — 腾讯云 VPR 声纹识别（可选，未配置时自动回退手动按钮模式）
     # 允许在用户 settings.json 中覆盖，此处为全局兜底
     tencent_secret_id: str = ""
