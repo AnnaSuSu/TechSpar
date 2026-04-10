@@ -33,12 +33,14 @@ python-jose[cryptography]>=3.3.0
 # Web search (Copilot Company Researcher)
 tavily-python>=0.3.0
 
-# Aliyun NLS token refresh (Copilot ASR)
-aliyun-python-sdk-core>=2.13.0
+# Copilot 实时 ASR (DashScope qwen3-asr-flash-realtime)
+websockets>=12.0
 
-# NLS Python SDK (实时语音识别) — 需从源码安装:
-#   git clone https://github.com/aliyun/alibabacloud-nls-python-sdk.git
-#   cd alibabacloud-nls-python-sdk && pip install -r requirements.txt && pip install .
+# Tencent Cloud VPR (可选，用于候选人声纹识别)
+tencentcloud-sdk-python-common>=3.0.1000
+
+# VAD 切段（C 库，非神经网络）
+webrtcvad>=2.0.10
 
 # Utils
 python-dotenv>=1.0.0

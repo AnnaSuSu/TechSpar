@@ -42,7 +42,10 @@ export default function useCopilotStream({ prepId, onUpdate } = {}) {
     manualClose.current = false;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/copilot/${sessionId}`);
+    // Append JWT so backend can load per-user voiceprint config
+    const token = localStorage.getItem("token") || "";
+    const tokenQs = token ? `?token=${encodeURIComponent(token)}` : "";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/copilot/${sessionId}${tokenQs}`);
 
     ws.onopen = () => {
       setConnected(true);
@@ -102,7 +105,13 @@ export default function useCopilotStream({ prepId, onUpdate } = {}) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true },
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
       streamRef.current = stream;
 

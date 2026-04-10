@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     nls_access_key_id: str = ""
     nls_access_key_secret: str = ""
 
+    # Copilot — 腾讯云 VPR 声纹识别（可选，未配置时自动回退手动按钮模式）
+    # 允许在用户 settings.json 中覆盖，此处为全局兜底
+    tencent_secret_id: str = ""
+    tencent_secret_key: str = ""
+    tencent_vpr_app_id: str = ""
+
     # Copilot — Tavily Web Search
     tavily_api_key: str = ""
 

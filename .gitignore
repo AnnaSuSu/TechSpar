@@ -4,6 +4,7 @@
 # Python
 __pycache__/
 *.pyc
+VoiceWings-master/
 
 # Node
 frontend/node_modules/

@@ -17,6 +17,7 @@ from backend.models import (
     RecordingAnalyzeRequest, RegisterRequest, LoginRequest,
     InterviewMode, InterviewPhase,
     UserSettings, LLMSettings, SettingsResponse,
+    VoiceprintCredentials,
 )
 from backend.graphs.job_prep import (
     generate_job_prep_preview,
@@ -593,6 +594,95 @@ def put_user_settings(payload: SettingsResponse, user_id: str = Depends(get_curr
     _reset_llama_singleton()
 
     _save_user_settings(payload.training, user_id)
+    return {"ok": True}
+
+
+# ── Voiceprint (optional Tencent Cloud VPR) ──
+
+@router.get("/voiceprint/status")
+def voiceprint_status(user_id: str = Depends(get_current_user)):
+    """返回用户声纹配置状态（未配置/已配置未注册/已注册）。"""
+    from backend.copilot import voiceprint_store
+    return voiceprint_store.status_summary(user_id)
+
+
+@router.put("/voiceprint/credentials")
+async def voiceprint_put_credentials(
+    payload: VoiceprintCredentials,
+    user_id: str = Depends(get_current_user),
+):
+    """保存腾讯云凭据。保存前先 ping 一下验证有效性。"""
+    from backend.copilot import voiceprint_store
+    from backend.copilot.voiceprint import VoiceprintClient
+
+    client = VoiceprintClient(
+        secret_id=payload.secret_id,
+        secret_key=payload.secret_key,
+        app_id=payload.app_id,
+    )
+    if not await client.ping():
+        raise HTTPException(400, "腾讯云凭据无效或网络不通，请检查 SecretId / SecretKey")
+
+    data = voiceprint_store.load(user_id)
+    data["credentials"] = payload.model_dump()
+    voiceprint_store.save(user_id, data)
+    return {"ok": True}
+
+
+@router.post("/voiceprint/enroll")
+async def voiceprint_enroll(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user),
+):
+    """上传 WAV 文件注册候选人声纹。前端应录制 ≥6 秒 16kHz mono WAV。"""
+    from backend.copilot import voiceprint_store
+    from backend.copilot.voiceprint import extract_pcm_from_wav
+
+    client = voiceprint_store.get_client(user_id)
+    if client is None:
+        raise HTTPException(400, "请先在设置页配置腾讯云凭据")
+
+    wav_bytes = await file.read()
+    if not wav_bytes:
+        raise HTTPException(400, "上传文件为空")
+    try:
+        pcm_bytes = extract_pcm_from_wav(wav_bytes)
+    except ValueError as e:
+        raise HTTPException(400, f"WAV 解析失败：{e}")
+
+    # 至少 2 秒（16000 samples/s * 2 bytes/sample * 2 s = 64000 bytes）
+    if len(pcm_bytes) < 64000:
+        raise HTTPException(400, "录音太短，至少 2 秒")
+
+    speaker_nick = f"techspar_{user_id}"
+    voice_print_id = await client.enroll(speaker_nick, pcm_bytes)
+    if not voice_print_id:
+        raise HTTPException(500, "腾讯云声纹注册失败，请检查日志")
+
+    data = voiceprint_store.load(user_id)
+    data["enrollment"] = {
+        "voice_print_id": voice_print_id,
+        "speaker_nick": speaker_nick,
+        "enrolled_at": datetime.now().isoformat(),
+    }
+    voiceprint_store.save(user_id, data)
+    return {"ok": True, "enrolled_at": data["enrollment"]["enrolled_at"]}
+
+
+@router.delete("/voiceprint/enroll")
+async def voiceprint_unenroll(user_id: str = Depends(get_current_user)):
+    """删除已注册声纹（本地 + 腾讯云端）。保留凭据。"""
+    from backend.copilot import voiceprint_store
+
+    voice_print_id = voiceprint_store.get_voice_print_id(user_id)
+    if voice_print_id:
+        client = voiceprint_store.get_client(user_id)
+        if client is not None:
+            await client.delete(voice_print_id)
+
+    data = voiceprint_store.load(user_id)
+    data.pop("enrollment", None)
+    voiceprint_store.save(user_id, data)
     return {"ok": True}
 
 
@@ -1581,7 +1671,7 @@ async def get_copilot_strategy_tree(prep_id: str, user_id: str = Depends(get_cur
 
 
 @app.websocket("/ws/copilot/{session_id}")
-async def copilot_realtime_ws(ws: WebSocket, session_id: str):
+async def copilot_realtime_ws(ws: WebSocket, session_id: str, token: str = ""):
     """Copilot 实时面试辅助 WebSocket。
 
     客户端发送:
@@ -1595,9 +1685,14 @@ async def copilot_realtime_ws(ws: WebSocket, session_id: str):
       - JSON {"type": "copilot_update", ...} 分析结果
       - JSON {"type": "risk_alert", ...} 风险警告
       - JSON {"type": "error", "message": "..."} 错误
+
+    查询参数 `token` 可选：传入 JWT 以启用 per-user 声纹识别；未传则走默认 HR 模式。
     """
+    from backend.auth import decode_token
+
     await ws.accept()
     session = None
+    user_id = decode_token(token) if token else None
 
     try:
         while True:
@@ -1623,7 +1718,7 @@ async def copilot_realtime_ws(ws: WebSocket, session_id: str):
             if msg_type == "start":
                 try:
                     session = await _init_copilot_session(
-                        ws, msg.get("prep_id", ""), session_id,
+                        ws, msg.get("prep_id", ""), session_id, user_id=user_id,
                     )
                     _copilot_sessions[session_id] = session
                     await ws.send_json({"type": "started", "session_id": session_id})
@@ -1637,19 +1732,17 @@ async def copilot_realtime_ws(ws: WebSocket, session_id: str):
                 # 手动输入 HR 发言
                 text = msg.get("text", "").strip()
                 if text:
-                    await _process_hr_utterance(ws, session, text)
+                    await _process_utterance(ws, session, text, role="hr")
 
             elif msg_type == "candidate_response" and session:
                 # 候选人手动输入自己的回答（仅存入对话历史，不触发 Answer Coach）
                 text = msg.get("text", "").strip()
                 if text:
-                    session.get("conversation", []).append({"role": "candidate", "text": text})
-                    # 候选人回答后触发 Interview Monitor（后台）
-                    asyncio.create_task(_run_interview_monitor(ws, session))
+                    await _process_utterance(ws, session, text, role="candidate")
 
             elif msg_type == "stop":
                 if session and session.get("asr"):
-                    session["asr"].stop()
+                    await session["asr"].stop()
                 await ws.send_json({"type": "stopped"})
                 break
 
@@ -1668,15 +1761,22 @@ async def copilot_realtime_ws(ws: WebSocket, session_id: str):
             pass
     finally:
         if session and session.get("asr"):
-            session["asr"].shutdown()
+            try:
+                await session["asr"].shutdown()
+            except Exception:
+                pass
         _copilot_sessions.pop(session_id, None)
 
 
 async def _init_copilot_session(
-    ws: WebSocket, prep_id: str, session_id: str,
+    ws: WebSocket, prep_id: str, session_id: str, *, user_id: str | None = None,
 ) -> dict:
-    """初始化 Copilot 实时会话。"""
+    """初始化 Copilot 实时会话。
+
+    user_id 可选：传入后，会加载该用户的声纹配置（如已注册则启用自动 role 识别）。
+    """
     from backend.copilot.strategy_tree import StrategyTreeNavigator
+    from backend.copilot import voiceprint_store
 
     prep_data = prep_store.get_prep_by_id(prep_id)
     if not prep_data or prep_data["status"] != "done" or not prep_data.get("result"):
@@ -1689,13 +1789,26 @@ async def _init_copilot_session(
     await ws.send_json({"type": "progress", "message": "正在预计算策略树 embedding..."})
     await navigator.precompute_embeddings()
 
+    # 加载该用户的声纹配置（可选）
+    vp_client = None
+    vp_id = None
+    vp_enabled = False
+    if user_id:
+        vp_client = voiceprint_store.get_client(user_id)
+        vp_id = voiceprint_store.get_voice_print_id(user_id)
+        vp_enabled = bool(vp_client and vp_id)
+
     # 尝试启动 ASR（可选，失败不阻塞）
     asr = None
-    if settings.nls_appkey and settings.nls_access_key_id:
+    if settings.dashscope_api_key:
         try:
             from backend.copilot.asr_stream import CopilotASR
             loop = asyncio.get_event_loop()
-            asr = CopilotASR(loop)
+            asr = CopilotASR(
+                loop,
+                voiceprint_client=vp_client if vp_enabled else None,
+                voice_print_id=vp_id if vp_enabled else None,
+            )
 
             async def on_interim(text):
                 try:
@@ -1705,8 +1818,15 @@ async def _init_copilot_session(
 
             async def on_sentence_end(text):
                 try:
-                    await ws.send_json({"type": "asr_final", "text": text})
-                    await _process_hr_utterance(ws, _copilot_sessions.get(session_id, {}), text)
+                    # 声纹可用时按实时结果分发；否则默认 hr（保持现有行为）
+                    current_session = _copilot_sessions.get(session_id, {})
+                    role = "hr"
+                    if asr is not None:
+                        detected = asr.lookup_role_now()
+                        if detected:
+                            role = detected
+                    await ws.send_json({"type": "asr_final", "text": text, "role": role})
+                    await _process_utterance(ws, current_session, text, role=role)
                 except Exception as e:
                     logger.error(f"ASR sentence processing failed: {e}")
 
@@ -1719,14 +1839,15 @@ async def _init_copilot_session(
             asr.on_interim = on_interim
             asr.on_sentence_end = on_sentence_end
             asr.on_error = on_error
-            asr.start()
-            await ws.send_json({"type": "progress", "message": "语音识别已就绪"})
+            await asr.start()
+            ready_msg = "语音识别 + 声纹自动识别已就绪" if vp_enabled else "语音识别已就绪"
+            await ws.send_json({"type": "progress", "message": ready_msg})
         except Exception as e:
             logger.warning(f"ASR init failed (will use manual input): {e}")
             asr = None
             await ws.send_json({"type": "progress", "message": "语音识别不可用，请使用手动输入"})
     else:
-        await ws.send_json({"type": "progress", "message": "未配置语音识别，请使用手动输入"})
+        await ws.send_json({"type": "progress", "message": "未配置 DashScope API Key，请使用手动输入"})
 
     return {
         "asr": asr,
@@ -1735,19 +1856,37 @@ async def _init_copilot_session(
         "conversation": [],
         "last_node_id": None,
         "turn_count": 0,
+        "voiceprint_enabled": vp_enabled,
     }
 
 
 
-async def _process_hr_utterance(ws: WebSocket, session: dict, text: str):
-    """处理 HR 的一句话：Intent Router (同步) → 3 个 Agent 并发。"""
+async def _process_utterance(
+    ws: WebSocket, session: dict, text: str, *, role: str = "hr"
+):
+    """处理一句话（HR 提问或候选人自述）。
+
+    role="hr"：触发完整的 Intent Router + 3 个 Agent 管线
+    role="candidate"：只写入对话历史 + 触发 Interview Monitor（对话连贯性假设）
+    """
+    if not session:
+        return
+
+    conversation = session.get("conversation", [])
+
+    # 候选人路径：轻量处理
+    if role == "candidate":
+        conversation.append({"role": "candidate", "text": text})
+        asyncio.create_task(_run_interview_monitor(ws, session))
+        return
+
+    # HR 路径（下面是原 _process_hr_utterance 的逻辑）
     from backend.copilot.intent_classifier import classify_intent
     from backend.copilot.answer_advisor import prepare_advice_context, stream_advice
     from backend.copilot import hr_profiler
 
     navigator = session.get("navigator")
     prep = session.get("prep", {})
-    conversation = session.get("conversation", [])
 
     conversation.append({"role": "hr", "text": text})
     session["turn_count"] = session.get("turn_count", 0) + 1

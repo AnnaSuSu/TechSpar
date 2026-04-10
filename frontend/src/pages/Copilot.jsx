@@ -13,6 +13,7 @@ import {
   deleteCopilotPrep,
 } from "../api/copilot";
 import { getResumeStatus, getProfile } from "../api/interview";
+import { getVoiceprintStatus } from "../api/voiceprint";
 import useCopilotStream from "../hooks/useCopilotStream";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -764,7 +765,14 @@ function RealtimePhase({ prepId, onBack }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [progressMsg, setProgressMsg] = useState("连接中...");
   const [started, setStarted] = useState(false);
+  const [voiceprintAuto, setVoiceprintAuto] = useState(false);
   const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    getVoiceprintStatus()
+      .then((s) => setVoiceprintAuto(Boolean(s?.configured && s?.enrolled)))
+      .catch(() => {});
+  }, []);
 
   const handleUpdate = useCallback((msg) => {
     switch (msg.type) {
@@ -794,7 +802,10 @@ function RealtimePhase({ prepId, onBack }) {
       case "progress": setProgressMsg(msg.message); break;
       case "started": setStarted(true); setProgressMsg(""); setPerfMetrics({ warming: true }); break;
       case "asr_final":
-        if (msg.text) setConversation((prev) => [...prev, { role: "hr", text: msg.text }]);
+        if (msg.text) {
+          const role = msg.role === "candidate" ? "candidate" : "hr";
+          setConversation((prev) => [...prev, { role, text: msg.text }]);
+        }
         break;
       case "error": setProgressMsg(`Error: ${msg.message}`); break;
     }
@@ -972,15 +983,25 @@ function RealtimePhase({ prepId, onBack }) {
             <div ref={chatEndRef} />
           </div>
           <div className="px-5 py-4 border-t border-border shrink-0 flex gap-3 bg-card/20 md:px-6">
-            <Button
-              size="sm"
-              variant={inputRole === "hr" ? "outline" : "secondary"}
-              className="rounded-xl h-[46px] px-3 shrink-0 text-xs font-semibold min-w-[56px] shadow-sm transition-all"
-              onClick={() => setInputRole(inputRole === "hr" ? "candidate" : "hr")}
-              disabled={!connected || !started}
-            >
-              {inputRole === "hr" ? "HR" : "You"}
-            </Button>
+            {voiceprintAuto ? (
+              <div
+                className="rounded-xl h-[46px] px-3 shrink-0 text-[11px] font-semibold min-w-[56px] shadow-sm flex items-center justify-center bg-primary/10 text-primary border border-primary/25"
+                title="已启用声纹自动识别 HR/You"
+              >
+                <Radio size={14} className="mr-1" />
+                Auto
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant={inputRole === "hr" ? "outline" : "secondary"}
+                className="rounded-xl h-[46px] px-3 shrink-0 text-xs font-semibold min-w-[56px] shadow-sm transition-all"
+                onClick={() => setInputRole(inputRole === "hr" ? "candidate" : "hr")}
+                disabled={!connected || !started}
+              >
+                {inputRole === "hr" ? "HR" : "You"}
+              </Button>
+            )}
             <Input className="h-[46px] rounded-xl border-border/80 bg-background shadow-sm px-4 focus-visible:bg-card/50" placeholder={inputRole === "hr" ? "手动输入 HR 的问题..." : "记录你的回答..."} value={manualInput} onChange={(e) => setManualInput(e.target.value)} onKeyDown={handleKeyDown} disabled={!connected || !started} />
             <Button size="icon" className="rounded-xl h-[46px] w-[46px] shrink-0 shadow-sm" onClick={handleManualSend} disabled={!manualInput.trim() || !started}>
               <Send size={16} />

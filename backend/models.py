@@ -170,3 +170,10 @@ class SettingsResponse(BaseModel):
     """Combined response for GET/PUT /settings."""
     llm: LLMSettings
     training: UserSettings
+
+
+class VoiceprintCredentials(BaseModel):
+    """腾讯云 VPR 凭据（per-user）。"""
+    secret_id: str
+    secret_key: str
+    app_id: str = ""

@@ -9,7 +9,7 @@ function authHeaders(extra = {}) {
   return headers;
 }
 
-async function authFetch(url, options = {}) {
+export async function authFetch(url, options = {}) {
   const headers = authHeaders(options.headers);
   const res = await fetch(url, { ...options, headers });
   if (res.status === 401) {
