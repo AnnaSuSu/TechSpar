@@ -35,6 +35,9 @@ DEFAULT_PROFILE = {
     "target_role": "AI 应用开发实习生",
     "updated_at": "",
 
+    # 上次 consolidation 运行时间 (用于节流,避免每次 session 都跑 Stage 3)
+    "last_consolidation_at": "",
+
     # 技术掌握度 (topic → {level: 1-5, notes: str})
     "topic_mastery": {},
 
@@ -563,10 +566,13 @@ def _archive_stale_weak_points(profile: dict):
     - last_seen > 60 days → archive regardless
     - last_seen > 30 days AND times_seen <= 2 → archive
     - Already improved/archived → skip
+    - source == "consolidated" → skip (refreshed by re-running consolidation, not by time)
     """
     now = datetime.now()
     for wp in profile.get("weak_points", []):
         if wp.get("improved") or wp.get("archived"):
+            continue
+        if wp.get("source") == "consolidated":
             continue
         last_seen_str = wp.get("last_seen", "")
         if not last_seen_str:
@@ -736,6 +742,11 @@ async def llm_update_profile(
         user_id=user_id,
     )
 
+    # ── Stage 3: Consolidation (带节流, 失败不阻塞) ──
+    # 从 active observed weak_points 里识别跨领域规律, 输出 source="consolidated" 的条目.
+    # 内部节流: 24h cooldown + 至少 3 条新 wp + 至少 5 条 active wp 才真的跑 LLM.
+    await consolidate_patterns(user_id)
+
 
 async def update_profile_after_interview(
     mode: str,
@@ -804,3 +815,289 @@ async def update_profile_after_interview(
     )
 
     return extraction
+
+
+# ── Stage 3: Consolidation ──────────────────────────────────────────────────
+# 从扁平的 weak_points 里识别跨领域规律,产出 source="consolidated" 的高层条目。
+# 被整合的原始 wp 会被 archive,reason="superseded_by_consolidation"。
+# 设计要点:
+# - 跨至少 2 个不同 topic 才算合格 pattern (挡住同领域换粒度的假整合)
+# - 失败不影响 Stage 1/2 (整个函数 try/except 包裹)
+# - 节流: 24h + 至少 3 条新 observed wp 才跑一次
+
+CONSOLIDATE_MIN_ACTIVE_WPS = 5       # 活跃 observed wp 少于这个不跑
+CONSOLIDATE_MIN_NEW_WPS = 3          # 距上次 consolidation 新增少于这个不跑
+CONSOLIDATE_COOLDOWN_HOURS = 24      # 两次 consolidation 之间的最小间隔
+CONSOLIDATE_MIN_SUPPORTING = 2       # 一条 pattern 至少需要引用的 wp 数
+CONSOLIDATE_MIN_SPANNING_TOPICS = 2  # 必须跨多少个不同 topic
+CONSOLIDATE_MAX_STATEMENT_LEN = 80   # pattern 描述的字符上限
+
+CONSOLIDATE_PROMPT = """你是面试教练的模式识别引擎。你的任务是从用户的薄弱点观察列表里,
+识别**用户自己可能没意识到的跨领域规律** (pattern)。
+
+## 合格 pattern 的 4 个必要条件
+
+一条 pattern 必须同时满足以下 4 条, 否则视为不合格:
+
+1. **跨至少 2 个不同的领域 (topic)**
+   例: [GIL (python)] + [Transformer 注意力 (llm)] + [B+ 树 (database)]
+       → 跨 3 个领域, 可能是一个真规律
+   反例: [GIL (python)] + [async (python)] + [描述符 (python)]
+       → 全在 python 内, 这只是一个领域的弱点, 不是跨领域规律
+
+2. **比原始观察抽象层次更高**
+   例: 5 条"底层机制讲不清"的具体观察 → 1 条"对底层原理偏表面" (思考方式的倾向)
+   反例: "GIL 不懂" + "async 不懂" → "Python 并发不懂"
+       (这只是换了个粒度, 没有真正抽象, 不合格)
+
+3. **是用户自己不容易察觉的规律**
+   例: "被追问 'why' 时倾向跳过推导过程" (思维模式,用户自己难以看到)
+   反例: "Python 的很多东西不熟" (用户自己都知道, 没价值)
+
+4. **可证伪**
+   pattern 必须是将来能被新观察验证或推翻的具体假设。
+   "你可能有点紧张"这种虚话不算。
+
+## 什么时候不要产出
+
+以下任何一种情况, 请返回 {{"patterns": []}}:
+
+- 观察列表里看不到跨领域的规律
+- 所有观察都集中在 1-2 个具体技术点
+- 你没有高度把握某条 pattern 真的成立
+- 观察之间的联系只是表面相似, 不是结构性共性
+
+**宁可产出 0 个 pattern, 不要产出 1 个错的**。
+编造的 pattern 会被用户标记为不准, 损害系统可信度。
+返回空数组完全不会被惩罚, 乱产出才会被惩罚。
+
+## 输入: 用户当前的活跃薄弱点
+
+{weak_points_formatted}
+
+## 输出格式 (严格 JSON)
+
+{{
+  "patterns": [
+    {{
+      "statement": "一句话规律描述, 不超过 40 字",
+      "supporting_wp_indices": [0, 3, 7],
+      "topic": "cross_cutting 或 meta",
+      "confidence": 0.85,
+      "reasoning": "内部用, 为什么这几条指向同一规律 (不展示给用户)"
+    }}
+  ]
+}}
+
+只输出 JSON, 不要任何其他内容。
+"""
+
+
+def _filter_active_observed_wps(profile: dict) -> list[tuple[int, dict]]:
+    """返回 (原 index, wp) 对的列表, 只包含活跃的 observed 条目.
+
+    原 index 用于 consolidation 写回时精确定位 profile["weak_points"] 里的原条目.
+    """
+    out = []
+    for i, wp in enumerate(profile.get("weak_points", [])):
+        if wp.get("improved") or wp.get("archived"):
+            continue
+        # 只对 observed 的条目做 consolidation, 不整合已整合过的或 JD 预测的
+        if wp.get("source", "observed") != "observed":
+            continue
+        out.append((i, wp))
+    return out
+
+
+def _validate_consolidation_pattern(pattern: dict, active: list[tuple[int, dict]]) -> str | None:
+    """验证一条 LLM 产出的 pattern. 返回 None 表示通过, 否则返回拒绝原因."""
+    idxs = pattern.get("supporting_wp_indices")
+    if not isinstance(idxs, list) or len(idxs) < CONSOLIDATE_MIN_SUPPORTING:
+        return "too_few_supporting"
+
+    # idxs 是"输入给 LLM 时的局部 index",引用的是 active 列表的位置
+    if any(not isinstance(i, int) or i < 0 or i >= len(active) for i in idxs):
+        return "invalid_index"
+
+    # 必须跨至少 2 个 topic
+    topics = {active[i][1].get("topic", "") for i in idxs}
+    topics.discard("")
+    if len(topics) < CONSOLIDATE_MIN_SPANNING_TOPICS:
+        return "not_cross_cutting"
+
+    statement = (pattern.get("statement") or "").strip()
+    if not statement:
+        return "empty_statement"
+    if len(statement) > CONSOLIDATE_MAX_STATEMENT_LEN:
+        return "statement_too_long"
+
+    return None
+
+
+def _apply_consolidation_pattern(profile: dict, pattern: dict, active: list[tuple[int, dict]], now: str):
+    """把一条 pattern 写入 profile: 追加新 consolidated wp + archive 被 supersede 的原条目."""
+    idxs = pattern["supporting_wp_indices"]
+    supporting_pairs = [active[i] for i in idxs]
+    supporting_wps = [wp for _, wp in supporting_pairs]
+
+    new_wp = {
+        "point": pattern["statement"].strip(),
+        "topic": pattern.get("topic") or "cross_cutting",
+        "source": "consolidated",
+        "first_seen": now,
+        "last_seen": now,
+        "times_seen": sum(w.get("times_seen", 1) for w in supporting_wps),
+        "improved": False,
+        "archived": False,
+        "consolidates": [w.get("point", "") for w in supporting_wps],
+        "confidence": float(pattern.get("confidence", 0.7)),
+        "user_acknowledged": False,
+    }
+    profile.setdefault("weak_points", []).append(new_wp)
+
+    # Archive 被 supersede 的原条目 (用原 profile index 精确定位, 防止锁外并发写)
+    all_wps = profile.get("weak_points", [])
+    for orig_idx, wp in supporting_pairs:
+        if orig_idx >= len(all_wps):
+            continue
+        target = all_wps[orig_idx]
+        # 再次确认这条就是我们要改的 (防止锁外并发写把 list 改了)
+        if target.get("point") != wp.get("point"):
+            continue
+        target["archived"] = True
+        target["archived_at"] = now
+        target["archived_reason"] = "superseded_by_consolidation"
+        target.setdefault("history", []).append({
+            "date": now,
+            "event": "archived",
+            "reason": f"superseded by consolidation: {new_wp['point'][:40]}",
+        })
+
+
+def _should_run_consolidation(profile: dict) -> tuple[bool, str]:
+    """检查节流条件. 返回 (是否应该跑, 原因)."""
+    active = _filter_active_observed_wps(profile)
+    if len(active) < CONSOLIDATE_MIN_ACTIVE_WPS:
+        return False, f"too_few_active_wps ({len(active)} < {CONSOLIDATE_MIN_ACTIVE_WPS})"
+
+    last_str = profile.get("last_consolidation_at", "")
+    if last_str:
+        try:
+            last_time = datetime.fromisoformat(last_str)
+            hours_since = (datetime.now() - last_time).total_seconds() / 3600
+            if hours_since < CONSOLIDATE_COOLDOWN_HOURS:
+                return False, f"cooldown (last run {hours_since:.1f}h ago)"
+        except (ValueError, TypeError):
+            pass  # 解析失败就当没跑过
+
+        # 至少 N 条新 observed wp 才值得重跑
+        new_count = 0
+        for _, wp in active:
+            first_seen = wp.get("first_seen", "")
+            try:
+                if datetime.fromisoformat(first_seen) > last_time:
+                    new_count += 1
+            except (ValueError, TypeError):
+                continue
+        if new_count < CONSOLIDATE_MIN_NEW_WPS:
+            return False, f"too_few_new_wps ({new_count} < {CONSOLIDATE_MIN_NEW_WPS})"
+
+    return True, "ok"
+
+
+async def consolidate_patterns(user_id: str) -> dict:
+    """Stage 3: 从 active observed weak_points 里识别跨领域规律.
+
+    带节流: 满足 cooldown + 新观察数量 + 活跃数量三个条件才真的跑 LLM.
+    失败不影响上游 (所有异常在这里被吞).
+
+    Returns:
+        {"ran": bool, "applied": int, "skipped": list, "reason": str}
+    """
+    try:
+        profile = _load_profile(user_id)
+
+        should_run, reason = _should_run_consolidation(profile)
+        if not should_run:
+            return {"ran": False, "applied": 0, "skipped": [], "reason": reason}
+
+        active = _filter_active_observed_wps(profile)
+        formatted = "\n".join(
+            f"[{i}] {wp['point']} (领域: {wp.get('topic', '?')}, 观察 {wp.get('times_seen', 1)} 次)"
+            for i, (_, wp) in enumerate(active)
+        )
+
+        llm = get_langchain_llm()
+        response = llm.invoke([
+            SystemMessage(content="你是面试教练的模式识别引擎。只返回 JSON。宁可不产出,不要编造。"),
+            HumanMessage(content=CONSOLIDATE_PROMPT.format(weak_points_formatted=formatted)),
+        ])
+
+        try:
+            parsed = _parse_json_safe(response.content)
+            if not isinstance(parsed, dict):
+                raise ValueError(f"Expected dict, got {type(parsed)}")
+            raw_patterns = parsed.get("patterns", []) or []
+            if not isinstance(raw_patterns, list):
+                raise ValueError("patterns is not a list")
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            logger.warning(f"Consolidation parse failed: {e}. Raw: {response.content[:200]}")
+            # 解析失败不更新 last_consolidation_at, 下次 session 会重试
+            return {"ran": False, "applied": 0, "skipped": [], "reason": "llm_parse_failed"}
+
+        # 验证
+        valid_patterns = []
+        skipped = []
+        for p in raw_patterns:
+            if not isinstance(p, dict):
+                skipped.append({"reason": "not_a_dict"})
+                continue
+            rej = _validate_consolidation_pattern(p, active)
+            if rej is None:
+                valid_patterns.append(p)
+            else:
+                skipped.append({"statement": p.get("statement", "?"), "reason": rej})
+
+        # 写入 (在锁内)
+        applied = 0
+        async with _get_profile_lock(user_id):
+            profile = _load_profile(user_id)
+            # 锁内重新过滤 active, 因为 profile 在 LLM 期间可能被并发写
+            active_inside = _filter_active_observed_wps(profile)
+
+            # 重新验证 index 还有效 (active 可能变短了)
+            now = datetime.now().isoformat()
+            for p in valid_patterns:
+                idxs = p["supporting_wp_indices"]
+                if any(i >= len(active_inside) for i in idxs):
+                    skipped.append({"statement": p.get("statement", "?"), "reason": "stale_index_after_reload"})
+                    continue
+                # 还要确认 active 列表的顺序没变 (通过比对 point 文本)
+                ok = True
+                for local_i in idxs:
+                    orig_idx_outside = active[local_i][0]
+                    if orig_idx_outside >= len(profile.get("weak_points", [])):
+                        ok = False
+                        break
+                    if profile["weak_points"][orig_idx_outside].get("point") != active[local_i][1].get("point"):
+                        ok = False
+                        break
+                if not ok:
+                    skipped.append({"statement": p.get("statement", "?"), "reason": "profile_changed_during_llm"})
+                    continue
+
+                _apply_consolidation_pattern(profile, p, active, now)
+                applied += 1
+
+            profile["last_consolidation_at"] = now
+            _save_profile(profile, user_id)
+
+        logger.info(
+            f"Consolidation for user {user_id}: applied={applied}, skipped={len(skipped)}, "
+            f"candidates={len(raw_patterns)}"
+        )
+        return {"ran": True, "applied": applied, "skipped": skipped, "reason": "ok"}
+
+    except Exception as e:
+        logger.warning(f"Consolidation failed for user {user_id}: {type(e).__name__}: {e}")
+        return {"ran": False, "applied": 0, "skipped": [], "reason": f"error: {type(e).__name__}"}

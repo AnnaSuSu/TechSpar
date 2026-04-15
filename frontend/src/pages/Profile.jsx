@@ -531,34 +531,66 @@ function EvidenceTable({ weakItems, strongItems, improvedItems }) {
         <div className="py-6 text-center text-sm text-dim">暂无匹配的证据条目。</div>
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
-          {visible.map((item, i) => (
-            <div
-              key={`${item._type}-${item.point}-${i}`}
-              className={cn(
-                "flex items-center gap-3 px-4 py-3 text-sm",
-                i > 0 && "border-t border-border",
-                item._type === "improved" && "opacity-65"
-              )}
-            >
-              <span className={cn("w-2 h-2 rounded-full shrink-0", dotColor[item._type])} />
-              <span className={cn("flex-1 min-w-0 truncate", item._type === "improved" && "line-through")}>
-                {item.point}
-              </span>
-              {item.topic && (
-                <Badge variant="outline" className="shrink-0 text-[11px]">{item.topic}</Badge>
-              )}
-              {item._type === "weak" && (item.times_seen || 1) > 1 && (
-                <span className="shrink-0 text-xs text-dim">{item.times_seen}次</span>
-              )}
-              <span className="shrink-0 text-xs text-dim w-12 text-right">
-                {formatShortDate(
-                  item._type === "improved"
-                    ? (item.improved_at || item.last_seen || item.first_seen)
-                    : (item.last_seen || item.first_seen)
+          {visible.map((item, i) => {
+            const isConsolidated = item.source === "consolidated";
+            const sourceList = Array.isArray(item.consolidates) ? item.consolidates : [];
+            return (
+              <div
+                key={`${item._type}-${item.point}-${i}`}
+                className={cn(
+                  "px-4 py-3 text-sm",
+                  i > 0 && "border-t border-border",
+                  item._type === "improved" && "opacity-65",
+                  isConsolidated && "bg-accent/5"
                 )}
-              </span>
-            </div>
-          ))}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      "w-2 h-2 rounded-full shrink-0",
+                      isConsolidated ? "bg-accent" : dotColor[item._type]
+                    )}
+                  />
+                  <span className={cn("flex-1 min-w-0 truncate", item._type === "improved" && "line-through")}>
+                    {item.point}
+                  </span>
+                  {isConsolidated && (
+                    <Badge
+                      variant="secondary"
+                      className="shrink-0 text-[10px] bg-accent/15 text-accent border-accent/30"
+                    >
+                      ✦ 系统观察
+                    </Badge>
+                  )}
+                  {item.topic && !isConsolidated && (
+                    <Badge variant="outline" className="shrink-0 text-[11px]">{item.topic}</Badge>
+                  )}
+                  {item._type === "weak" && !isConsolidated && (item.times_seen || 1) > 1 && (
+                    <span className="shrink-0 text-xs text-dim">{item.times_seen}次</span>
+                  )}
+                  <span className="shrink-0 text-xs text-dim w-12 text-right">
+                    {formatShortDate(
+                      item._type === "improved"
+                        ? (item.improved_at || item.last_seen || item.first_seen)
+                        : (item.last_seen || item.first_seen)
+                    )}
+                  </span>
+                </div>
+                {isConsolidated && sourceList.length > 0 && (
+                  <div className="mt-2 ml-5 pl-3 border-l-2 border-accent/30 space-y-0.5">
+                    <div className="text-[11px] text-dim/70">
+                      基于 {sourceList.length} 条具体观察整合
+                    </div>
+                    {sourceList.map((src, ci) => (
+                      <div key={ci} className="text-[11px] text-dim/80 truncate">
+                        · {src}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -665,7 +697,7 @@ function buildDomainInsights(profile, realTopics) {
   });
 
   (profile.weak_points || [])
-    .filter((item) => !item.improved && item.topic && realTopics.has(item.topic))
+    .filter((item) => !item.improved && !item.archived && item.topic && realTopics.has(item.topic))
     .forEach((item) => {
       const existing = domainMap.get(item.topic) || {
         topic: item.topic,
@@ -857,7 +889,7 @@ export default function Profile() {
 
   const stats = profile.stats || {};
   const scoreHistory = stats.score_history || [];
-  const weakActive = (profile.weak_points || []).filter((item) => !item.improved);
+  const weakActive = (profile.weak_points || []).filter((item) => !item.improved && !item.archived);
   const weakImproved = sortByDateDesc(
     (profile.weak_points || []).filter((item) => item.improved),
     "improved_at",
