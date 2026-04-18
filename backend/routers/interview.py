@@ -50,6 +50,26 @@ router = APIRouter(prefix="/api")
 _EVAL_TAG_PREFIX = "<!--EVAL:"
 _EVAL_TAG_SUFFIX = "-->"
 
+# Token chunk size for the simulated SSE stream in /interview/chat/stream.
+# Real token streaming is blocked by the sync SqliteSaver checkpointer.
+_STREAM_CHUNK_CHARS = 12
+
+
+def _strip_eval_tags(text: str) -> str:
+    result = []
+    i = 0
+    while i < len(text):
+        start = text.find(_EVAL_TAG_PREFIX, i)
+        if start == -1:
+            result.append(text[i:])
+            break
+        result.append(text[i:start])
+        end = text.find(_EVAL_TAG_SUFFIX, start)
+        if end == -1:
+            break
+        i = end + len(_EVAL_TAG_SUFFIX)
+    return "".join(result).rstrip()
+
 
 @router.post("/job-prep/preview")
 def job_prep_preview(req: JobPrepPreviewRequest, user_id: str = Depends(get_current_user)):
@@ -258,52 +278,39 @@ async def chat_stream(req: ChatRequest, user_id: str = Depends(get_current_user)
     graph.update_state(config, {"messages": [HumanMessage(content=req.message)]})
     append_message(req.session_id, "user", req.message, user_id=user_id)
 
+    # The resume interview graph is compiled with a sync SqliteSaver, which
+    # cannot back graph.astream_events(). Run graph.invoke() in a worker thread
+    # and chunk the final AI message as SSE tokens.
     async def event_generator():
-        full_text = ""
-        pending = ""
-
         try:
-            async for event in graph.astream_events(None, config, version="v2"):
-                if event["event"] != "on_chat_model_stream":
-                    continue
-                chunk = event["data"].get("chunk")
-                if not chunk or not hasattr(chunk, "content") or not chunk.content:
-                    continue
-
-                token = chunk.content
-                pending += token
-
-                if _EVAL_TAG_PREFIX in pending:
-                    start = pending.index(_EVAL_TAG_PREFIX)
-                    if _EVAL_TAG_SUFFIX in pending[start:]:
-                        before = pending[:start]
-                        if before:
-                            full_text += before
-                            yield f"data: {json.dumps({'token': before})}\n\n"
-                        pending = ""
-                elif pending.endswith(("<", "<!", "<!-", "<!--", "<!--E", "<!--EV", "<!--EVA", "<!--EVAL", "<!--EVAL:")):
-                    pass
-                else:
-                    full_text += pending
-                    yield f"data: {json.dumps({'token': pending})}\n\n"
-                    pending = ""
-
-            if pending and _EVAL_TAG_PREFIX not in pending:
-                full_text += pending
-                yield f"data: {json.dumps({'token': pending})}\n\n"
+            result = await asyncio.to_thread(graph.invoke, None, config)
         except Exception as exc:
+            logger.exception("chat/stream graph.invoke failed")
             yield f"data: {json.dumps({'error': str(exc)})}\n\n"
             return
 
-        final_state = graph.get_state(config)
+        ai_message = ""
+        if isinstance(result, dict):
+            for msg in reversed(result.get("messages", [])):
+                if isinstance(msg, AIMessage):
+                    ai_message = msg.content or ""
+                    break
+
+        clean_text = _strip_eval_tags(ai_message)
+
+        for i in range(0, len(clean_text), _STREAM_CHUNK_CHARS):
+            token = clean_text[i:i + _STREAM_CHUNK_CHARS]
+            yield f"data: {json.dumps({'token': token})}\n\n"
+            await asyncio.sleep(0)
+
         is_finished = False
-        if isinstance(final_state.values, dict):
-            is_finished = final_state.values.get("is_finished", False)
-            phase = final_state.values.get("phase", "")
+        if isinstance(result, dict):
+            is_finished = result.get("is_finished", False)
+            phase = result.get("phase", "")
             if phase in (InterviewPhase.END.value, "end"):
                 is_finished = True
 
-        append_message(req.session_id, "assistant", full_text, user_id=user_id)
+        append_message(req.session_id, "assistant", clean_text, user_id=user_id)
         yield f"data: {json.dumps({'done': True, 'is_finished': is_finished})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
