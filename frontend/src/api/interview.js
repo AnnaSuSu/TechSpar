@@ -180,6 +180,20 @@ export async function getReview(sessionId) {
   return res.json();
 }
 
+export async function retryReview(sessionId) {
+  const res = await authFetch(`${API_BASE}/interview/review/${sessionId}/generate`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getResumableSession(sessionId) {
+  const res = await authFetch(`${API_BASE}/interview/session/${sessionId}/resume`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function getTaskStatus(taskId) {
   const res = await authFetch(`${API_BASE}/tasks/${taskId}`);
   if (!res.ok) throw new Error(await res.text());

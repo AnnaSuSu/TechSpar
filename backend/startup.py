@@ -7,6 +7,7 @@ from backend.config import settings
 from backend.indexer import _init_llama_settings
 from backend.llm_provider import get_embedding
 from backend.storage import copilot_preps as prep_store
+from backend.storage.sessions import reset_stale_reviewing
 from backend.vector_memory import init_memory_table
 
 logger = logging.getLogger("uvicorn")
@@ -27,4 +28,7 @@ def preload_models():
     init_users_table()
     ensure_default_user()
     prep_store.reset_stale_running()
+    recovered = reset_stale_reviewing()
+    if recovered:
+        logger.info("Recovered %s stuck reviewing sessions to review_failed.", recovered)
     logger.info("Database tables initialized.")

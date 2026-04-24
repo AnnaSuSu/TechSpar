@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
-import { AlertTriangle, CalendarDays, ChevronRight, Filter, Hash, LoaderCircle, Trash2 } from "lucide-react";
-import { getHistory, deleteSession, getInterviewTopics } from "../api/interview";
+import { AlertTriangle, CalendarDays, ChevronRight, CircleAlert, CircleCheck, Filter, Hash, LoaderCircle, Play, RotateCw, Trash2 } from "lucide-react";
+import { getHistory, deleteSession, getInterviewTopics, retryReview } from "../api/interview";
+import { useTaskStatus } from "../contexts/TaskStatusContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,8 +29,26 @@ const FILTER_OPTIONS = [
   { key: "recording", label: "录音复盘" },
 ];
 
+// Session lifecycle → UI affordances. Ongoing sessions with no review yet are
+// shown distinctly from review-failed ones so users can take the right action.
+const STATUS_META = {
+  reviewed: { label: "已复盘", tone: "success", icon: CircleCheck },
+  reviewing: { label: "复盘生成中", tone: "info", icon: LoaderCircle, spin: true },
+  review_failed: { label: "总结失败", tone: "danger", icon: CircleAlert },
+  ended: { label: "待复盘", tone: "warn", icon: RotateCw },
+  ongoing: { label: "未完成", tone: "warn", icon: Play },
+};
+
+const STATUS_TONE_STYLE = {
+  success: "bg-success/10 text-success border-success/30",
+  info: "bg-primary/10 text-primary border-primary/30",
+  danger: "bg-red/10 text-red border-red/30",
+  warn: "bg-orange/10 border-orange/30 text-orange",
+};
+
 export default function History() {
   const navigate = useNavigate();
+  const { startTask } = useTaskStatus();
   const [sessions, setSessions] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -40,6 +59,7 @@ export default function History() {
   const [topics, setTopics] = useState([]);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [retrying, setRetrying] = useState({});
   const hasLoadedOnceRef = useRef(false);
   const requestIdRef = useRef(0);
 
@@ -92,6 +112,43 @@ export default function History() {
 
   const handleTopicChange = (value) => {
     setTopicFilter(value);
+  };
+
+  // Status dictates where a row click goes. Reviewed → /review. Anything else
+  // routes back into /interview so the user can continue answering or retry review.
+  const openSession = (session) => {
+    if (session.status === "reviewed") navigate(`/review/${session.session_id}`);
+    else navigate(`/interview/${session.session_id}`);
+  };
+
+  const handleRetryReview = async (event, session) => {
+    event.stopPropagation();
+    if (retrying[session.session_id]) return;
+    setRetrying((prev) => ({ ...prev, [session.session_id]: true }));
+    try {
+      await retryReview(session.session_id);
+      const label = session.mode === "resume"
+        ? "简历面试复盘生成中"
+        : session.mode === "jd_prep" ? "JD 备面复盘生成中" : "专项训练复盘生成中";
+      const type = session.mode === "resume"
+        ? "resume_review"
+        : session.mode === "jd_prep" ? "jd_review" : "drill_review";
+      startTask(session.session_id, type, label);
+      // Optimistically reflect the new status so the row updates without a full refetch.
+      setSessions((prev) => prev.map((s) =>
+        s.session_id === session.session_id
+          ? { ...s, status: "reviewing", review_error: null }
+          : s
+      ));
+    } catch (err) {
+      alert("重新生成失败: " + err.message);
+    } finally {
+      setRetrying((prev) => {
+        const next = { ...prev };
+        delete next[session.session_id];
+        return next;
+      });
+    }
   };
 
   const handleDeleteRequest = (event, session) => {
@@ -290,8 +347,10 @@ export default function History() {
                 <HistoryRow
                   key={session.session_id}
                   session={session}
-                  onOpen={() => navigate(`/review/${session.session_id}`)}
+                  onOpen={() => openSession(session)}
                   onDelete={handleDeleteRequest}
+                  onRetry={handleRetryReview}
+                  retrying={!!retrying[session.session_id]}
                 />
               ))}
             </div>
@@ -341,12 +400,14 @@ function HistorySummaryChip({ label, value, hint, valueClassName = "text-primary
   );
 }
 
-function HistoryRow({ session, onOpen, onDelete }) {
+function HistoryRow({ session, onOpen, onDelete, onRetry, retrying }) {
   const badge = MODE_BADGES[session.mode] || MODE_BADGES.resume;
   const title = session.meta?.position || session.topic || "综合";
   const subtitle = session.meta?.company || "";
   const createdDate = session.created_at?.slice(0, 10);
   const compactSessionId = formatSessionId(session.session_id);
+  const status = session.status || "reviewed";
+  const canRetry = status === "review_failed" && session.mode !== "recording";
 
   return (
     <Card
@@ -366,6 +427,7 @@ function HistoryRow({ session, onOpen, onDelete }) {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={badge.variant}>{badge.text}</Badge>
+              <StatusBadge status={status} />
               <div className="min-w-0 flex-1 truncate text-[15px] font-semibold text-text">{title}</div>
             </div>
 
@@ -398,9 +460,27 @@ function HistoryRow({ session, onOpen, onDelete }) {
                 </span>
               )}
             </div>
+
+            {status === "review_failed" && session.review_error && (
+              <div className="mt-2 text-[12px] leading-5 text-red/80">
+                {session.review_error}
+              </div>
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-1 self-center">
+            {canRetry && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
+                title="重新生成复盘"
+                onClick={(event) => onRetry(event, session)}
+                disabled={retrying}
+              >
+                <RotateCw size={13} className={retrying ? "animate-spin" : ""} />
+                {retrying ? "重试中" : "重新生成"}
+              </button>
+            )}
             <button
               type="button"
               className="rounded-lg p-2 text-dim opacity-75 transition-colors hover:bg-red/8 hover:text-red hover:opacity-100"
@@ -417,6 +497,22 @@ function HistoryRow({ session, onOpen, onDelete }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function StatusBadge({ status }) {
+  const meta = STATUS_META[status] || STATUS_META.reviewed;
+  const Icon = meta.icon;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+        STATUS_TONE_STYLE[meta.tone],
+      )}
+    >
+      <Icon size={11} className={meta.spin ? "animate-spin" : ""} />
+      {meta.label}
+    </span>
   );
 }
 

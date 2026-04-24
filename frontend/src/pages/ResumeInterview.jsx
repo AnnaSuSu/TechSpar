@@ -320,11 +320,18 @@ export default function ResumeInterview() {
               </div>
             ) : (
               <div className="flex flex-col gap-3.5">
-                {history.map((s) => (
+                {history.map((s) => {
+                  const reviewed = (s.status || "reviewed") === "reviewed";
+                  const title = reviewed
+                    ? "简历沉浸式死磕"
+                    : s.status === "review_failed" ? "复盘生成失败，点击重试"
+                    : s.status === "reviewing" ? "复盘正在生成中"
+                    : "面试未完成，点击继续";
+                  return (
                   <Card
                     key={s.session_id}
                     className="cursor-pointer group flex items-center justify-between p-4 md:p-5 hover:border-primary/40 hover:bg-card hover:shadow-lg hover:shadow-primary/5 transition-all rounded-2xl border-border/80 bg-card/40"
-                    onClick={() => navigate(`/review/${s.session_id}`)}
+                    onClick={() => navigate(reviewed ? `/review/${s.session_id}` : `/interview/${s.session_id}`)}
                   >
                     <div className="flex items-center gap-4 min-w-0 flex-1">
                       <div className="w-11 h-11 rounded-xl bg-background border border-border/60 flex items-center justify-center text-text shrink-0 group-hover:bg-primary/10 group-hover:border-primary/30 group-hover:text-primary transition-all shadow-sm">
@@ -332,7 +339,7 @@ export default function ResumeInterview() {
                       </div>
                       <div className="flex flex-col min-w-0 gap-1.5">
                         <div className="font-bold text-[15px] text-text truncate pr-4 tracking-tight group-hover:text-primary transition-colors">
-                          简历沉浸式死磕
+                          {title}
                         </div>
                         <div className="flex items-center gap-1.5 text-[12px] text-dim font-medium tabular-nums">
                           <Clock size={12} className="opacity-80" />
@@ -347,7 +354,8 @@ export default function ResumeInterview() {
                        </div>
                     </div>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -37,12 +37,18 @@ from backend.runtime import (
     get_or_restore_resume_graph,
 )
 from backend.storage.sessions import (
+    STATUS_ENDED,
+    STATUS_ONGOING,
+    STATUS_REVIEW_FAILED,
+    STATUS_REVIEWED,
+    STATUS_REVIEWING,
     append_message,
     create_session,
     get_session,
     save_drill_answers,
     save_reference_answer,
     save_review,
+    update_session_status,
 )
 from backend.storage.user_settings import load_user_settings
 
@@ -330,20 +336,31 @@ async def chat_stream(req: ChatRequest, user_id: str = Depends(get_current_user)
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-def _generate_review_background(
-    session_id: str,
-    mode,
-    topic,
-    messages,
-    scores,
-    weak_points,
-    eval_history,
-    topic_name,
-    user_id: str,
-):
-    """Background task: generate review + update profile."""
+async def _run_resume_review(session_id: str, user_id: str):
+    """Background: restore graph state from checkpoint, run review, persist.
+
+    Self-contained — reads everything it needs from SQLite, so it survives
+    process restarts and can be retried via /interview/review/{id}/generate.
+    """
     try:
-        review = generate_review(
+        entry = await get_or_restore_resume_graph(session_id, user_id)
+        if entry is None:
+            raise RuntimeError("会话状态已失效，无法恢复")
+
+        graph = entry["graph"]
+        config = entry["config"]
+        state = await graph.aget_state(config)
+        values = state.values or {}
+        messages = list(values.get("messages", []))
+        scores = values.get("scores", [])
+        weak_points = values.get("weak_points", [])
+        eval_history = values.get("eval_history", [])
+        topic_name = values.get("topic_name", entry.get("topic"))
+        mode = entry["mode"]
+        topic = entry.get("topic")
+
+        review = await asyncio.to_thread(
+            generate_review,
             mode=mode,
             messages=messages,
             scores=scores,
@@ -352,13 +369,13 @@ def _generate_review_background(
             eval_history=eval_history,
         )
 
-        extraction = asyncio.run(update_profile_after_interview(
+        extraction = await update_profile_after_interview(
             mode=mode.value,
             topic=topic,
             messages=messages,
             user_id=user_id,
             scores=scores,
-        ))
+        )
 
         resume_overall = {}
         if extraction.get("dimension_scores"):
@@ -366,12 +383,18 @@ def _generate_review_background(
         if extraction.get("avg_score"):
             resume_overall["avg_score"] = extraction["avg_score"]
 
-        save_review(session_id, review, scores, weak_points, overall=resume_overall, user_id=user_id)
+        save_review(session_id, review, scores, weak_points,
+                    overall=resume_overall, user_id=user_id)
         _task_status[session_id] = {"status": "done", "type": "resume_review"}
+        _graphs.pop(session_id, None)
         logger.info("Review generated for session %s", session_id)
     except Exception as exc:
+        logger.exception("Review generation failed for session %s", session_id)
+        update_session_status(
+            session_id, STATUS_REVIEW_FAILED,
+            user_id=user_id, review_error=str(exc)[:500] or "未知错误",
+        )
         _task_status[session_id] = {"status": "error", "type": "resume_review"}
-        logger.error("Review generation failed for session %s: %s", session_id, exc)
 
 
 def _end_drill_background(session_id, topic, questions, answers, user_id):
@@ -402,8 +425,12 @@ def _end_drill_background(session_id, topic, questions, answers, user_id):
         _drill_sessions.pop(session_id, None)
         logger.info("Drill review generated for session %s", session_id)
     except Exception as exc:
+        logger.exception("Drill review failed for session %s", session_id)
+        update_session_status(
+            session_id, STATUS_REVIEW_FAILED,
+            user_id=user_id, review_error=str(exc)[:500] or "未知错误",
+        )
         _task_status[session_id] = {"status": "error", "type": "drill_review"}
-        logger.error("Drill review failed for session %s: %s", session_id, exc)
 
 
 def _end_jd_prep_background(session_id, questions, answers, preview, meta, user_id):
@@ -426,8 +453,90 @@ def _end_jd_prep_background(session_id, questions, answers, preview, meta, user_
         _job_prep_sessions.pop(session_id, None)
         logger.info("JD prep review generated for session %s", session_id)
     except Exception as exc:
+        logger.exception("JD prep review failed for session %s", session_id)
+        update_session_status(
+            session_id, STATUS_REVIEW_FAILED,
+            user_id=user_id, review_error=str(exc)[:500] or "未知错误",
+        )
         _task_status[session_id] = {"status": "error", "type": "jd_review"}
-        logger.error("JD prep review failed for session %s: %s", session_id, exc)
+
+
+def _extract_answers_from_transcript(transcript: list, questions: list) -> list[dict]:
+    """Reconstruct [{question_id, answer}] from the Q/A transcript pattern.
+
+    save_drill_answers lays out transcript as [assistant Q, user A, assistant Q, ...].
+    We walk each question in order and take the next user turn as its answer.
+    """
+    answers: list[dict] = []
+    cursor = 0
+    for q in questions:
+        q_text = q.get("question", "")
+        # advance cursor past the question's own assistant entry
+        while cursor < len(transcript) and not (
+            transcript[cursor].get("role") == "assistant"
+            and transcript[cursor].get("content") == q_text
+        ):
+            cursor += 1
+        if cursor >= len(transcript):
+            break
+        cursor += 1
+        if cursor < len(transcript) and transcript[cursor].get("role") == "user":
+            answers.append({"question_id": q["id"], "answer": transcript[cursor].get("content", "")})
+            cursor += 1
+    return answers
+
+
+def _dispatch_review(
+    session_id: str,
+    session: dict,
+    user_id: str,
+    background_tasks: BackgroundTasks,
+    answers_override: list | None = None,
+) -> dict:
+    """Kick off background review generation for any mode. Updates status → reviewing.
+
+    Called by both /interview/end (first attempt) and /interview/review/{id}/generate (retry).
+    """
+    mode = session["mode"]
+
+    if mode == InterviewMode.RESUME.value:
+        update_session_status(session_id, STATUS_REVIEWING, user_id=user_id, clear_error=True)
+        _task_status[session_id] = {"status": "pending", "type": "resume_review"}
+        background_tasks.add_task(_run_resume_review, session_id, user_id)
+        return {"session_id": session_id, "mode": mode, "status": "pending"}
+
+    if mode == InterviewMode.TOPIC_DRILL.value:
+        cached = _drill_sessions.get(session_id)
+        topic = (cached or {}).get("topic") or session.get("topic")
+        questions = (cached or {}).get("questions") or session.get("questions") or []
+        if not topic or not questions:
+            raise HTTPException(400, "会话缺少必要的题目信息，无法生成复盘。")
+        answers = answers_override if answers_override is not None else _extract_answers_from_transcript(
+            session.get("transcript", []), questions,
+        )
+
+        update_session_status(session_id, STATUS_REVIEWING, user_id=user_id, clear_error=True)
+        _task_status[session_id] = {"status": "pending", "type": "drill_review"}
+        background_tasks.add_task(_end_drill_background, session_id, topic, questions, answers, user_id)
+        return {"session_id": session_id, "mode": mode, "status": "pending"}
+
+    if mode == InterviewMode.JD_PREP.value:
+        cached = _job_prep_sessions.get(session_id)
+        questions = (cached or {}).get("questions") or session.get("questions") or []
+        preview = (cached or {}).get("preview") or (session.get("meta") or {}).get("preview") or {}
+        meta = (cached or {}).get("meta") or session.get("meta") or {}
+        if not questions:
+            raise HTTPException(400, "会话缺少必要的题目信息，无法生成复盘。")
+        answers = answers_override if answers_override is not None else _extract_answers_from_transcript(
+            session.get("transcript", []), questions,
+        )
+
+        update_session_status(session_id, STATUS_REVIEWING, user_id=user_id, clear_error=True)
+        _task_status[session_id] = {"status": "pending", "type": "jd_review"}
+        background_tasks.add_task(_end_jd_prep_background, session_id, questions, answers, preview, meta, user_id)
+        return {"session_id": session_id, "mode": mode, "status": "pending"}
+
+    raise HTTPException(400, f"Unsupported mode for review: {mode}")
 
 
 @router.post("/interview/end/{session_id}")
@@ -437,84 +546,121 @@ async def end_interview(
     body: EndDrillRequest | None = None,
     user_id: str = Depends(get_current_user),
 ):
-    """End interview → start async evaluation + review generation."""
-    if session_id in _drill_sessions:
-        entry = _drill_sessions[session_id]
-        if entry.get("user_id") != user_id:
-            raise HTTPException(403, "Access denied.")
+    """End interview → transition status and kick off review generation.
 
-        if _task_status.get(session_id, {}).get("status") == "pending":
-            return {"session_id": session_id, "mode": "topic_drill", "status": "pending"}
-
-        topic = entry["topic"]
-        questions = entry["questions"]
-        answers = body.answers if body and body.answers else []
-        save_drill_answers(session_id, answers, user_id=user_id)
-
-        _task_status[session_id] = {"status": "pending", "type": "drill_review"}
-        background_tasks.add_task(_end_drill_background, session_id, topic, questions, answers, user_id)
-        return {"session_id": session_id, "mode": "topic_drill", "status": "pending"}
-
-    if session_id in _job_prep_sessions:
-        entry = _job_prep_sessions[session_id]
-        if entry.get("user_id") != user_id:
-            raise HTTPException(403, "Access denied.")
-
-        if _task_status.get(session_id, {}).get("status") == "pending":
-            return {"session_id": session_id, "mode": InterviewMode.JD_PREP.value, "status": "pending"}
-
-        questions = entry["questions"]
-        preview = entry["preview"]
-        meta = entry["meta"]
-        answers = body.answers if body and body.answers else []
-        save_drill_answers(session_id, answers, user_id=user_id)
-
-        _task_status[session_id] = {"status": "pending", "type": "jd_review"}
-        background_tasks.add_task(_end_jd_prep_background, session_id, questions, answers, preview, meta, user_id)
-        return {"session_id": session_id, "mode": InterviewMode.JD_PREP.value, "status": "pending"}
-
-    if session_id in _task_status:
-        task_status = _task_status[session_id]
-        return {
-            "session_id": session_id,
-            "mode": task_status.get("type", "unknown"),
-            "status": task_status.get("status", "pending"),
-        }
-
-    if session_id not in _graphs:
+    Idempotent: safe to call again on a session whose review is already done,
+    pending, or previously failed. For batch modes, fresh answers in the body
+    override anything already persisted (preserves the old "resubmit" flow).
+    """
+    session = get_session(session_id, user_id=user_id)
+    if not session:
         raise HTTPException(404, "Session not found.")
 
-    entry = _graphs[session_id]
-    if entry.get("user_id") != user_id:
-        raise HTTPException(403, "Access denied.")
+    status = session["status"]
+    mode = session["mode"]
 
-    graph = entry["graph"]
-    config = entry["config"]
-    state = await graph.aget_state(config)
-    messages = list(state.values.get("messages", []))
-    scores = state.values.get("scores", [])
-    weak_points = state.values.get("weak_points", [])
-    eval_history = state.values.get("eval_history", [])
-    topic_name = state.values.get("topic_name", entry.get("topic"))
-    mode = entry["mode"]
-    topic = entry.get("topic")
+    if status == STATUS_REVIEWED:
+        _task_status[session_id] = {"status": "done", "type": _mode_task_type(mode)}
+        return {"session_id": session_id, "mode": mode, "status": "done"}
 
-    del _graphs[session_id]
+    if status == STATUS_REVIEWING:
+        return {"session_id": session_id, "mode": mode, "status": "pending"}
 
-    _task_status[session_id] = {"status": "pending", "type": "resume_review"}
-    background_tasks.add_task(
-        _generate_review_background,
-        session_id,
-        mode,
-        topic,
-        messages,
-        scores,
-        weak_points,
-        eval_history,
-        topic_name,
-        user_id,
-    )
-    return {"session_id": session_id, "mode": "resume", "status": "pending"}
+    # Batch modes expect fresh answer payload on /end — persist it even if we're
+    # retrying after a prior failure.
+    answers_override: list | None = None
+    if mode in (InterviewMode.TOPIC_DRILL.value, InterviewMode.JD_PREP.value):
+        answers_override = body.answers if body and body.answers else []
+        save_drill_answers(session_id, answers_override, user_id=user_id)
+
+    # Flip ongoing → ended before dispatching review so the session is always
+    # visible in history even if review generation later crashes.
+    if status == STATUS_ONGOING:
+        update_session_status(session_id, STATUS_ENDED, user_id=user_id)
+        session["status"] = STATUS_ENDED
+
+    return _dispatch_review(session_id, session, user_id, background_tasks, answers_override=answers_override)
+
+
+def _mode_task_type(mode: str) -> str:
+    return {
+        InterviewMode.RESUME.value: "resume_review",
+        InterviewMode.TOPIC_DRILL.value: "drill_review",
+        InterviewMode.JD_PREP.value: "jd_review",
+    }.get(mode, "review")
+
+
+@router.post("/interview/review/{session_id}/generate")
+async def generate_session_review(
+    session_id: str,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user),
+):
+    """Re-run review generation for a session. Idempotent; works after restart.
+
+    Accepts sessions in ended / review_failed states. Refuses ongoing sessions
+    (user should call /interview/end first) and no-ops on already reviewed ones.
+    """
+    session = get_session(session_id, user_id=user_id)
+    if not session:
+        raise HTTPException(404, "Session not found.")
+
+    status = session["status"]
+    mode = session["mode"]
+
+    if status == STATUS_REVIEWED:
+        _task_status[session_id] = {"status": "done", "type": _mode_task_type(mode)}
+        return {"session_id": session_id, "mode": mode, "status": "done"}
+    if status == STATUS_REVIEWING:
+        return {"session_id": session_id, "mode": mode, "status": "pending"}
+    if status == STATUS_ONGOING:
+        raise HTTPException(400, "面试尚未结束，请先结束面试再生成复盘。")
+    if status not in (STATUS_ENDED, STATUS_REVIEW_FAILED):
+        raise HTTPException(400, f"当前状态 {status} 不支持重新生成复盘。")
+
+    return _dispatch_review(session_id, session, user_id, background_tasks)
+
+
+@router.get("/interview/session/{session_id}/resume")
+async def get_session_for_resume(
+    session_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Return everything needed to reopen a session in the UI.
+
+    For resume-mode chats, also checks whether the LangGraph checkpoint can
+    still drive another turn (can_continue=True ⇒ user can keep answering).
+    """
+    session = get_session(session_id, user_id=user_id)
+    if not session:
+        raise HTTPException(404, "Session not found.")
+
+    can_continue = False
+    is_finished = False
+
+    if session["mode"] == InterviewMode.RESUME.value:
+        entry = await get_or_restore_resume_graph(session_id, user_id)
+        if entry is not None:
+            state = await entry["graph"].aget_state(entry["config"])
+            values = state.values or {}
+            is_finished = bool(values.get("is_finished"))
+            can_continue = bool(state.next) and not is_finished
+
+    meta = session.get("meta") or {}
+    return {
+        "session_id": session_id,
+        "mode": session["mode"],
+        "topic": session.get("topic"),
+        "status": session["status"],
+        "review_error": session.get("review_error"),
+        "transcript": session.get("transcript", []),
+        "questions": session.get("questions", []),
+        "target_role": meta.get("target_role", ""),
+        "meta": meta,
+        "can_continue": can_continue,
+        "is_finished": is_finished,
+        "has_review": bool(session.get("review")),
+    }
 
 
 async def _update_drill_profile(topic: str, overall: dict, scores: list, total_questions: int, user_id: str):

@@ -3,7 +3,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Check, Minus, Star } from "lucide-react";
 import ChatBubble from "../components/ChatBubble";
-import { sendMessage, sendMessageStream, endInterview } from "../api/interview";
+import { sendMessage, sendMessageStream, endInterview, retryReview, getResumableSession } from "../api/interview";
 import { useTaskStatus } from "../contexts/TaskStatusContext";
 import useVoiceInput from "../hooks/useVoiceInput";
 import { cn } from "@/lib/utils";
@@ -20,18 +20,24 @@ export default function Interview() {
   const chatEndRef = useRef(null);
   const textareaRef = useRef(null);
 
-  const initData = location.state || {};
-  const isBatchMode = initData.mode === "topic_drill" || initData.mode === "jd_prep";
-  const isJobPrep = initData.mode === "jd_prep";
+  // Session bootstrap: populate either from router state (fresh start) or by
+  // fetching /interview/session/:id/resume (opened via history).
+  const [initData, setInitData] = useState(() => location.state || null);
+  const [bootstrapError, setBootstrapError] = useState("");
+  const [sessionStatus, setSessionStatus] = useState(location.state?.status || null);
+  const [resumeError, setResumeError] = useState(location.state?.review_error || "");
+
+  const isBatchMode = initData?.mode === "topic_drill" || initData?.mode === "jd_prep";
+  const isJobPrep = initData?.mode === "jd_prep";
 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [finished, setFinished] = useState(false);
   const [reviewing, setReviewing] = useState(false);
-  const [progress, setProgress] = useState(initData.progress || "");
+  const [progress] = useState(location.state?.progress || "");
 
-  const [questions] = useState(initData.questions || []);
+  const [questions, setQuestions] = useState(location.state?.questions || []);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [drillInput, setDrillInput] = useState("");
@@ -46,9 +52,66 @@ export default function Interview() {
   });
 
   useEffect(() => {
-    if (!isBatchMode && initData.message) {
-      setMessages([{ role: "assistant", content: initData.message }]);
+    // Fresh start from a landing page → location.state carries everything.
+    if (location.state) {
+      if (!isBatchMode && location.state.message) {
+        setMessages([{ role: "assistant", content: location.state.message }]);
+      }
+      return;
     }
+    // Resume-from-history: rebuild from server state.
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getResumableSession(sessionId);
+        if (cancelled) return;
+        setInitData({
+          mode: data.mode,
+          topic: data.topic,
+          target_role: data.target_role,
+          questions: data.questions,
+          meta: data.meta,
+          company: data.meta?.company,
+          position: data.meta?.position,
+        });
+        setQuestions(data.questions || []);
+        setSessionStatus(data.status);
+        setResumeError(data.review_error || "");
+        if (data.mode === "resume") {
+          setMessages((data.transcript || []).map((m) => ({ role: m.role, content: m.content })));
+          // A session past its chat phase (ended / failed review / reviewing / reviewed)
+          // locks the input and offers retry/view-review controls.
+          if (!data.can_continue || data.is_finished || data.status !== "ongoing") {
+            setFinished(true);
+          }
+        } else {
+          // Batch modes: replay saved answers so user can review which ones were skipped.
+          const saved = {};
+          (data.transcript || []).forEach((entry, idx, arr) => {
+            if (entry.role !== "user") return;
+            const prev = arr[idx - 1];
+            if (!prev || prev.role !== "assistant") return;
+            const q = (data.questions || []).find((q) => q.question === prev.content);
+            if (q) saved[q.id] = entry.content;
+          });
+          setAnswers(saved);
+          if (data.status !== "ongoing") {
+            setFinished(true);
+            setSubmitted(true);
+          }
+        }
+        // If a review is already in flight server-side, subscribe to its status
+        // so the UI polls to "done" without needing the user to click anything.
+        if (data.status === "reviewing") {
+          const type = data.mode === "resume" ? "resume_review"
+            : data.mode === "jd_prep" ? "jd_review" : "drill_review";
+          startTask(sessionId, type, "复盘生成中");
+        }
+      } catch (err) {
+        if (!cancelled) setBootstrapError(err.message || "无法加载面试");
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -169,9 +232,25 @@ export default function Interview() {
     try {
       await endInterview(sessionId);
       setFinished(true);
+      setSessionStatus("reviewing");
+      setResumeError("");
       startTask(sessionId, "resume_review", "简历面试复盘生成中");
     } catch (err) {
       alert("结束面试失败: " + err.message);
+    } finally {
+      setReviewing(false);
+    }
+  };
+
+  const handleRetryResumeReview = async () => {
+    setReviewing(true);
+    try {
+      await retryReview(sessionId);
+      setSessionStatus("reviewing");
+      setResumeError("");
+      startTask(sessionId, "resume_review", "简历面试复盘生成中");
+    } catch (err) {
+      alert("重新生成失败: " + err.message);
     } finally {
       setReviewing(false);
     }
@@ -186,7 +265,7 @@ export default function Interview() {
 
   const modeBadge = isJobPrep
     ? { text: "JD 备面", variant: "blue" }
-    : initData.mode === "topic_drill"
+    : initData?.mode === "topic_drill"
       ? { text: "专项训练", variant: "success" }
       : { text: "简历面试", variant: "default" };
 
@@ -210,6 +289,27 @@ export default function Interview() {
     </button>
   );
 
+  // Bootstrap gate: show a skeleton while the resume payload is in flight, or
+  // an error view if the session doesn't exist / can't be loaded.
+  if (!initData) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
+        {bootstrapError ? (
+          <>
+            <div className="text-[15px] text-red">{bootstrapError}</div>
+            <Button variant="outline" onClick={() => navigate("/history")}>返回历史记录</Button>
+          </>
+        ) : (
+          <>
+            <Skeleton className="h-8 w-72" />
+            <Skeleton className="h-32 w-full max-w-[720px]" />
+            <Skeleton className="h-32 w-full max-w-[720px]" />
+          </>
+        )}
+      </div>
+    );
+  }
+
   if (isBatchMode) {
     return (
       <div className="flex-1 flex flex-col h-full">
@@ -219,10 +319,10 @@ export default function Interview() {
             {isJobPrep
               ? (
                 <span className="text-sm text-dim">
-                  {initData.company ? `${initData.company} · ` : ""}{initData.position || "目标岗位"}
+                  {initData?.company ? `${initData.company} · ` : ""}{initData?.position || "目标岗位"}
                 </span>
               )
-              : initData.topic && <span className="text-sm text-dim">{initData.topic}</span>}
+              : initData?.topic && <span className="text-sm text-dim">{initData.topic}</span>}
             <span className="text-[13px] text-dim">{answeredCount}/{totalQ} 已答</span>
           </div>
           {(() => {
@@ -399,7 +499,7 @@ export default function Interview() {
       <div className="flex items-center justify-between px-4 py-3 md:px-6 border-b border-border bg-card">
         <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           <Badge variant={modeBadge.variant}>{modeBadge.text}</Badge>
-          {initData.topic && <span className="text-sm text-dim">{initData.topic}</span>}
+          {initData?.topic && <span className="text-sm text-dim">{initData.topic}</span>}
           {progress && (
             <span className="text-[13px] text-dim flex items-center gap-1.5">
               <span className="text-border">|</span>
@@ -409,21 +509,45 @@ export default function Interview() {
         </div>
         {(() => {
           const task = tasks.find((t) => t.id === sessionId);
-          const taskDone = task?.status === "done";
+          const taskDone = task?.status === "done" || sessionStatus === "reviewed";
+          const taskError = task?.status === "error" || sessionStatus === "review_failed";
+          // Four branches: live chat → end, review failed → retry, review in-flight → wait, review done → view.
+          let handler;
+          let label;
+          if (taskDone) {
+            handler = () => navigate(`/review/${sessionId}`);
+            label = "查看复盘";
+          } else if (taskError) {
+            handler = handleRetryResumeReview;
+            label = reviewing ? "重新生成中..." : "重新生成复盘";
+          } else if (!finished) {
+            handler = handleEndResume;
+            label = reviewing ? "生成复盘中..." : "结束面试";
+          } else {
+            handler = undefined;
+            label = "复盘生成中...";
+          }
           return (
             <Button
               variant="destructive"
               size="sm"
-              onClick={finished && taskDone ? () => navigate(`/review/${sessionId}`) : !finished ? handleEndResume : undefined}
-              disabled={reviewing || (finished && !taskDone)}
+              onClick={handler}
+              disabled={reviewing || (!handler && !taskDone)}
             >
-              {reviewing ? "生成复盘中..." : !finished ? "结束面试" : taskDone ? "查看复盘" : "复盘生成中..."}
+              {label}
             </Button>
           );
         })()}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 md:px-6 md:py-8 flex flex-col gap-7 max-w-3xl w-full mx-auto">
+        {sessionStatus === "review_failed" && (
+          <div className="rounded-xl border border-red/20 bg-red/5 px-4 py-3 text-[13px] leading-6 text-red/90">
+            <div className="font-medium">复盘生成失败</div>
+            {resumeError && <div className="mt-1 text-red/80">{resumeError}</div>}
+            <div className="mt-1 text-dim">面试问答已保存；点击右上角"重新生成复盘"再次尝试。</div>
+          </div>
+        )}
         {messages.map((msg, i) => (
           <ChatBubble key={i} role={msg.role} content={msg.content} />
         ))}
