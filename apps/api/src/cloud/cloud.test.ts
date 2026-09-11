@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { AppError, PLATFORM_PROVIDER, QuotaExceeded, USER_PROVIDER, type ProviderSource, type QuotaUseCases, type UsageRepository } from '@techspar/core'
 import { JoseTokenService } from '@techspar/platform'
+import { QuotaStatusSchema } from '@techspar/contracts'
 import { verifyOrderSignature, type AfdianOrder } from './afdian.ts'
 import { OrderRepository } from './orders.ts'
 import { processOrder } from './process-order.ts'
@@ -118,7 +119,7 @@ describe('CloudQuotaService', () => {
     await expect(quota.check('u1', PLATFORM_PROVIDER)).rejects.toThrow('停止赠送免费额度')
     await expect(quota.check(undefined, PLATFORM_PROVIDER)).rejects.toThrow(QuotaExceeded)
     expect(base.checked).toBe(0)
-    expect(await quota.status('u1', PLATFORM_PROVIDER)).toMatchObject({ source: PLATFORM_PROVIDER, used: 0, limit: 0 })
+    expect(QuotaStatusSchema.parse(await quota.status('u1', PLATFORM_PROVIDER))).toMatchObject({ source: PLATFORM_PROVIDER, used: 0, limit: 0 })
   })
 
   test('关闭免费赠送后,未订阅用户仍可使用自己的 Key', async () => {
