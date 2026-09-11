@@ -18,6 +18,8 @@
 
 TechSpar is more than a question generator. Focused drills, resume interviews, JD prep, realtime Copilot, and recording review share the same long-term profile, knowledge base, weak points, and review schedule. Every result changes what the next round focuses on.
 
+The hosted version no longer offers free credits due to repeated abuse by automated account-registration bots. Sorry for the inconvenience, and thank you for understanding. Paid credits are available through [Afdian](https://ifdian.net/a/techspar).
+
 ## Versions and branches
 
 - **`main`** is the current product. The backend is fully TypeScript, Bun, and Hono, with one Bun workspace for backend and frontend dependencies. All new work continues here.
