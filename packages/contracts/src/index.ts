@@ -100,7 +100,8 @@ export const SettingsProbeResponseSchema = z.object({ ok: z.boolean(), error: z.
 export const QuotaStatusSchema = z.object({
   source: z.enum(['user', 'platform']),
   used: z.number().int().nonnegative(),
-  limit: z.number().int().positive().nullable(),
+  /** 0 表示没有可用额度,null 表示不限量。 */
+  limit: z.number().int().nonnegative().nullable(),
   /** 计量单位。token 按消耗量计，call 是仅按次数的兼容模式 */
   unit: z.enum(['token', 'call']),
   /** 额度的计量窗口。subscription 表示按订阅期的额度包计 */
