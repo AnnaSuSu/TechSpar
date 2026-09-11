@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -103,12 +104,50 @@ describe('SubscriptionRepository', () => {
 })
 
 describe('CloudQuotaService', () => {
-  test('未订阅时委托给默认策略', async () => {
+  test('显式开启免费赠送时,未订阅用户委托给默认策略', async () => {
     const base = new StubBaseQuota()
-    const quota = new CloudQuotaService(base, new StubUsage(999), subscriptions)
+    const quota = new CloudQuotaService(base, new StubUsage(999), subscriptions, true)
     await quota.check('u1', PLATFORM_PROVIDER)
     expect(base.checked).toBe(1)
     expect((await quota.status('u1', PLATFORM_PROVIDER)).limit).toBe(20)
+  })
+
+  test('默认不赠送免费额度,零用量用户也不能调用平台模型', async () => {
+    const base = new StubBaseQuota()
+    const quota = new CloudQuotaService(base, new StubUsage(0), subscriptions)
+    await expect(quota.check('u1', PLATFORM_PROVIDER)).rejects.toThrow('停止赠送免费额度')
+    await expect(quota.check(undefined, PLATFORM_PROVIDER)).rejects.toThrow(QuotaExceeded)
+    expect(base.checked).toBe(0)
+    expect(await quota.status('u1', PLATFORM_PROVIDER)).toMatchObject({ source: PLATFORM_PROVIDER, used: 0, limit: 0 })
+  })
+
+  test('关闭免费赠送后,未订阅用户仍可使用自己的 Key', async () => {
+    const base = new StubBaseQuota()
+    const quota = new CloudQuotaService(base, new StubUsage(0), subscriptions, false)
+    await quota.check('u1', USER_PROVIDER)
+    expect(base.checked).toBe(1)
+    expect(await quota.status('u1', USER_PROVIDER)).toEqual(await base.status('u1', USER_PROVIDER))
+  })
+
+  test('关闭免费赠送后,有效订阅仍按原额度包计费', async () => {
+    subscriptions.grant('u1', 'basic')
+    const usage = new StubUsage(400)
+    const quota = new CloudQuotaService(new StubBaseQuota(), usage, subscriptions, false)
+    await quota.check('u1', PLATFORM_PROVIDER)
+    expect(await quota.status('u1', PLATFORM_PROVIDER)).toMatchObject({ used: 400, limit: 1000, window: 'subscription' })
+    usage.tokens = 1000
+    await expect(quota.check('u1', PLATFORM_PROVIDER)).rejects.toThrow('本期额度已用完')
+  })
+
+  test('关闭免费赠送后,订阅过期不能回落到免费额度', async () => {
+    subscriptions.grant('u1', 'basic')
+    const db = new Database(join(directory, 'test.db'))
+    try {
+      db.query('UPDATE cloud_subscriptions SET expires_at = ? WHERE user_id = ?').run(new Date(Date.now() - DAY).toISOString(), 'u1')
+    } finally { db.close() }
+    const quota = new CloudQuotaService(new StubBaseQuota(), new StubUsage(0), subscriptions, false)
+    await expect(quota.check('u1', PLATFORM_PROVIDER)).rejects.toThrow('停止赠送免费额度')
+    expect((await quota.status('u1', PLATFORM_PROVIDER)).limit).toBe(0)
   })
 
   test('非平台来源始终委托', async () => {
@@ -130,7 +169,7 @@ describe('CloudQuotaService', () => {
   test('token_quota 为 0 的档位不限量', async () => {
     subscriptions.grant('u1', 'sprint')
     const base = new StubBaseQuota()
-    const quota = new CloudQuotaService(base, new StubUsage(10_000), subscriptions)
+    const quota = new CloudQuotaService(base, new StubUsage(10_000), subscriptions, false)
     await quota.check('u1', PLATFORM_PROVIDER)
     expect(base.checked).toBe(0)
     expect((await quota.status('u1', PLATFORM_PROVIDER)).limit).toBeNull()
