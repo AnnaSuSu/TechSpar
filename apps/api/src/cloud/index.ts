@@ -59,7 +59,7 @@ function startReconcile(deps: NonNullable<typeof shared>): void {
 const extensions: Extensions = {
   quota: (base, context) => {
     const { subscriptions, usage } = store(context.dbPath)
-    return new CloudQuotaService(base, usage, subscriptions)
+    return new CloudQuotaService(base, usage, subscriptions, process.env.CLOUD_FREE_QUOTA_ENABLED === 'true')
   },
   routes: (app, context) => {
     const { subscriptions, orders, users, usage } = store(context.dbPath)
