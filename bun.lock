@@ -21,7 +21,7 @@
     },
     "apps/api": {
       "name": "@techspar/api",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "dependencies": {
         "@hono/zod-openapi": "^1.1.5",
         "@techspar/contracts": "workspace:*",
@@ -35,7 +35,7 @@
     },
     "apps/desktop": {
       "name": "@techspar/desktop",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "devDependencies": {
         "electron": "43.4.1",
         "electron-builder": "26.15.7",
@@ -111,18 +111,18 @@
     },
     "packages/contracts": {
       "name": "@techspar/contracts",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "dependencies": {
         "zod": "^4.3.6",
       },
     },
     "packages/core": {
       "name": "@techspar/core",
-      "version": "0.3.2",
+      "version": "0.4.0",
     },
     "packages/db": {
       "name": "@techspar/db",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "dependencies": {
         "@techspar/core": "workspace:*",
         "drizzle-orm": "^0.44.7",
@@ -130,7 +130,7 @@
     },
     "packages/platform": {
       "name": "@techspar/platform",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "dependencies": {
         "@techspar/core": "workspace:*",
         "bcryptjs": "^3.0.3",
@@ -141,7 +141,7 @@
     },
     "packages/providers": {
       "name": "@techspar/providers",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "dependencies": {
         "@huggingface/transformers": "^3.8.1",
         "@techspar/core": "workspace:*",
@@ -150,7 +150,7 @@
     },
     "packages/testing": {
       "name": "@techspar/testing",
-      "version": "0.3.2",
+      "version": "0.4.0",
     },
   },
   "packages": {

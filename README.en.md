@@ -20,6 +20,14 @@ TechSpar is more than a question generator. Focused drills, resume interviews, J
 
 The hosted version no longer offers free credits due to repeated abuse by automated account-registration bots. Sorry for the inconvenience, and thank you for understanding. Paid credits are available through [Afdian](https://ifdian.net/a/techspar).
 
+## Community and official editions
+
+This repository contains the self-hosted community edition, with personal API keys and local desktop builds. Official orders, subscriptions, payment reconciliation and hosted-only policies are maintained in a private repository.
+
+Starting with v0.4.0, official installers on [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases) connect to https://techspar.cn and use official accounts, platform models and subscriptions. They do not accept personal API keys or custom server URLs. The automatically generated source archives contain this community edition, not the official commercial application source.
+
+Community sponsorship links remain available through [Afdian](https://ifdian.net/a/techspar). Sponsorship does not grant quotas in a self-hosted instance. See [edition boundaries](docs/editions.md).
+
 ## Versions and branches
 
 - **`main`** is the current product. The backend is fully TypeScript, Bun, and Hono, with one Bun workspace for backend and frontend dependencies. All new work continues here.
@@ -49,9 +57,9 @@ bun install --frozen-lockfile
 cp .env.example .env
 ```
 
-### Electron desktop client
+### Community desktop development
 
-Download published macOS and Windows installers from [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases).
+Official installers are cloud clients. The commands below build the separate self-hosted community desktop client.
 
 Run Vite, Hono, and Electron together in development:
 

@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import Logo from "./Logo";
-import SidebarQuota from "@/cloud/SidebarQuota";
+import AfdianIcon from "./AfdianIcon";
 import {
   Tooltip,
   TooltipContent,
@@ -120,7 +120,17 @@ export default function Sidebar() {
         <Separator />
 
         <div className={cn("py-2 space-y-0.5", collapsed ? "px-2" : "px-3")}>
-          <SidebarQuota collapsed={collapsed} />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a href="https://ifdian.net/a/techspar" target="_blank" rel="noopener noreferrer"
+                aria-label="赞助 TechSpar"
+                className={cn("flex items-center gap-2.5 w-full py-2 rounded-lg text-[13px] text-dim hover:text-primary hover:bg-hover transition-all", collapsed && "justify-center")}>
+                <AfdianIcon size={18} />
+                {!collapsed && <span>赞助 TechSpar</span>}
+              </a>
+            </TooltipTrigger>
+            {collapsed && <TooltipContent side="right" sideOffset={8}>赞助 TechSpar</TooltipContent>}
+          </Tooltip>
 
 
           <Tooltip>
