@@ -551,7 +551,7 @@ export default function Landing() {
           </div>
           <p className="text-xs text-dim">从刷题到实战的 AI 技术面试陪练系统</p>
           <p className="max-w-md text-xs leading-relaxed text-dim">
-            完整开源，你自己部署永远免费。托管版的服务器和模型推理都是我自费在扛，如果它帮到了你，
+            社区版支持自行部署，官方云服务提供平台模型与套餐。你的支持会用于服务器、模型推理和持续开发。
             <a
               href={SPONSOR_URL}
               target="_blank"

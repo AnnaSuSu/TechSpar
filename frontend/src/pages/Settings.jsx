@@ -1628,9 +1628,8 @@ export default function Settings() {
               <h2 className="text-[15px] font-semibold">支持这个项目</h2>
             </div>
             <p className="mb-4 text-[13px] leading-relaxed text-dim">
-              TechSpar 是完整开源的，你自己部署它永远免费，功能一个不少。托管版的服务器和模型推理
-              费用现在都是我自己在扛——一个人做这件事，它能不能继续更新下去，说到底取决于能不能
-              养活自己。
+              TechSpar 社区版支持自行部署；官方网站和官方桌面端提供统一的平台服务与套餐。
+              你的支持会用于模型推理、服务器和持续开发。
               <br />
               如果它帮到了你，去爱发电赞助一点，对我意义很大。
             </p>
