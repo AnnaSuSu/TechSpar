@@ -22,9 +22,11 @@ The hosted version no longer offers free credits due to repeated abuse by automa
 
 ## Community and official editions
 
+TechSpar is growing from a personal project into a continuously maintained product. Model inference, servers, development, and user support all have ongoing costs. Starting with v0.4.0, the project is therefore maintained as a community edition and an official commercial edition. Revenue from official platform services and subscription plans supports continued development.
+
 This repository contains the self-hosted community edition, with personal API keys and local desktop builds. Official orders, subscriptions, payment reconciliation and hosted-only policies are maintained in a private repository.
 
-Starting with v0.4.0, official installers on [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases) connect to https://techspar.cn and use official accounts, platform models and subscriptions. They do not accept personal API keys or custom server URLs. The automatically generated source archives contain this community edition, not the official commercial application source.
+Starting with v0.4.0, official installers on [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases) connect to https://techspar.cn. The website and official desktop clients use platform services and subscription plans, require no model configuration, and share accounts, quotas, and training records. They do not accept personal API keys or custom server URLs. Users who want to configure their own models can self-host the community edition. The automatically generated source archives contain this community edition, not the official commercial application source.
 
 Community sponsorship links remain available through [Afdian](https://ifdian.net/a/techspar). Sponsorship does not grant quotas in a self-hosted instance. See [edition boundaries](docs/editions.md).
 
