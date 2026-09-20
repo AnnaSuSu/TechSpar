@@ -8,7 +8,6 @@
 
 [![Release](https://img.shields.io/github/v/release/AnnaSuSu/TechSpar?color=6E56CF)](https://github.com/AnnaSuSu/TechSpar/releases)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-6E56CF.svg)](LICENSE)
-[![Self-host](https://img.shields.io/badge/自托管-永久免费-2EA043.svg)](#快速开始)
 [![Status](https://img.shields.io/badge/状态-持续开发中-2EA043.svg)](https://github.com/AnnaSuSu/TechSpar/commits/main)
 
 ![TechSpar 产品总览](images/techspar-overview.png)
@@ -36,20 +35,6 @@ TechSpar 想做的是另一件事——**让每一次练习都算数**。专项�
 
 想看实际效果，直接去 [在线体验](https://techspar.cn/)，比截图直观。
 
-## 社区版与官方服务
-
-TechSpar 正在从个人项目走向持续维护的产品。模型推理、服务器、产品开发和用户支持都有长期成本，因此从 v0.4.0 起，项目分为社区版和官方商业版维护。官方商业版通过平台服务与套餐收入支持项目持续发展。
-
-本仓库维护 TechSpar 社区版，支持自行部署、配置自己的模型 API Key，以及本地桌面构建。训练、知识库、画像和数据迁移等现有社区能力继续保留。
-
-[techspar.cn](https://techspar.cn/) 和从 v0.4.0 起发布的官方桌面客户端使用独立维护的商业版本。官网和官方桌面端统一使用平台服务与套餐，免去模型配置，并共享账户、额度和训练记录，不提供个人 API Key 或自定义服务地址入口。希望自行配置模型的用户，可以选择部署社区版。
-
-官方订单、订阅、支付对账和平台专属策略在私有仓库维护，不包含在本仓库当前源码中。自行部署社区版不会获得官方套餐运营系统。
-
-如果项目帮到了你，欢迎在[爱发电](https://ifdian.net/a/techspar)支持持续开发。社区版保留赞助入口；赞助链接本身不在自部署实例中发放套餐。
-
-版本与发布说明见[两个版本的边界](docs/editions.md)。
-
 ## 快速开始
 
 ### 环境要求
@@ -57,7 +42,7 @@ TechSpar 正在从个人项目走向持续维护的产品。模型推理、服�
 - Bun `1.3.14` 或兼容的 `1.3.x`
 - macOS、Linux 或 Windows
 
-官方 v0.4.0 起的桌面安装包连接 techspar.cn，需要联网登录。下面的源码命令用于社区版开发和本地构建，自行构建的社区桌面版包含本地后端。
+以下环境要求和命令适用于源码开发与自行部署。
 
 源码开发或本机构建先执行：
 
@@ -70,7 +55,7 @@ cp .env.example .env
 
 ### Electron 桌面客户端
 
-已发布版本可从 [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases) 下载 macOS 与 Windows 安装包。
+可从 [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases) 下载 macOS 与 Windows 安装包，联网登录后使用。以下命令用于从源码构建带有本地后端的桌面应用。
 
 开发模式会同时启动 Vite、Hono 和 Electron：
 
@@ -90,16 +75,14 @@ bun run pack:desktop
 bun run dist:desktop
 ```
 
-构建正式发布目标：
+按目标平台构建：
 
 ```bash
 bun run dist:desktop:mac-arm64 # macOS Apple Silicon：DMG + ZIP
 bun run dist:desktop:win-x64   # Windows x64：NSIS 安装包
 ```
 
-产物位于 `dist/desktop/`。当前仓库配置了 macOS DMG/ZIP、Windows NSIS、Linux AppImage/DEB；v0.3.1 提供 macOS arm64 与 Windows x64 包。当前公开包未配置商业代码签名，安装时可能触发系统安全提示；真实安装与启动仍应在对应目标平台验收。
-
-发布新版本时先同步根 `package.json` 与桌面包版本，再推送同名 `vX.Y.Z` tag。发布工作流会分别构建 macOS arm64 和 Windows x64 客户端、校验 tag、生成 SHA-256 校验文件并上传到 [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases)；签名和 macOS 公证会在仓库配置对应 secrets 后自动启用。
+产物位于 `dist/desktop/`。当前仓库配置了 macOS DMG/ZIP、Windows NSIS、Linux AppImage/DEB。自行构建的应用自带 Electron 和编译后的 Bun 后端，运行时不需要另外安装 Bun。
 
 ### Web 本地开发
 
@@ -134,7 +117,7 @@ docker compose up --build
 
 ## 模型与服务配置
 
-LLM、Embedding、DashScope、Tavily、OSS 与腾讯云 VPR 密钥默认按用户隔离保存在本地数据目录，登录后在“设置”中填写；`.env` 只放启动配置和可选的平台兜底模型。
+自行部署或从源码构建桌面应用时，在“设置”中填写 LLM、Embedding、DashScope、Tavily、OSS 与腾讯云 VPR 密钥。密钥默认按用户隔离保存在本地数据目录；`.env` 只放启动配置和可选的平台兜底模型。
 
 - **LLM**：任意 OpenAI-compatible API。
 - **Embedding API**：任意 OpenAI-compatible embeddings 接口；完整的 `/v1/embeddings` 地址会自动归一化。
@@ -176,8 +159,6 @@ packages/providers/   LLM、Embedding、ASR、OSS、搜索与声纹适配器
 frontend/             React Web 客户端
 tests-ts/             TypeScript 测试与旧版 OpenAPI 基线
 ```
-
-通用扩展接口继续保留，官方订单、订阅、支付和套餐模块已从本仓库当前源码移除。官方桌面安装包由私有仓库构建，再发布到本仓库 Releases；本仓库 CI 只验证社区源码。
 
 ## 质量检查
 
