@@ -18,18 +18,6 @@
 
 TechSpar is more than a question generator. Focused drills, resume interviews, JD prep, realtime Copilot, and recording review share the same long-term profile, knowledge base, weak points, and review schedule. Every result changes what the next round focuses on.
 
-The hosted version no longer offers free credits due to repeated abuse by automated account-registration bots. Sorry for the inconvenience, and thank you for understanding. Paid credits are available through [Afdian](https://ifdian.net/a/techspar).
-
-## Community and official editions
-
-TechSpar is growing from a personal project into a continuously maintained product. Model inference, servers, development, and user support all have ongoing costs. Starting with v0.4.0, the project is therefore maintained as a community edition and an official commercial edition. Revenue from official platform services and subscription plans supports continued development.
-
-This repository contains the self-hosted community edition, with personal API keys and local desktop builds. Official orders, subscriptions, payment reconciliation and hosted-only policies are maintained in a private repository.
-
-Starting with v0.4.0, official installers on [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases) connect to https://techspar.cn. The website and official desktop clients use platform services and subscription plans, require no model configuration, and share accounts, quotas, and training records. They do not accept personal API keys or custom server URLs. Users who want to configure their own models can self-host the community edition. The automatically generated source archives contain this community edition, not the official commercial application source.
-
-Community sponsorship links remain available through [Afdian](https://ifdian.net/a/techspar). Sponsorship does not grant quotas in a self-hosted instance. See [edition boundaries](docs/editions.md).
-
 ## Versions and branches
 
 - **`main`** is the current product. The backend is fully TypeScript, Bun, and Hono, with one Bun workspace for backend and frontend dependencies. All new work continues here.
@@ -59,9 +47,9 @@ bun install --frozen-lockfile
 cp .env.example .env
 ```
 
-### Community desktop development
+### Electron desktop client
 
-Official installers are cloud clients. The commands below build the separate self-hosted community desktop client.
+Download macOS and Windows installers from [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases) and sign in online to use them. The commands below build a desktop application with a local backend from source.
 
 Run Vite, Hono, and Electron together in development:
 
@@ -76,14 +64,14 @@ bun run pack:desktop
 bun run dist:desktop
 ```
 
-Build the release targets explicitly:
+Build for a specific target platform:
 
 ```bash
 bun run dist:desktop:mac-arm64 # macOS Apple Silicon: DMG + ZIP
 bun run dist:desktop:win-x64   # Windows x64: NSIS installer
 ```
 
-Artifacts are written to `dist/desktop/`. Built applications include Electron and a compiled Bun sidecar, so end users do not need Bun. The repository configures macOS DMG/ZIP, Windows NSIS, and Linux AppImage/DEB targets. v0.3.1 includes macOS arm64 and Windows x64 packages. The public packages are not commercially code-signed and may trigger operating-system security warnings; installation and launch should still be validated on each target platform.
+Artifacts are written to `dist/desktop/`. Applications built from source include Electron and a compiled Bun backend, so end users do not need Bun. The repository configures macOS DMG/ZIP, Windows NSIS, and Linux AppImage/DEB targets.
 
 ### Web development
 
@@ -106,7 +94,7 @@ Then open <http://localhost>.
 
 ## Models and optional services
 
-LLM, embedding, DashScope, Tavily, OSS, and Tencent VPR credentials are user-scoped and configured after login. `.env` only contains bootstrap settings and optional platform fallback models.
+When self-hosting or building the desktop application from source, configure LLM, embedding, DashScope, Tavily, OSS, and Tencent VPR credentials in Settings. Credentials are user-scoped. `.env` only contains bootstrap settings and optional platform fallback models.
 
 - Any OpenAI-compatible chat and embeddings API is supported.
 - Local embeddings use Transformers.js and ONNX. The default is `Xenova/bge-m3`; it downloads and caches on first use with no Python, PyTorch, or pip dependency.
