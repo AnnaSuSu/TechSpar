@@ -1,0 +1,3 @@
+data: {"progress":0.5,"message":"正在索引"}
+
+data: {"done":true}
