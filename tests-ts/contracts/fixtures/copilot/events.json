@@ -1,0 +1,1 @@
+[{"type":"started","session_id":"session-1"},{"type":"asr_interim","text":"请介绍"},{"type":"asr_final","text":"请介绍一下项目"},{"type":"progress","progress":0.5,"message":"分析中"},{"type":"error","message":"连接已关闭"}]
