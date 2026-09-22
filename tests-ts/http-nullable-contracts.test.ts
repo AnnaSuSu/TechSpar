@@ -1,22 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { ProviderResponseError, type CopilotPrepUseCases, type InterviewUseCases, type JobPrepInput, type PersonalAgentUseCases, type StartInterviewInput } from '@techspar/core'
-import { createApp, type AppDependencies } from '../apps/api/src/app.ts'
-
-const unavailable = new Proxy({}, { get() { return () => Promise.reject(new Error('unexpected dependency call')) } })
-const headers = { authorization: 'Bearer test-token', 'content-type': 'application/json' }
-
-function boundaryApp(overrides: Partial<AppDependencies>) {
-  return createApp({
-    auth: unavailable,
-    registration: { allowRegistration: false },
-    settings: unavailable,
-    quota: unavailable,
-    tokens: { async create() { return 'test-token' }, async decode(token: string) { return token === 'test-token' ? 'user-a' : undefined } },
-    knowledge: unavailable,
-    resume: unavailable,
-    ...overrides,
-  } as unknown as AppDependencies)
-}
+import { boundaryApp, jsonHeaders as headers } from './contracts/test-app.ts'
 
 describe('legacy nullable HTTP request contracts', () => {
   test('accepts numeric confidence when ending a batch interview', async () => {
