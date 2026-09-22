@@ -61,6 +61,10 @@ git diff -- packages/contracts/openapi.json frontend/src/api/schema.d.ts
 
 旧版 FastAPI 基线保存在 `tests-ts/contracts/fastapi-openapi.json`。现有兼容路由不能无意删除或改方法；有意的破坏性变更应单独说明并更新契约测试。
 
+### API 响应契约盘点
+
+在正式收紧响应 schema 之前，先维护 `tests-ts/contracts/response-inventory.ts`，并在 `tests-ts/contracts/fixtures/` 保存脱敏的响应和事件样例。HTTP 边界测试必须通过 Hono `app.request()` 验证状态码、Content-Type、错误格式和当前字段形状；不要只调用 Core 内部用例。新增或修改 API 时，先更新 inventory、fixture 和边界测试，再在后续改动中更新 `packages/contracts` 的正式 Zod schema。
+
 ## 测试与构建
 
 提交前的默认门槛：
