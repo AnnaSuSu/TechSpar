@@ -64,7 +64,7 @@ export const responseInventory: readonly ResponseInventoryEntry[] = [
   { operation: 'GET /api/interview/topics', routeFile: 'apps/api/src/routes/interview.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'interview-topics.json', dynamic: false },
   { operation: 'GET /api/profile', routeFile: 'apps/api/src/routes/profile.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'profile.json', dynamic: true },
   { operation: 'POST /api/profile/infer-target-role', routeFile: 'apps/api/src/routes/profile.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'target-role.json', dynamic: false },
-  { operation: 'POST /api/profile/viewed', routeFile: 'apps/api/src/routes/profile.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'profile.json', dynamic: true },
+  { operation: 'POST /api/profile/viewed', routeFile: 'apps/api/src/routes/profile.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'profile-viewed.json', dynamic: true, requiredKeys: ['at', 'total_sessions', 'topic_scores'] },
   { operation: 'POST /api/profile/pattern/feedback', routeFile: 'apps/api/src/routes/profile.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'profile-feedback.json', dynamic: true },
   { operation: 'GET /api/profile/due-reviews', routeFile: 'apps/api/src/routes/profile.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'due-reviews.json', dynamic: true },
   { operation: 'GET /api/profile/topic/{topic}/history', routeFile: 'apps/api/src/routes/profile.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'topic-history.json', dynamic: true },

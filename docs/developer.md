@@ -65,6 +65,8 @@ git diff -- packages/contracts/openapi.json frontend/src/api/schema.d.ts
 
 在正式收紧响应 schema 之前，先维护 `tests-ts/contracts/response-inventory.ts`，并在 `tests-ts/contracts/fixtures/` 保存脱敏的响应和事件样例。HTTP 边界测试必须通过 Hono `app.request()` 验证状态码、Content-Type、错误格式和当前字段形状；不要只调用 Core 内部用例。新增或修改 API 时，先更新 inventory、fixture 和边界测试，再在后续改动中更新 `packages/contracts` 的正式 Zod schema。
 
+验证响应样例时，使用真实 service 配合内存 repository 或确定性的外部依赖替身，按 inventory 映射加载 fixture 并与完整 HTTP 响应对照，避免让 service 替身直接返回 fixture 而掩盖样例偏差。`service-response-boundaries.test.ts` 覆盖画像浏览标记和重建索引 SSE；SSE 按事件解析后逐项比较，动态时间先校验原始格式和持久化值，再规范化为固定时间，保留各接口现有的时间精度与时区格式。
+
 ## 测试与构建
 
 提交前的默认门槛：
