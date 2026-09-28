@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { createApp, type AppDependencies } from '../../apps/api/src/app.ts'
+import { inventoryOperations } from './response-inventory.ts'
 
 type Operation = {
   parameters?: unknown[]
@@ -77,5 +78,10 @@ describe('FastAPI to Hono OpenAPI parity', () => {
       'application/x-www-form-urlencoded',
       'multipart/form-data',
     ])
+  })
+
+  test('keeps every generated HTTP operation in the response inventory', async () => {
+    const { current } = await loadSpecs()
+    expect(inventoryOperations).toEqual(operations(current))
   })
 })

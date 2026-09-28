@@ -1,0 +1,17 @@
+data: {"completed":0,"total":4,"label":"清理旧向量","status":"running"}
+
+data: {"completed":1,"total":4,"label":"清理旧向量","status":"done"}
+
+data: {"completed":1,"total":4,"label":"记忆 / 薄弱点","status":"running"}
+
+data: {"completed":2,"total":4,"label":"记忆 / 薄弱点","status":"done"}
+
+data: {"completed":2,"total":4,"label":"个人资料库","status":"running"}
+
+data: {"completed":3,"total":4,"label":"个人资料库","status":"done"}
+
+data: {"completed":3,"total":4,"label":"知识库 · TypeScript","status":"running"}
+
+data: {"completed":4,"total":4,"label":"知识库 · TypeScript","status":"done"}
+
+data: {"done":true,"rebuilt":{"weak_points":true,"personal_documents":true,"topics":["typescript"]},"last_rebuild_at":"2026-01-01T00:00:00"}
