@@ -3,6 +3,7 @@ import { AppError, AuthenticationError, ProviderResponseError } from '../kernel/
 import { parseJsonResponse } from '../kernel/json.ts'
 import { STRUCTURED_CHAT_OPTIONS } from '../provider/ports.ts'
 import type { InterviewUseCases, InterviewDependencies } from './ports.ts'
+import type { InterviewDraftResult, InterviewResumeResult, InterviewReviewSubmissionResult, InterviewStartResult, JobPrepPreview, JobPrepStartResult, TaskStatusResult } from './results.ts'
 import type {
   InterviewAnswer,
   InterviewMode,
@@ -217,7 +218,7 @@ export class InterviewService implements InterviewUseCases {
     this.resumeEngine = new ResumeInterviewEngine(deps.ai, deps.states, deps.profile, deps.maxQuestionsPerPhase)
   }
 
-  async previewJob(context: RequestContext, input: JobPrepInput) {
+  async previewJob(context: RequestContext, input: JobPrepInput): Promise<{ preview: JobPrepPreview }> {
     const id = userId(context)
     const jd = input.jd_text.trim()
     if (jd.length < 50) throw new AppError('JD 内容太短，无法分析。', 400)
@@ -246,7 +247,7 @@ export class InterviewService implements InterviewUseCases {
     } }
   }
 
-  async startJob(context: RequestContext, input: JobPrepInput): Promise<Record<string, unknown>> {
+  async startJob(context: RequestContext, input: JobPrepInput): Promise<JobPrepStartResult> {
     const id = userId(context)
     const jd = input.jd_text.trim()
     if (jd.length < 50) throw new AppError('JD 内容太短，无法生成训练。', 400)
@@ -263,7 +264,7 @@ export class InterviewService implements InterviewUseCases {
     return { session_id: sessionId, mode: 'jd_prep', questions: generated, preview, company: meta.company, position: meta.position, meta }
   }
 
-  async start(context: RequestContext, input: StartInterviewInput): Promise<Record<string, unknown>> {
+  async start(context: RequestContext, input: StartInterviewInput): Promise<InterviewStartResult> {
     const id = userId(context)
     const sessionId = this.deps.ids.next()
     if (input.mode === 'topic_drill') {
@@ -335,13 +336,13 @@ export class InterviewService implements InterviewUseCases {
     return ({ resume: 'resume_review', topic_drill: 'drill_review', jd_prep: 'jd_review', recording: 'recording_review' } as const)[mode]
   }
 
-  private async dispatch(session: InterviewSession, answersOverride?: InterviewAnswer[]): Promise<Record<string, unknown>> {
+  private async dispatch(session: InterviewSession, answersOverride?: InterviewAnswer[]): Promise<InterviewReviewSubmissionResult> {
     await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'reviewing', { clearError: true })
     await this.deps.tasks.enqueue({ taskId: session.session_id, userId: session.user_id, type: this.taskType(session.mode), payload: { session_id: session.session_id, ...(answersOverride !== undefined ? { answers_override: answersOverride } : {}) } })
     return { session_id: session.session_id, mode: session.mode, status: 'pending' }
   }
 
-  async end(context: RequestContext, sessionId: string, answers: InterviewAnswer[]) {
+  async end(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<InterviewReviewSubmissionResult> {
     const id = userId(context)
     const session = await this.deps.sessions.get(sessionId, id)
     if (!session) throw new AppError('Session not found.', 404)
@@ -353,7 +354,7 @@ export class InterviewService implements InterviewUseCases {
     return this.dispatch(session, batchMode ? answers : undefined)
   }
 
-  async draft(context: RequestContext, sessionId: string, answers: InterviewAnswer[]) {
+  async draft(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<InterviewDraftResult> {
     const id = userId(context)
     const session = await this.deps.sessions.get(sessionId, id)
     if (!session) throw new AppError('Session not found.', 404)
@@ -363,7 +364,7 @@ export class InterviewService implements InterviewUseCases {
     return { session_id: sessionId, status: 'ongoing', saved: true }
   }
 
-  async generateReview(context: RequestContext, sessionId: string) {
+  async generateReview(context: RequestContext, sessionId: string): Promise<InterviewReviewSubmissionResult> {
     const id = userId(context)
     const session = await this.deps.sessions.get(sessionId, id)
     if (!session) throw new AppError('Session not found.', 404)
@@ -438,7 +439,7 @@ export class InterviewService implements InterviewUseCases {
     return { reference_answer: answer, cached: false }
   }
 
-  async resume(context: RequestContext, sessionId: string) {
+  async resume(context: RequestContext, sessionId: string): Promise<InterviewResumeResult> {
     const id = userId(context)
     await this.deps.sessions.expireStaleReviewing(id)
     const session = await this.deps.sessions.get(sessionId, id)
@@ -467,7 +468,7 @@ export class InterviewService implements InterviewUseCases {
 
   topics(context: RequestContext) { return this.deps.sessions.topics(userId(context)) }
 
-  async task(context: RequestContext, taskId: string): Promise<Record<string, unknown>> {
+  async task(context: RequestContext, taskId: string): Promise<TaskStatusResult> {
     const id = userId(context)
     const [task, session] = await Promise.all([this.deps.tasks.get(taskId, id), this.deps.sessions.get(taskId, id)])
     if (!task && !session) throw new AppError('Task not found.', 404)

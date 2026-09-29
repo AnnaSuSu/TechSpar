@@ -272,6 +272,7 @@ describe('interview application service', () => {
     }))
 
     const result = await service.start(context, { mode: 'topic_drill', topic: 'typescript', num_questions: 10 })
+    if (result.mode !== 'topic_drill') throw new Error('Expected topic drill result')
     expect(result.questions).toHaveLength(10)
     expect(ai.calls).toHaveLength(2)
     expect(ai.options).toEqual([
