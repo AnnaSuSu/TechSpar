@@ -1,10 +1,10 @@
 import type { RequestContext } from '../kernel/context.ts'
 import type { InterviewSessionRepository, PersistentTaskDispatcher } from '../interview/ports.ts'
-import type { TaskRecord } from '../interview/model.ts'
+import type { InterviewSession, TaskRecord } from '../interview/model.ts'
 import type { KnowledgeStore } from '../knowledge/ports.ts'
 import type { EmbeddingUseCases, TextGenerationUseCases } from '../provider/ports.ts'
 import type { ResumeUseCases } from '../resume/ports.ts'
-import type { CandidateProfile } from './model.ts'
+import type { CandidateProfile, ProfileViewMarker, RetrospectiveResult, WeakPoint } from './model.ts'
 
 export interface CandidateProfileRepository {
   load(userId: string): Promise<CandidateProfile>
@@ -32,12 +32,12 @@ export interface ProfileVectorMemoryPort {
 export interface ProfileUseCases {
   get(context: RequestContext): Promise<CandidateProfile>
   inferTargetRole(context: RequestContext): Promise<{ target_role: string }>
-  viewed(context: RequestContext): Promise<Record<string, unknown>>
-  feedback(context: RequestContext, point: string, verdict: string): Promise<Record<string, unknown>>
-  dueReviews(context: RequestContext, topic?: string): Promise<Array<Record<string, unknown>>>
-  topicHistory(context: RequestContext, topic: string): Promise<unknown[]>
+  viewed(context: RequestContext): Promise<ProfileViewMarker>
+  feedback(context: RequestContext, point: string, verdict: string): Promise<WeakPoint>
+  dueReviews(context: RequestContext, topic?: string): Promise<WeakPoint[]>
+  topicHistory(context: RequestContext, topic: string): Promise<InterviewSession[]>
   retrospective(context: RequestContext, topic: string): Promise<{ task_id: string; status: 'pending' }>
-  runRetrospectiveTask(task: TaskRecord): Promise<Record<string, unknown>>
+  runRetrospectiveTask(task: TaskRecord): Promise<RetrospectiveResult>
 }
 
 export type ProfileDependencies = {

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, type ReactNode } from "react";
 import { getTaskStatus } from "../api/interview";
 import TaskStatusContext, { type TaskInfo } from "./TaskStatusContextBase";
+import { applyTaskResponse } from "../lib/taskStatus";
 
 const POLL_INTERVAL = 3000;
 
@@ -25,15 +26,12 @@ export function TaskStatusProvider({ children }: { children: ReactNode }) {
 
       timersRef.current[id] = setInterval(async () => {
         try {
-          const data = (await getTaskStatus(id)) as {
-            status?: string;
-            result?: unknown;
-          };
+          const data = await getTaskStatus(id);
           if (data.status === "done" || data.status === "error") {
             setTasks((prev) =>
               prev.map((t) =>
                 t.id === id
-                  ? { ...t, status: data.status as TaskInfo["status"], result: data.result }
+                  ? applyTaskResponse(t, data)
                   : t
               )
             );

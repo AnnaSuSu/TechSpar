@@ -1,1 +1,41 @@
-[]
+[
+  {
+    "point": "微任务顺序",
+    "topic": "typescript",
+    "first_seen": "2026-01-01",
+    "last_seen": "2026-01-01",
+    "times_seen": 2,
+    "improved": false,
+    "archived": false,
+    "source": "session",
+    "axis": "knowledge",
+    "confidence": 0.8,
+    "sr": {
+      "interval_days": 1,
+      "ease_factor": 2.5,
+      "repetitions": 1,
+      "next_review": "2000-01-01",
+      "last_score": 5,
+      "legacy_sr": true
+    },
+    "history": [
+      {
+        "date": "2026-01-01",
+        "event": "reviewed",
+        "score": 5,
+        "evidence": "合成回答",
+        "legacy_history": true
+      }
+    ],
+    "legacy_weak": {
+      "kept": true
+    }
+  },
+  {
+    "point": "容量规划",
+    "topic": "typescript",
+    "source": "predicted",
+    "improved": false,
+    "archived": false
+  }
+]

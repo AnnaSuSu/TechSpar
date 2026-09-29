@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { ProviderResponseError, type CopilotPrepUseCases, type InterviewUseCases, type JobPrepInput, type PersonalAgentUseCases, type StartInterviewInput } from '@techspar/core'
 import { boundaryApp, jsonHeaders as headers } from './contracts/test-app.ts'
+import { loadResponseFixture } from './contracts/fixture.ts'
 
 describe('legacy nullable HTTP request contracts', () => {
   test('accepts numeric confidence when ending a batch interview', async () => {
@@ -8,7 +9,7 @@ describe('legacy nullable HTTP request contracts', () => {
     const interview = {
       async end(_context: unknown, _sessionId: string, answers: unknown) {
         received = answers
-        return { session_id: 'drill-1', status: 'pending' }
+        return { session_id: 'drill-1', mode: 'topic_drill', status: 'pending' }
       },
     } as unknown as InterviewUseCases
     const response = await boundaryApp({ interview }).request('/api/interview/end/drill-1', {
@@ -22,7 +23,7 @@ describe('legacy nullable HTTP request contracts', () => {
   test('accepts topic: null when starting a resume interview', async () => {
     let received: StartInterviewInput | undefined
     const interview = {
-      async start(_context: unknown, input: StartInterviewInput) { received = input; return { session_id: 'resume-1', mode: 'resume' } },
+      async start(_context: unknown, input: StartInterviewInput) { received = input; return { session_id: 'resume-1', mode: 'resume', target_role: input.target_role || '', job_description: input.job_description || '', message: '合成开场白' } },
     } as unknown as InterviewUseCases
     const response = await boundaryApp({ interview }).request('/api/interview/start', {
       method: 'POST', headers, body: JSON.stringify({ mode: 'resume', topic: null, target_role: 'AI 应用开发工程师' }),
@@ -38,8 +39,8 @@ describe('legacy nullable HTTP request contracts', () => {
     let previewInput: JobPrepInput | undefined
     let startInput: JobPrepInput | undefined
     const interview = {
-      async previewJob(_context: unknown, input: JobPrepInput) { previewInput = input; return { preview: { role_summary: '后端岗位' } } },
-      async startJob(_context: unknown, input: JobPrepInput) { startInput = input; return { session_id: 'job-1', mode: 'jd_prep' } },
+      async previewJob(_context: unknown, input: JobPrepInput) { previewInput = input; return loadResponseFixture('interview-job-preview.json') },
+      async startJob(_context: unknown, input: JobPrepInput) { startInput = input; return loadResponseFixture('interview-start-jd.json') },
     } as unknown as InterviewUseCases
     const app = boundaryApp({ interview })
     const payload = { jd_text: '负责后端系统设计与 TypeScript 服务开发', company: null, position: null, use_resume: true }

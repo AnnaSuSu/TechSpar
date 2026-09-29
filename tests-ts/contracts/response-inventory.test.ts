@@ -37,8 +37,7 @@ describe('API response inventory', () => {
   test('marks current dynamic response surfaces for later tightening', () => {
     const dynamic = responseInventory.filter((entry) => entry.dynamic).map((entry) => entry.operation)
     expect(dynamic).toEqual(expect.arrayContaining([
-      'POST /api/interview/start',
-      'GET /api/profile',
+      'GET /api/personal-agent/documents',
       'GET /api/copilot/prep/{prep_id}',
     ]))
   })

@@ -5,7 +5,7 @@ import { STRUCTURED_CHAT_OPTIONS } from '../provider/ports.ts'
 import type { CandidateProfilePort } from '../interview/ports.ts'
 import type { InterviewSession, TaskRecord } from '../interview/model.ts'
 import { fill } from '../interview/prompts.ts'
-import { defaultProfile, type CandidateProfile, type WeakPoint } from './model.ts'
+import { defaultProfile, type CandidateProfile, type ProfileViewMarker, type RetrospectiveResult, type WeakPoint } from './model.ts'
 import type { ProfileDependencies, ProfileMemoryEntry, ProfileMemorySearchResult, ProfileUseCases } from './ports.ts'
 
 const INFER_ROLE_PROMPT = `根据以下简历内容，推断候选人最可能应聘的岗位名称。给出一个具体岗位，12 个汉字以内；学生可带实习生或校招后缀。只返回岗位名称，不要解释。\n\n{resume}`
@@ -370,7 +370,7 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     return { target_role: role }
   }
 
-  async viewed(context: RequestContext): Promise<Record<string, unknown>> {
+  async viewed(context: RequestContext): Promise<ProfileViewMarker> {
     return this.deps.repository.update(id(context), (profile) => {
       const marker = { at: new Date().toISOString(), total_sessions: Number(profile.stats?.total_sessions || 0), topic_scores: Object.fromEntries(Object.entries(profile.topic_mastery || {}).map(([topic, mastery]) => [topic, Number(mastery.score ?? Number(mastery.level || 0) * 20)])) }
       profile.view_marker = marker
@@ -378,7 +378,7 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     })
   }
 
-  async feedback(context: RequestContext, point: string, verdict: string): Promise<Record<string, unknown>> {
+  async feedback(context: RequestContext, point: string, verdict: string): Promise<WeakPoint> {
     if (!point.trim() || !['accurate', 'inaccurate', 'acknowledged'].includes(verdict)) throw new AppError('需要 point 和 verdict (accurate|inaccurate|acknowledged)', 400)
     const updated = await this.deps.repository.update(id(context), (profile) => {
       const target = profile.weak_points.find((item) => item.source === 'consolidated' && item.point === point && !item.archived)
@@ -395,7 +395,7 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     return updated
   }
 
-  async dueReviews(context: RequestContext, topic?: string): Promise<Array<Record<string, unknown>>> {
+  async dueReviews(context: RequestContext, topic?: string): Promise<WeakPoint[]> {
     const today = new Date().toISOString().slice(0, 10)
     return (await this.profile(id(context))).weak_points.filter((point) => !point.improved && !point.archived && point.source !== 'consolidated' && point.axis !== 'performance' && (!topic || point.topic === topic) && String(object(point.sr).next_review || '2000-01-01') <= today).sort((a, b) => Number(object(a.sr).ease_factor || 2.5) - Number(object(b.sr).ease_factor || 2.5))
   }
@@ -411,7 +411,7 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     return { task_id: taskId, status: 'pending' as const }
   }
 
-  async runRetrospectiveTask(task: TaskRecord): Promise<Record<string, unknown>> {
+  async runRetrospectiveTask(task: TaskRecord): Promise<RetrospectiveResult> {
     const topic = String(task.payload.topic || '')
     const sessions = await this.deps.sessions.reviewedByTopic(task.user_id, topic)
     if (!sessions.length) throw new Error('该领域暂无训练记录')

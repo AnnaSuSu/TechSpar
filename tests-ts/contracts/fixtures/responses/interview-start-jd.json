@@ -1,1 +1,127 @@
-{"session_id":"jd-session-1","mode":"jd_prep","questions":[],"preview":{},"company":"示例公司","position":"后端工程师","meta":{}}
+{
+  "session_id": "jd-session-1",
+  "mode": "jd_prep",
+  "questions": [
+    {
+      "id": 1,
+      "question": "解释事件循环",
+      "difficulty": 3,
+      "focus_area": "异步执行",
+      "legacy_question": {
+        "kept": true
+      }
+    },
+    {
+      "id": "q2",
+      "question": "解释闭包"
+    },
+    {
+      "id": 3,
+      "question": "设计缓存"
+    },
+    {
+      "id": 4,
+      "question": "定位慢查询"
+    }
+  ],
+  "preview": {
+    "company": "示例公司",
+    "position": "后端工程师",
+    "role_summary": "负责后端服务",
+    "focus_areas": [
+      {
+        "area": "异步执行",
+        "priority": "high",
+        "reason": "岗位需要"
+      }
+    ],
+    "likely_question_groups": [
+      {
+        "title": "服务设计",
+        "reason": "岗位需要",
+        "sample_questions": [
+          "如何设计缓存？"
+        ]
+      }
+    ],
+    "resume_alignment": {
+      "resume_used": true,
+      "fit_assessment": "具备相关经验",
+      "matching_evidence": [
+        "缓存项目"
+      ],
+      "risk_gaps": [
+        "容量规划"
+      ],
+      "recommended_stories": [
+        {
+          "project": "缓存项目",
+          "reason": "相关经验"
+        }
+      ]
+    },
+    "prep_priorities": [
+      "复习事件循环"
+    ],
+    "question_blueprint": [
+      {
+        "legacy_blueprint": true
+      }
+    ],
+    "jd_excerpt": "合成测试岗位描述，要求设计后端服务、掌握 TypeScript、异步执行、缓存和数据库，并具有清晰的技术表达能力。"
+  },
+  "company": "示例公司",
+  "position": "后端工程师",
+  "meta": {
+    "company": "示例公司",
+    "position": "后端工程师",
+    "jd_text": "合成测试岗位描述，要求设计后端服务、掌握 TypeScript、异步执行、缓存和数据库，并具有清晰的技术表达能力。",
+    "use_resume": true,
+    "preview": {
+      "company": "示例公司",
+      "position": "后端工程师",
+      "role_summary": "负责后端服务",
+      "focus_areas": [
+        {
+          "area": "异步执行",
+          "priority": "high",
+          "reason": "岗位需要"
+        }
+      ],
+      "likely_question_groups": [
+        {
+          "title": "服务设计",
+          "reason": "岗位需要",
+          "sample_questions": [
+            "如何设计缓存？"
+          ]
+        }
+      ],
+      "resume_alignment": {
+        "resume_used": true,
+        "fit_assessment": "具备相关经验",
+        "matching_evidence": [
+          "缓存项目"
+        ],
+        "risk_gaps": [
+          "容量规划"
+        ],
+        "recommended_stories": [
+          {
+            "project": "缓存项目",
+            "reason": "相关经验"
+          }
+        ]
+      },
+      "prep_priorities": [
+        "复习事件循环"
+      ],
+      "question_blueprint": [
+        {
+          "legacy_blueprint": true
+        }
+      ],
+      "jd_excerpt": "合成测试岗位描述，要求设计后端服务、掌握 TypeScript、异步执行、缓存和数据库，并具有清晰的技术表达能力。"
+    }
+  }
+}

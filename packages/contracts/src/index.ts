@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import { InterviewModeSchema } from './interview-shared.ts'
+export * from './interview-shared.ts'
+export * from './interview-responses.ts'
+export * from './task-responses.ts'
+export * from './profile-responses.ts'
 
 const UploadedFileSchema = z.instanceof(File).meta({ type: 'string', format: 'binary' })
 
@@ -144,16 +149,6 @@ export const RecordingAnalyzeSchema = z.object({
 export const RecordingAnalyzeResponseSchema = z.object({ session_id: z.string(), status: z.literal('pending') })
 export const BinarySchema = z.any()
 
-export const InterviewModeSchema = z.enum(['resume', 'topic_drill', 'jd_prep', 'recording'])
-export const SessionStatusSchema = z.enum(['ongoing', 'ended', 'reviewing', 'reviewed', 'review_failed'])
-export const InterviewQuestionSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  question: z.string(),
-  difficulty: z.number().optional(),
-  focus_area: z.string().optional(),
-  category: z.string().optional(),
-  intent: z.string().optional(),
-}).passthrough()
 export const InterviewAnswerSchema = z.object({
   question_id: z.union([z.string(), z.number()]),
   answer: z.string(),
@@ -173,9 +168,12 @@ export const InterviewChatSchema = z.object({ session_id: z.string(), message: z
 export const EndInterviewSchema = z.object({ answers: z.array(InterviewAnswerSchema).default([]) })
 export const ReferenceAnswerRequestSchema = z.object({ session_id: z.string(), question_id: z.union([z.string(), z.number()]) })
 export const ReferenceAnswerResponseSchema = z.object({ reference_answer: z.string(), cached: z.boolean() })
+/** @deprecated Phase-two HTTP routes use named response schemas; remove in phase five. */
 export const InterviewObjectSchema = z.record(z.string(), z.unknown())
 export const InterviewTopicsSchema = z.array(z.string())
+/** @deprecated Phase-two HTTP routes use named response schemas; remove in phase five. */
 export const TaskStatusSchema = z.object({ status: z.enum(['pending', 'done', 'error']), type: z.string(), error: z.string().optional() }).passthrough()
+/** @deprecated Phase-two HTTP routes use named response schemas; remove in phase five. */
 export const ProfileSchema = z.record(z.string(), z.unknown())
 export const TargetRoleSchema = z.object({ target_role: z.string() })
 export const ProfileFeedbackSchema = z.object({ point: z.string(), verdict: z.enum(['accurate', 'inaccurate', 'acknowledged']) })

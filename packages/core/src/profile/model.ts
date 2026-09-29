@@ -13,6 +13,9 @@ export type WeakPoint = {
   [key: string]: unknown
 }
 
+export type ProfileViewMarker = { at: string; total_sessions: number; topic_scores: Record<string, number> }
+export type RetrospectiveResult = { topic: string; topic_name: string; retrospective: string; retrospective_at: string; session_count: number }
+
 export type CandidateProfile = {
   name: string
   target_role: string

@@ -6,6 +6,1998 @@
   },
   "components": {
     "schemas": {
+      "JobPrepPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "preview": {
+            "type": "object",
+            "properties": {
+              "company": {
+                "type": "string"
+              },
+              "position": {
+                "type": "string"
+              },
+              "role_summary": {
+                "type": "string"
+              },
+              "focus_areas": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "area": {
+                      "type": "string"
+                    },
+                    "priority": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "area",
+                    "priority",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "likely_question_groups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "sample_questions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "reason",
+                    "sample_questions"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "resume_alignment": {
+                "type": "object",
+                "properties": {
+                  "resume_used": {
+                    "type": "boolean"
+                  },
+                  "fit_assessment": {
+                    "type": "string"
+                  },
+                  "matching_evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "risk_gaps": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "recommended_stories": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "project": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "project",
+                        "reason"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "resume_used",
+                  "fit_assessment",
+                  "matching_evidence",
+                  "risk_gaps",
+                  "recommended_stories"
+                ],
+                "additionalProperties": false
+              },
+              "prep_priorities": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "question_blueprint": {
+                "type": "array",
+                "items": {
+                  "nullable": true
+                },
+                "description": "Raw provider blueprint items; structured validation is deferred to phase four."
+              },
+              "jd_excerpt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "company",
+              "position",
+              "role_summary",
+              "focus_areas",
+              "likely_question_groups",
+              "resume_alignment",
+              "prep_priorities",
+              "question_blueprint",
+              "jd_excerpt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "preview"
+        ],
+        "additionalProperties": false
+      },
+      "JobPrepStartResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "jd_prep"
+            ]
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
+                "question": {
+                  "type": "string"
+                },
+                "difficulty": {
+                  "type": "number"
+                },
+                "focus_area": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "intent": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "question"
+              ],
+              "additionalProperties": {
+                "nullable": true
+              }
+            }
+          },
+          "preview": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Caller-supplied preview_data is echoed unchanged, including legacy partial previews."
+          },
+          "company": {
+            "type": "string"
+          },
+          "position": {
+            "type": "string"
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "company": {
+                "type": "string"
+              },
+              "position": {
+                "type": "string"
+              },
+              "jd_text": {
+                "type": "string"
+              },
+              "use_resume": {
+                "type": "boolean"
+              },
+              "preview": {
+                "type": "object",
+                "additionalProperties": {
+                  "nullable": true
+                },
+                "description": "Caller-supplied preview_data is echoed unchanged, including legacy partial previews."
+              }
+            },
+            "required": [
+              "company",
+              "position",
+              "jd_text",
+              "use_resume",
+              "preview"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "session_id",
+          "mode",
+          "questions",
+          "preview",
+          "company",
+          "position",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "InterviewStartResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "session_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "topic_drill"
+                ]
+              },
+              "topic": {
+                "type": "string"
+              },
+              "questions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    "question": {
+                      "type": "string"
+                    },
+                    "difficulty": {
+                      "type": "number"
+                    },
+                    "focus_area": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "intent": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "question"
+                  ],
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            },
+            "required": [
+              "session_id",
+              "mode",
+              "topic",
+              "questions"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "session_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "resume"
+                ]
+              },
+              "topic": {
+                "type": "string",
+                "nullable": true
+              },
+              "target_role": {
+                "type": "string"
+              },
+              "job_description": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "session_id",
+              "mode",
+              "target_role",
+              "job_description",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "InterviewChatResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "is_finished": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "session_id",
+          "message",
+          "is_finished"
+        ],
+        "additionalProperties": false
+      },
+      "InterviewReviewSubmissionResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "resume",
+              "topic_drill",
+              "jd_prep",
+              "recording"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "done"
+            ]
+          }
+        },
+        "required": [
+          "session_id",
+          "mode",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "InterviewDraftResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "session_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ongoing"
+                ]
+              },
+              "saved": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "session_id",
+              "status",
+              "saved"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "session_id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ended",
+                  "reviewing",
+                  "reviewed",
+                  "review_failed"
+                ]
+              },
+              "saved": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              }
+            },
+            "required": [
+              "session_id",
+              "status",
+              "saved"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "InterviewResumeResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "resume",
+              "topic_drill",
+              "jd_prep",
+              "recording"
+            ]
+          },
+          "topic": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ongoing",
+              "ended",
+              "reviewing",
+              "reviewed",
+              "review_failed"
+            ]
+          },
+          "review_error": {
+            "type": "string",
+            "nullable": true
+          },
+          "transcript": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "content": {
+                  "type": "string"
+                },
+                "time": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "additionalProperties": {
+                "nullable": true
+              }
+            }
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
+                "question": {
+                  "type": "string"
+                },
+                "difficulty": {
+                  "type": "number"
+                },
+                "focus_area": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "intent": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "question"
+              ],
+              "additionalProperties": {
+                "nullable": true
+              }
+            }
+          },
+          "target_role": {
+            "type": "string"
+          },
+          "job_description": {
+            "type": "string"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Persisted session metadata; legacy/provider extensions are preserved."
+          },
+          "can_continue": {
+            "type": "boolean"
+          },
+          "is_finished": {
+            "type": "boolean"
+          },
+          "has_review": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "session_id",
+          "mode",
+          "status",
+          "transcript",
+          "questions",
+          "target_role",
+          "job_description",
+          "meta",
+          "can_continue",
+          "is_finished",
+          "has_review"
+        ],
+        "additionalProperties": false
+      },
+      "InterviewSessionResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "resume",
+              "topic_drill",
+              "jd_prep",
+              "recording"
+            ]
+          },
+          "topic": {
+            "type": "string",
+            "nullable": true
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Persisted session metadata; legacy/provider extensions are preserved."
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
+                "question": {
+                  "type": "string"
+                },
+                "difficulty": {
+                  "type": "number"
+                },
+                "focus_area": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "intent": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "question"
+              ],
+              "additionalProperties": {
+                "nullable": true
+              }
+            }
+          },
+          "transcript": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "content": {
+                  "type": "string"
+                },
+                "time": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "additionalProperties": {
+                "nullable": true
+              }
+            }
+          },
+          "scores": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "nullable": true
+              },
+              "description": "Unnormalized review content; producer validation is deferred to phase four."
+            }
+          },
+          "weak_points": {
+            "type": "array",
+            "items": {
+              "nullable": true
+            }
+          },
+          "overall": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Unnormalized review content; producer validation is deferred to phase four."
+          },
+          "reference_answers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "review": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ongoing",
+              "ended",
+              "reviewing",
+              "reviewed",
+              "review_failed"
+            ]
+          },
+          "review_error": {
+            "type": "string",
+            "nullable": true
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "mode",
+          "meta",
+          "questions",
+          "transcript",
+          "scores",
+          "weak_points",
+          "overall",
+          "reference_answers",
+          "status",
+          "user_id",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      },
+      "TaskStatusResponse": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending"
+                ]
+              },
+              "type": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "status",
+              "type"
+            ],
+            "additionalProperties": {
+              "nullable": true
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "error"
+                ]
+              },
+              "type": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "status",
+              "type"
+            ],
+            "additionalProperties": {
+              "nullable": true
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "done"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "resume_review",
+                  "drill_review",
+                  "jd_review",
+                  "recording_review",
+                  "review"
+                ]
+              },
+              "error": {
+                "type": "string",
+                "nullable": true
+              },
+              "session_id": {
+                "type": "string",
+                "description": "Omitted when a reviewed session short-circuits task polling."
+              }
+            },
+            "required": [
+              "status",
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "done"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "copilot_prep"
+                ]
+              },
+              "prep_id": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "status",
+              "type",
+              "prep_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "done"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "retrospective"
+                ]
+              },
+              "error": {
+                "type": "string",
+                "nullable": true
+              },
+              "topic": {
+                "type": "string"
+              },
+              "topic_name": {
+                "type": "string"
+              },
+              "retrospective": {
+                "type": "string"
+              },
+              "retrospective_at": {
+                "type": "string"
+              },
+              "session_count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "status",
+              "type",
+              "topic",
+              "topic_name",
+              "retrospective",
+              "retrospective_at",
+              "session_count"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "done"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "pattern": "^(?!(?:resume_review|drill_review|jd_review|recording_review|review|copilot_prep|retrospective)$)[^]*$",
+                "description": "Legacy/extension task type, explicitly excluding all known types."
+              },
+              "error": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "status",
+              "type"
+            ],
+            "additionalProperties": {
+              "nullable": true
+            }
+          }
+        ]
+      },
+      "InterviewHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "session_id": {
+                  "type": "string"
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "resume",
+                    "topic_drill",
+                    "jd_prep",
+                    "recording"
+                  ]
+                },
+                "topic": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "meta": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  },
+                  "description": "Persisted session metadata; legacy/provider extensions are preserved."
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "avg_score": {
+                  "type": "number",
+                  "nullable": true
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ongoing",
+                    "ended",
+                    "reviewing",
+                    "reviewed",
+                    "review_failed"
+                  ]
+                },
+                "review_error": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "session_id",
+                "mode",
+                "meta",
+                "created_at",
+                "avg_score",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "CandidateProfileResponse": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "target_role": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "last_consolidation_at": {
+            "type": "string"
+          },
+          "topic_mastery": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "score": {
+                  "type": "number"
+                },
+                "level": {
+                  "type": "number"
+                },
+                "notes": {
+                  "type": "string"
+                },
+                "last_assessed": {
+                  "type": "string"
+                },
+                "session_count": {
+                  "type": "number"
+                },
+                "retrospective": {
+                  "type": "string"
+                },
+                "retrospective_at": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": {
+                "nullable": true
+              }
+            }
+          },
+          "weak_points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "point": {
+                  "type": "string"
+                },
+                "topic": {
+                  "type": "string"
+                },
+                "first_seen": {
+                  "type": "string"
+                },
+                "last_seen": {
+                  "type": "string"
+                },
+                "times_seen": {
+                  "type": "number"
+                },
+                "improved": {
+                  "type": "boolean"
+                },
+                "improved_at": {
+                  "type": "string"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "archived_at": {
+                  "type": "string"
+                },
+                "archived_reason": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "axis": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number"
+                },
+                "history": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string"
+                      },
+                      "event": {
+                        "type": "string"
+                      },
+                      "evidence": {
+                        "type": "string"
+                      },
+                      "score": {
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  }
+                },
+                "sr": {
+                  "type": "object",
+                  "properties": {
+                    "interval_days": {
+                      "type": "number"
+                    },
+                    "ease_factor": {
+                      "type": "number"
+                    },
+                    "repetitions": {
+                      "type": "number"
+                    },
+                    "next_review": {
+                      "type": "string"
+                    },
+                    "last_score": {
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                },
+                "consolidates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "user_acknowledged": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "point"
+              ],
+              "additionalProperties": {
+                "nullable": true
+              }
+            }
+          },
+          "strong_points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "point": {
+                  "type": "string"
+                },
+                "topic": {
+                  "type": "string"
+                },
+                "first_seen": {
+                  "type": "string"
+                },
+                "last_seen": {
+                  "type": "string"
+                },
+                "times_seen": {
+                  "type": "number"
+                },
+                "improved": {
+                  "type": "boolean"
+                },
+                "improved_at": {
+                  "type": "string"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "archived_at": {
+                  "type": "string"
+                },
+                "archived_reason": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "axis": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number"
+                },
+                "history": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string"
+                      },
+                      "event": {
+                        "type": "string"
+                      },
+                      "evidence": {
+                        "type": "string"
+                      },
+                      "score": {
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  }
+                }
+              },
+              "required": [
+                "point"
+              ],
+              "additionalProperties": {
+                "nullable": true
+              }
+            }
+          },
+          "behavior_signals": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "topic": {
+                  "type": "string"
+                },
+                "first_seen": {
+                  "type": "string"
+                },
+                "last_seen": {
+                  "type": "string"
+                },
+                "times_seen": {
+                  "type": "number"
+                },
+                "improved": {
+                  "type": "boolean"
+                },
+                "improved_at": {
+                  "type": "string"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "archived_at": {
+                  "type": "string"
+                },
+                "archived_reason": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "axis": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number"
+                },
+                "history": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string"
+                      },
+                      "event": {
+                        "type": "string"
+                      },
+                      "evidence": {
+                        "type": "string"
+                      },
+                      "score": {
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  }
+                },
+                "namespace": {
+                  "type": "string"
+                },
+                "polarity": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "examples": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "session_id": {
+                        "type": "string"
+                      },
+                      "date": {
+                        "type": "string"
+                      },
+                      "snippet": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  }
+                }
+              },
+              "additionalProperties": {
+                "nullable": true
+              }
+            }
+          },
+          "communication": {
+            "type": "object",
+            "properties": {
+              "style": {
+                "type": "string"
+              },
+              "habits": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "suggestions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "style",
+              "habits",
+              "suggestions"
+            ],
+            "additionalProperties": {
+              "nullable": true
+            }
+          },
+          "thinking_patterns": {
+            "type": "object",
+            "properties": {
+              "strengths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "gaps": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "strengths",
+              "gaps"
+            ],
+            "additionalProperties": {
+              "nullable": true
+            }
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "total_sessions": {
+                "type": "number"
+              },
+              "resume_sessions": {
+                "type": "number"
+              },
+              "drill_sessions": {
+                "type": "number"
+              },
+              "job_prep_sessions": {
+                "type": "number"
+              },
+              "avg_score": {
+                "type": "number"
+              },
+              "score_history": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "topic": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "avg_score": {
+                      "type": "number"
+                    },
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "dimension_scores": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "total_answers": {
+                "type": "number"
+              },
+              "recording_sessions": {
+                "type": "number"
+              },
+              "copilot_sessions": {
+                "type": "number"
+              },
+              "drill_avg_score": {
+                "type": "number"
+              },
+              "resume_avg_score": {
+                "type": "number"
+              },
+              "job_prep_avg_score": {
+                "type": "number"
+              },
+              "recording_avg_score": {
+                "type": "number"
+              },
+              "dimension_scores": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              }
+            },
+            "required": [
+              "total_sessions",
+              "resume_sessions",
+              "drill_sessions",
+              "job_prep_sessions",
+              "avg_score",
+              "score_history"
+            ],
+            "additionalProperties": {
+              "nullable": true
+            }
+          },
+          "view_marker": {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "total_sessions": {
+                "type": "number"
+              },
+              "topic_scores": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              }
+            },
+            "additionalProperties": {
+              "nullable": true
+            }
+          },
+          "due_reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "point": {
+                  "type": "string"
+                },
+                "topic": {
+                  "type": "string"
+                },
+                "next_review": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "point"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "session_extractions": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Persisted extraction cache; LLM validation is deferred to phase four."
+          }
+        },
+        "required": [
+          "name",
+          "target_role",
+          "updated_at",
+          "last_consolidation_at",
+          "topic_mastery",
+          "weak_points",
+          "strong_points",
+          "behavior_signals",
+          "communication",
+          "thinking_patterns",
+          "stats",
+          "due_reviews"
+        ],
+        "additionalProperties": {
+          "nullable": true
+        }
+      },
+      "ProfileViewedResponse": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "total_sessions": {
+            "type": "number"
+          },
+          "topic_scores": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "at",
+          "total_sessions",
+          "topic_scores"
+        ],
+        "additionalProperties": false
+      },
+      "ProfilePatternFeedbackResponse": {
+        "type": "object",
+        "properties": {
+          "point": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "first_seen": {
+            "type": "string"
+          },
+          "last_seen": {
+            "type": "string"
+          },
+          "times_seen": {
+            "type": "number"
+          },
+          "improved": {
+            "type": "boolean"
+          },
+          "improved_at": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "archived_at": {
+            "type": "string"
+          },
+          "archived_reason": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "axis": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "event": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": {
+                "nullable": true
+              }
+            }
+          },
+          "sr": {
+            "type": "object",
+            "properties": {
+              "interval_days": {
+                "type": "number"
+              },
+              "ease_factor": {
+                "type": "number"
+              },
+              "repetitions": {
+                "type": "number"
+              },
+              "next_review": {
+                "type": "string"
+              },
+              "last_score": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": {
+              "nullable": true
+            }
+          },
+          "consolidates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "user_acknowledged": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "point"
+        ],
+        "additionalProperties": {
+          "nullable": true
+        }
+      },
+      "ProfileDueReviewsResponse": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "point": {
+              "type": "string"
+            },
+            "topic": {
+              "type": "string"
+            },
+            "first_seen": {
+              "type": "string"
+            },
+            "last_seen": {
+              "type": "string"
+            },
+            "times_seen": {
+              "type": "number"
+            },
+            "improved": {
+              "type": "boolean"
+            },
+            "improved_at": {
+              "type": "string"
+            },
+            "archived": {
+              "type": "boolean"
+            },
+            "archived_at": {
+              "type": "string"
+            },
+            "archived_reason": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "axis": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": "number"
+            },
+            "history": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "event": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "type": "string"
+                  },
+                  "score": {
+                    "type": "number"
+                  }
+                },
+                "additionalProperties": {
+                  "nullable": true
+                }
+              }
+            },
+            "sr": {
+              "type": "object",
+              "properties": {
+                "interval_days": {
+                  "type": "number"
+                },
+                "ease_factor": {
+                  "type": "number"
+                },
+                "repetitions": {
+                  "type": "number"
+                },
+                "next_review": {
+                  "type": "string"
+                },
+                "last_score": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": {
+                "nullable": true
+              }
+            },
+            "consolidates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "user_acknowledged": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "point"
+          ],
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "ProfileTopicHistoryResponse": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "resume",
+                "topic_drill",
+                "jd_prep",
+                "recording"
+              ]
+            },
+            "topic": {
+              "type": "string",
+              "nullable": true
+            },
+            "meta": {
+              "type": "object",
+              "additionalProperties": {
+                "nullable": true
+              },
+              "description": "Persisted session metadata; legacy/provider extensions are preserved."
+            },
+            "questions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "question": {
+                    "type": "string"
+                  },
+                  "difficulty": {
+                    "type": "number"
+                  },
+                  "focus_area": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "intent": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "question"
+                ],
+                "additionalProperties": {
+                  "nullable": true
+                }
+              }
+            },
+            "transcript": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "assistant"
+                    ]
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "time": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "role",
+                  "content"
+                ],
+                "additionalProperties": {
+                  "nullable": true
+                }
+              }
+            },
+            "scores": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "nullable": true
+                },
+                "description": "Unnormalized review content; producer validation is deferred to phase four."
+              }
+            },
+            "weak_points": {
+              "type": "array",
+              "items": {
+                "nullable": true
+              }
+            },
+            "overall": {
+              "type": "object",
+              "additionalProperties": {
+                "nullable": true
+              },
+              "description": "Unnormalized review content; producer validation is deferred to phase four."
+            },
+            "reference_answers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "review": {
+              "type": "string",
+              "nullable": true
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "ongoing",
+                "ended",
+                "reviewing",
+                "reviewed",
+                "review_failed"
+              ]
+            },
+            "review_error": {
+              "type": "string",
+              "nullable": true
+            },
+            "user_id": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "updated_at": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "session_id",
+            "mode",
+            "meta",
+            "questions",
+            "transcript",
+            "scores",
+            "weak_points",
+            "overall",
+            "reference_answers",
+            "status",
+            "user_id",
+            "created_at",
+            "updated_at"
+          ],
+          "additionalProperties": false
+        }
+      },
       "ValidationError": {
         "type": "object",
         "title": "ValidationError",
@@ -2156,10 +4148,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/JobPrepPreviewResponse"
                 }
               }
             }
@@ -2226,10 +4215,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/JobPrepStartResponse"
                 }
               }
             }
@@ -2305,10 +4291,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/InterviewStartResponse"
                 }
               }
             }
@@ -2361,10 +4344,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/InterviewChatResponse"
                 }
               }
             }
@@ -2502,10 +4482,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/InterviewReviewSubmissionResponse"
                 }
               }
             }
@@ -2590,10 +4567,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/InterviewDraftResponse"
                 }
               }
             }
@@ -2634,10 +4608,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/InterviewReviewSubmissionResponse"
                 }
               }
             }
@@ -2678,10 +4649,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/InterviewResumeResponse"
                 }
               }
             }
@@ -2753,7 +4721,8 @@
                   "required": [
                     "reference_answer",
                     "cached"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -2794,10 +4763,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/InterviewSessionResponse"
                 }
               }
             }
@@ -2838,30 +4804,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "pending",
-                        "done",
-                        "error"
-                      ]
-                    },
-                    "type": {
-                      "type": "string"
-                    },
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "status",
-                    "type"
-                  ],
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/TaskStatusResponse"
                 }
               }
             }
@@ -2934,10 +4877,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/InterviewHistoryResponse"
                 }
               }
             }
@@ -2989,7 +4929,8 @@
                   },
                   "required": [
                     "ok"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -3044,10 +4985,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/CandidateProfileResponse"
                 }
               }
             }
@@ -3076,7 +5014,8 @@
                   },
                   "required": [
                     "target_role"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -3097,10 +5036,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/ProfileViewedResponse"
                 }
               }
             }
@@ -3148,10 +5084,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "$ref": "#/components/schemas/ProfilePatternFeedbackResponse"
                 }
               }
             }
@@ -3192,13 +5125,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "nullable": true
-                    }
-                  }
+                  "$ref": "#/components/schemas/ProfileDueReviewsResponse"
                 }
               }
             }
@@ -3239,13 +5166,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "nullable": true
-                    }
-                  }
+                  "$ref": "#/components/schemas/ProfileTopicHistoryResponse"
                 }
               }
             }
@@ -3301,7 +5222,8 @@
                   "required": [
                     "task_id",
                     "status"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }

@@ -4,6 +4,7 @@ import type { KnowledgeQuery, KnowledgeStore } from '../knowledge/ports.ts'
 import type { TextGenerationUseCases } from '../provider/ports.ts'
 import type { ProviderSettingsRepository } from '../provider/ports.ts'
 import type { ResumeUseCases } from '../resume/ports.ts'
+import type { InterviewDraftResult, InterviewResumeResult, InterviewReviewSubmissionResult, InterviewStartResult, JobPrepPreview, JobPrepStartResult, TaskStatusResult } from './results.ts'
 import type {
   InterviewAnswer,
   InterviewMessage,
@@ -71,21 +72,21 @@ export interface CandidateProfilePort {
 }
 
 export interface InterviewUseCases {
-  previewJob(context: RequestContext, input: JobPrepInput): Promise<{ preview: Record<string, unknown> }>
-  startJob(context: RequestContext, input: JobPrepInput): Promise<Record<string, unknown>>
-  start(context: RequestContext, input: StartInterviewInput): Promise<Record<string, unknown>>
+  previewJob(context: RequestContext, input: JobPrepInput): Promise<{ preview: JobPrepPreview }>
+  startJob(context: RequestContext, input: JobPrepInput): Promise<JobPrepStartResult>
+  start(context: RequestContext, input: StartInterviewInput): Promise<InterviewStartResult>
   chat(context: RequestContext, sessionId: string, message: string): Promise<{ session_id: string; message: string; is_finished: boolean }>
   chatStream(context: RequestContext, sessionId: string, message: string): AsyncIterable<{ token?: string; done?: boolean; is_finished?: boolean }>
-  end(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<Record<string, unknown>>
-  draft(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<Record<string, unknown>>
-  generateReview(context: RequestContext, sessionId: string): Promise<Record<string, unknown>>
+  end(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<InterviewReviewSubmissionResult>
+  draft(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<InterviewDraftResult>
+  generateReview(context: RequestContext, sessionId: string): Promise<InterviewReviewSubmissionResult>
   referenceAnswer(context: RequestContext, sessionId: string, questionId: string | number): Promise<{ reference_answer: string; cached: boolean }>
-  resume(context: RequestContext, sessionId: string): Promise<Record<string, unknown>>
+  resume(context: RequestContext, sessionId: string): Promise<InterviewResumeResult>
   review(context: RequestContext, sessionId: string): Promise<InterviewSession>
   history(context: RequestContext, input: { limit?: number; offset?: number; mode?: InterviewMode; topic?: string }): Promise<{ items: SessionSummary[]; total: number }>
   delete(context: RequestContext, sessionId: string): Promise<{ ok: true }>
   topics(context: RequestContext): Promise<string[]>
-  task(context: RequestContext, taskId: string): Promise<Record<string, unknown>>
+  task(context: RequestContext, taskId: string): Promise<TaskStatusResult>
   runReviewTask(task: TaskRecord): Promise<Record<string, unknown> | undefined>
 }
 

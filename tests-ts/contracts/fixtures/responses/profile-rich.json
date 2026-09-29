@@ -1,0 +1,188 @@
+{
+  "name": "合成测试用户",
+  "target_role": "后端工程师",
+  "updated_at": "",
+  "last_consolidation_at": "",
+  "topic_mastery": {
+    "typescript": {
+      "score": 0,
+      "level": 4,
+      "notes": "保留零分",
+      "last_assessed": "2026-01-01",
+      "session_count": 1,
+      "retrospective": "# 回顾",
+      "retrospective_at": "2026-01-01T00:00:00.000Z",
+      "legacy_mastery": true
+    },
+    "python": {
+      "level": 3
+    }
+  },
+  "weak_points": [
+    {
+      "point": "微任务顺序",
+      "topic": "typescript",
+      "first_seen": "2026-01-01",
+      "last_seen": "2026-01-01",
+      "times_seen": 2,
+      "improved": false,
+      "archived": false,
+      "source": "session",
+      "axis": "knowledge",
+      "confidence": 0.8,
+      "sr": {
+        "interval_days": 1,
+        "ease_factor": 2.5,
+        "repetitions": 1,
+        "next_review": "2000-01-01",
+        "last_score": 5,
+        "legacy_sr": true
+      },
+      "history": [
+        {
+          "date": "2026-01-01",
+          "event": "reviewed",
+          "score": 5,
+          "evidence": "合成回答",
+          "legacy_history": true
+        }
+      ],
+      "legacy_weak": {
+        "kept": true
+      }
+    },
+    {
+      "point": "容量规划",
+      "topic": "typescript",
+      "source": "predicted",
+      "improved": false,
+      "archived": false
+    },
+    {
+      "point": "缺少边界讨论",
+      "topic": "cross_cutting",
+      "source": "consolidated",
+      "confidence": 0.8,
+      "user_acknowledged": true,
+      "consolidates": [
+        "微任务顺序",
+        "容量规划"
+      ],
+      "history": [
+        {
+          "date": "2026-01-01T00:00:00.000Z",
+          "event": "user_confirmed"
+        }
+      ],
+      "legacy_pattern": true
+    }
+  ],
+  "strong_points": [
+    {
+      "point": "缓存设计",
+      "topic": "typescript",
+      "first_seen": "2026-01-01",
+      "legacy_strong": true
+    }
+  ],
+  "behavior_signals": {
+    "reasoning.example": {
+      "namespace": "reasoning",
+      "polarity": "negative",
+      "description": "缺少实例",
+      "first_seen": "2026-01-01",
+      "last_seen": "2026-01-01",
+      "times_seen": 2,
+      "improved": false,
+      "examples": [
+        {
+          "session_id": "topic-session-1",
+          "date": "2026-01-01",
+          "snippet": "合成样例",
+          "legacy_example": true
+        }
+      ],
+      "history": [
+        {
+          "date": "2026-01-01",
+          "event": "regressed"
+        }
+      ],
+      "legacy_signal": true
+    },
+    "legacy.partial": {
+      "description": "历史部分记录"
+    }
+  },
+  "communication": {
+    "style": "",
+    "habits": [],
+    "suggestions": [],
+    "legacy_communication": true
+  },
+  "thinking_patterns": {
+    "strengths": [],
+    "gaps": [],
+    "legacy_thinking": true
+  },
+  "stats": {
+    "total_sessions": 2,
+    "resume_sessions": 0,
+    "drill_sessions": 1,
+    "job_prep_sessions": 0,
+    "avg_score": 7,
+    "score_history": [
+      {
+        "date": "2026-01-01",
+        "mode": "topic_drill",
+        "topic": "typescript",
+        "avg_score": 7,
+        "session_id": "topic-session-1",
+        "dimension_scores": {
+          "technical_depth": 7
+        },
+        "legacy_history": true
+      },
+      {
+        "date": "2026-01-01",
+        "mode": "recording",
+        "topic": null,
+        "avg_score": 7
+      }
+    ],
+    "recording_sessions": 1,
+    "total_answers": 3,
+    "dimension_scores": {
+      "technical_depth": 7
+    },
+    "legacy_stats": true
+  },
+  "due_reviews": [
+    {
+      "point": "微任务顺序",
+      "topic": "typescript",
+      "next_review": "2000-01-01"
+    },
+    {
+      "point": "容量规划",
+      "topic": "typescript"
+    }
+  ],
+  "view_marker": {
+    "at": "2025-12-31T00:00:00.000Z",
+    "total_sessions": 1,
+    "topic_scores": {
+      "typescript": 10,
+      "python": 60
+    },
+    "legacy_marker": true
+  },
+  "session_extractions": {
+    "topic-session-1": {
+      "raw_extension": true
+    }
+  },
+  "legacy_profile": {
+    "kept": true
+  }
+}

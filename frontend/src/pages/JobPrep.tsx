@@ -1,3 +1,4 @@
+import type { ApiResponse } from "../api/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -28,40 +29,7 @@ interface ResumeFile {
   size?: number;
 }
 
-interface FocusArea {
-  area: string;
-  priority?: string;
-  reason: string;
-}
-
-interface RecommendedStory {
-  project: string;
-  reason: string;
-}
-
-interface QuestionGroup {
-  title: string;
-  reason: string;
-  sample_questions?: string[];
-}
-
-interface ResumeAlignment {
-  resume_used?: boolean;
-  fit_assessment?: string;
-  risk_gaps?: string[];
-  matching_evidence?: string[];
-  recommended_stories?: RecommendedStory[];
-}
-
-interface JobPrepPreview {
-  company?: string;
-  position?: string;
-  role_summary?: string;
-  focus_areas?: FocusArea[];
-  prep_priorities?: string[];
-  likely_question_groups?: QuestionGroup[];
-  resume_alignment?: ResumeAlignment;
-}
+type JobPrepPreview = ApiResponse<"/api/job-prep/preview", "post">["preview"];
 
 interface JobPrepDraft {
   company: string;
@@ -198,7 +166,7 @@ export default function JobPrep({ embedded = false }: JobPrepProps) {
     setPreviewing(true);
     setError("");
     try {
-      const data = await previewJobPrep({ ...payload }) as unknown as { preview: JobPrepPreview };
+      const data = await previewJobPrep({ ...payload });
       setPreview(data.preview);
       setPreviewSignature(signature);
     } catch (err) {
@@ -216,7 +184,7 @@ export default function JobPrep({ embedded = false }: JobPrepProps) {
       const data = await startJobPrep({
         ...payload,
         preview_data: { ...preview },
-      }) as unknown as { session_id: string; [key: string]: unknown };
+      });
       try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       navigate(`/interview/${data.session_id}`, { state: data });
     } catch (err) {

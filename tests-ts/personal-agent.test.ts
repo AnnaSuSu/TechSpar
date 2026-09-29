@@ -14,9 +14,9 @@ afterEach(async () => { while (roots.length) await rm(roots.pop()!, { recursive:
 const context = (userId: string): RequestContext => ({ requestId: 'test', userId, signal: new AbortController().signal })
 const profile: ProfileUseCases = {
   async get() { const value = defaultProfile(); value.target_role = '后端工程师'; return value },
-  async inferTargetRole() { return { target_role: '' } }, async viewed() { return {} }, async feedback() { return {} },
+  async inferTargetRole() { return { target_role: '' } }, async viewed() { throw new Error('Unexpected profile use case: viewed') }, async feedback() { throw new Error('Unexpected profile use case: feedback') },
   async dueReviews() { return [{ point: 'GIL', topic: 'python' }] }, async topicHistory() { return [] },
-  async retrospective() { return { task_id: '', status: 'pending' } }, async runRetrospectiveTask() { return {} },
+  async retrospective() { return { task_id: '', status: 'pending' } }, async runRetrospectiveTask() { throw new Error('Unexpected profile use case: runRetrospectiveTask') },
 }
 
 class FakeAi implements TextGenerationUseCases {
