@@ -1,1 +1,18 @@
-{"point":"跨领域机制解释停留在表面","confidence":0.8,"user_acknowledged":true}
+{
+  "point": "缺少边界讨论",
+  "topic": "cross_cutting",
+  "source": "consolidated",
+  "confidence": 0.8,
+  "user_acknowledged": true,
+  "consolidates": [
+    "微任务顺序",
+    "容量规划"
+  ],
+  "history": [
+    {
+      "date": "2026-01-01T00:00:00.000Z",
+      "event": "user_confirmed"
+    }
+  ],
+  "legacy_pattern": true
+}

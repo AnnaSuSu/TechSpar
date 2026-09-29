@@ -1,12 +1,6 @@
 import { createContext } from "react";
-
-export interface TaskInfo {
-  id: string;
-  type: string;
-  label: string;
-  status: "pending" | "done" | "error";
-  result?: unknown;
-}
+import type { TaskInfo } from "../lib/taskStatus";
+export type { TaskInfo } from "../lib/taskStatus";
 
 export interface TaskStatusContextValue {
   tasks: TaskInfo[];

@@ -1,1 +1,80 @@
-[]
+[
+  {
+    "session_id": "topic-session-1",
+    "mode": "topic_drill",
+    "topic": "typescript",
+    "meta": {
+      "source_transcript": "synthetic transcript",
+      "legacy_meta": {
+        "kept": true
+      }
+    },
+    "questions": [
+      {
+        "id": 1,
+        "question": "解释事件循环",
+        "difficulty": 3,
+        "focus_area": "异步执行",
+        "legacy_question": {
+          "kept": true
+        }
+      },
+      {
+        "id": "q2",
+        "question": "解释闭包"
+      },
+      {
+        "id": 3,
+        "question": "设计缓存"
+      },
+      {
+        "id": 4,
+        "question": "定位慢查询"
+      }
+    ],
+    "transcript": [
+      {
+        "role": "assistant",
+        "content": "解释事件循环",
+        "time": "2026-01-01 00:00:00",
+        "legacy_message": "kept"
+      },
+      {
+        "role": "user",
+        "content": "先执行同步任务。"
+      }
+    ],
+    "scores": [
+      {
+        "question_id": 1,
+        "score": 7,
+        "difficulty": 3,
+        "provider_detail": {
+          "kept": true
+        }
+      }
+    ],
+    "weak_points": [
+      "微任务顺序",
+      {
+        "point": "异步边界",
+        "legacy": true
+      }
+    ],
+    "overall": {
+      "avg_score": 7,
+      "provider_summary": {
+        "kept": true
+      }
+    },
+    "reference_answers": {
+      "1": "参考回答"
+    },
+    "review": "# 复盘",
+    "status": "reviewed",
+    "review_error": null,
+    "user_id": "user-a",
+    "created_at": "2026-01-01 00:00:00",
+    "updated_at": "2026-01-01T00:00:00.000Z"
+  }
+]

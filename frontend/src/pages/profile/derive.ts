@@ -1,3 +1,4 @@
+import type { ApiResponse } from "../../api/client";
 import {
   DIMENSION_SCORE_META,
   MODE_META,
@@ -5,70 +6,15 @@ import {
   PERFORMANCE_DIMENSIONS,
 } from "./meta";
 
-// ── 画像数据模型(与后端 profile 结构对齐;后端无 schema,字段按实际使用建型) ──
-
-export interface ExposurePoint {
-  topic?: string;
-  axis?: string;
-  source?: string;
-  improved?: boolean;
-  archived?: boolean;
-  improved_at?: string;
-  first_seen?: string;
-  last_seen?: string;
-  times_seen?: number;
-  point?: string;
-  [key: string]: unknown;
-}
-
-export interface BehaviorSignalData extends ExposurePoint {
-  namespace?: string;
-  polarity?: "negative" | "positive";
-}
-
-export interface BehaviorSignal extends BehaviorSignalData {
-  id: string;
-}
-
-export interface TopicMasteryData {
-  score?: number;
-  level?: number;
-  notes?: string;
-  last_assessed?: string;
-  [key: string]: unknown;
-}
-
-export interface ProfileStats {
-  total_sessions?: number;
-  resume_sessions?: number;
-  drill_sessions?: number;
-  job_prep_sessions?: number;
-  [key: string]: unknown;
-}
-
-export interface ViewMarker {
-  at?: string;
-  total_sessions?: number;
-  topic_scores?: Record<string, number>;
-}
-
-export interface ProfileData {
-  weak_points?: ExposurePoint[];
-  strong_points?: ExposurePoint[];
-  behavior_signals?: Record<string, BehaviorSignalData>;
-  topic_mastery?: Record<string, TopicMasteryData>;
-  stats?: ProfileStats;
-  view_marker?: ViewMarker;
-  [key: string]: unknown;
-}
-
-export interface HistoryEntry {
-  topic?: string;
-  mode?: string;
-  avg_score?: number;
-  dimension_scores?: Record<string, number>;
-  [key: string]: unknown;
-}
+// HTTP types are generated from the response contracts; UI enrichment stays local.
+export type ProfileData = ApiResponse<"/api/profile", "get">;
+export type ExposurePoint = Partial<ProfileData["weak_points"][number]>;
+export type BehaviorSignalData = ProfileData["behavior_signals"][string];
+export type BehaviorSignal = BehaviorSignalData & { id: string };
+export type TopicMasteryData = ProfileData["topic_mastery"][string];
+export type ProfileStats = ProfileData["stats"];
+export type ViewMarker = NonNullable<ProfileData["view_marker"]>;
+export type HistoryEntry = ProfileStats["score_history"][number];
 
 // 知识轴 weak/strong 过滤:排除老数据里的 axis=performance 条目
 // (表现轴现在走 behavior_signals,不再混进 weak_points)
@@ -379,7 +325,7 @@ export function buildDomainInsights(
 
   (profile.weak_points || [])
     .filter(
-      (item): item is ExposurePoint & { topic: string } =>
+      (item): item is ProfileData["weak_points"][number] & { topic: string } =>
         !item.improved && !item.archived && !!item.topic && realTopics.has(item.topic)
     )
     .forEach((item) => {
@@ -401,7 +347,7 @@ export function buildDomainInsights(
 
   (profile.strong_points || [])
     .filter(
-      (item): item is ExposurePoint & { topic: string } =>
+      (item): item is ProfileData["strong_points"][number] & { topic: string } =>
         !!item.topic && realTopics.has(item.topic)
     )
     .forEach((item) => {

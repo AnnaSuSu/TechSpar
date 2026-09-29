@@ -1633,9 +1633,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["JobPrepPreviewResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -1692,9 +1690,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["JobPrepStartResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -1750,9 +1746,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["InterviewStartResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -1803,9 +1797,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["InterviewChatResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -1915,9 +1907,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["InterviewReviewSubmissionResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -1976,9 +1966,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["InterviewDraftResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -2024,9 +2012,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["InterviewReviewSubmissionResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -2070,9 +2056,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["InterviewResumeResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -2172,9 +2156,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["InterviewSessionResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -2220,14 +2202,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /** @enum {string} */
-                            status: "pending" | "done" | "error";
-                            type: string;
-                            error?: string;
-                        } & {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["TaskStatusResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -2276,9 +2251,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["InterviewHistoryResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -2406,9 +2379,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["CandidateProfileResponse"];
                     };
                 };
             };
@@ -2482,9 +2453,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["ProfileViewedResponse"];
                     };
                 };
             };
@@ -2527,9 +2496,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
+                        "application/json": components["schemas"]["ProfilePatternFeedbackResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -2573,9 +2540,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        }[];
+                        "application/json": components["schemas"]["ProfileDueReviewsResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -2621,9 +2586,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        }[];
+                        "application/json": components["schemas"]["ProfileTopicHistoryResponse"];
                     };
                 };
                 /** @description Validation Error */
@@ -3667,6 +3630,571 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        JobPrepPreviewResponse: {
+            preview: {
+                company: string;
+                position: string;
+                role_summary: string;
+                focus_areas: {
+                    area: string;
+                    priority: string;
+                    reason: string;
+                }[];
+                likely_question_groups: {
+                    title: string;
+                    reason: string;
+                    sample_questions: string[];
+                }[];
+                resume_alignment: {
+                    resume_used: boolean;
+                    fit_assessment: string;
+                    matching_evidence: string[];
+                    risk_gaps: string[];
+                    recommended_stories: {
+                        project: string;
+                        reason: string;
+                    }[];
+                };
+                prep_priorities: string[];
+                /** @description Raw provider blueprint items; structured validation is deferred to phase four. */
+                question_blueprint: unknown[];
+                jd_excerpt: string;
+            };
+        };
+        JobPrepStartResponse: {
+            session_id: string;
+            /** @enum {string} */
+            mode: "jd_prep";
+            questions: ({
+                id: string | number;
+                question: string;
+                difficulty?: number;
+                focus_area?: string;
+                category?: string;
+                intent?: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+            /** @description Caller-supplied preview_data is echoed unchanged, including legacy partial previews. */
+            preview: {
+                [key: string]: unknown;
+            };
+            company: string;
+            position: string;
+            meta: {
+                company: string;
+                position: string;
+                jd_text: string;
+                use_resume: boolean;
+                /** @description Caller-supplied preview_data is echoed unchanged, including legacy partial previews. */
+                preview: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        InterviewStartResponse: {
+            session_id: string;
+            /** @enum {string} */
+            mode: "topic_drill";
+            topic: string;
+            questions: ({
+                id: string | number;
+                question: string;
+                difficulty?: number;
+                focus_area?: string;
+                category?: string;
+                intent?: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+        } | {
+            session_id: string;
+            /** @enum {string} */
+            mode: "resume";
+            topic?: string | null;
+            target_role: string;
+            job_description: string;
+            message: string;
+        };
+        InterviewChatResponse: {
+            session_id: string;
+            message: string;
+            is_finished: boolean;
+        };
+        InterviewReviewSubmissionResponse: {
+            session_id: string;
+            /** @enum {string} */
+            mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+            /** @enum {string} */
+            status: "pending" | "done";
+        };
+        InterviewDraftResponse: {
+            session_id: string;
+            /** @enum {string} */
+            status: "ongoing";
+            /** @enum {boolean} */
+            saved: true;
+        } | {
+            session_id: string;
+            /** @enum {string} */
+            status: "ended" | "reviewing" | "reviewed" | "review_failed";
+            /** @enum {boolean} */
+            saved: false;
+        };
+        InterviewResumeResponse: {
+            session_id: string;
+            /** @enum {string} */
+            mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+            topic?: string | null;
+            /** @enum {string} */
+            status: "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
+            review_error?: string | null;
+            transcript: ({
+                /** @enum {string} */
+                role: "user" | "assistant";
+                content: string;
+                time?: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+            questions: ({
+                id: string | number;
+                question: string;
+                difficulty?: number;
+                focus_area?: string;
+                category?: string;
+                intent?: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+            target_role: string;
+            job_description: string;
+            /** @description Persisted session metadata; legacy/provider extensions are preserved. */
+            meta: {
+                [key: string]: unknown;
+            };
+            can_continue: boolean;
+            is_finished: boolean;
+            has_review: boolean;
+        };
+        InterviewSessionResponse: {
+            session_id: string;
+            /** @enum {string} */
+            mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+            topic?: string | null;
+            /** @description Persisted session metadata; legacy/provider extensions are preserved. */
+            meta: {
+                [key: string]: unknown;
+            };
+            questions: ({
+                id: string | number;
+                question: string;
+                difficulty?: number;
+                focus_area?: string;
+                category?: string;
+                intent?: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+            transcript: ({
+                /** @enum {string} */
+                role: "user" | "assistant";
+                content: string;
+                time?: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+            scores: {
+                [key: string]: unknown;
+            }[];
+            weak_points: unknown[];
+            /** @description Unnormalized review content; producer validation is deferred to phase four. */
+            overall: {
+                [key: string]: unknown;
+            };
+            reference_answers: {
+                [key: string]: string;
+            };
+            review?: string | null;
+            /** @enum {string} */
+            status: "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
+            review_error?: string | null;
+            user_id: string;
+            created_at: string;
+            updated_at: string;
+        };
+        TaskStatusResponse: ({
+            /** @enum {string} */
+            status: "pending";
+            type: string;
+            error?: string | null;
+        } & {
+            [key: string]: unknown;
+        }) | ({
+            /** @enum {string} */
+            status: "error";
+            type: string;
+            error?: string | null;
+        } & {
+            [key: string]: unknown;
+        }) | {
+            /** @enum {string} */
+            status: "done";
+            /** @enum {string} */
+            type: "resume_review" | "drill_review" | "jd_review" | "recording_review" | "review";
+            error?: string | null;
+            /** @description Omitted when a reviewed session short-circuits task polling. */
+            session_id?: string;
+        } | {
+            /** @enum {string} */
+            status: "done";
+            /** @enum {string} */
+            type: "copilot_prep";
+            prep_id: string;
+            error?: string | null;
+        } | {
+            /** @enum {string} */
+            status: "done";
+            /** @enum {string} */
+            type: "retrospective";
+            error?: string | null;
+            topic: string;
+            topic_name: string;
+            retrospective: string;
+            retrospective_at: string;
+            session_count: number;
+        } | ({
+            /** @enum {string} */
+            status: "done";
+            /** @description Legacy/extension task type, explicitly excluding all known types. */
+            type: string;
+            error?: string | null;
+        } & {
+            [key: string]: unknown;
+        });
+        InterviewHistoryResponse: {
+            items: {
+                session_id: string;
+                /** @enum {string} */
+                mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+                topic?: string | null;
+                /** @description Persisted session metadata; legacy/provider extensions are preserved. */
+                meta: {
+                    [key: string]: unknown;
+                };
+                created_at: string;
+                avg_score: number | null;
+                /** @enum {string} */
+                status: "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
+                review_error?: string | null;
+            }[];
+            total: number;
+        };
+        CandidateProfileResponse: {
+            name: string;
+            target_role: string;
+            updated_at: string;
+            last_consolidation_at: string;
+            topic_mastery: {
+                [key: string]: {
+                    score?: number;
+                    level?: number;
+                    notes?: string;
+                    last_assessed?: string;
+                    session_count?: number;
+                    retrospective?: string;
+                    retrospective_at?: string;
+                } & {
+                    [key: string]: unknown;
+                };
+            };
+            weak_points: ({
+                point: string;
+                topic?: string;
+                first_seen?: string;
+                last_seen?: string;
+                times_seen?: number;
+                improved?: boolean;
+                improved_at?: string;
+                archived?: boolean;
+                archived_at?: string;
+                archived_reason?: string;
+                source?: string;
+                axis?: string;
+                confidence?: number;
+                history?: ({
+                    date?: string;
+                    event?: string;
+                    evidence?: string;
+                    score?: number;
+                } & {
+                    [key: string]: unknown;
+                })[];
+                sr?: {
+                    interval_days?: number;
+                    ease_factor?: number;
+                    repetitions?: number;
+                    next_review?: string;
+                    last_score?: number;
+                } & {
+                    [key: string]: unknown;
+                };
+                consolidates?: string[];
+                user_acknowledged?: boolean;
+            } & {
+                [key: string]: unknown;
+            })[];
+            strong_points: ({
+                point: string;
+                topic?: string;
+                first_seen?: string;
+                last_seen?: string;
+                times_seen?: number;
+                improved?: boolean;
+                improved_at?: string;
+                archived?: boolean;
+                archived_at?: string;
+                archived_reason?: string;
+                source?: string;
+                axis?: string;
+                confidence?: number;
+                history?: ({
+                    date?: string;
+                    event?: string;
+                    evidence?: string;
+                    score?: number;
+                } & {
+                    [key: string]: unknown;
+                })[];
+            } & {
+                [key: string]: unknown;
+            })[];
+            behavior_signals: {
+                [key: string]: {
+                    topic?: string;
+                    first_seen?: string;
+                    last_seen?: string;
+                    times_seen?: number;
+                    improved?: boolean;
+                    improved_at?: string;
+                    archived?: boolean;
+                    archived_at?: string;
+                    archived_reason?: string;
+                    source?: string;
+                    axis?: string;
+                    confidence?: number;
+                    history?: ({
+                        date?: string;
+                        event?: string;
+                        evidence?: string;
+                        score?: number;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                    namespace?: string;
+                    polarity?: string;
+                    description?: string;
+                    examples?: ({
+                        session_id?: string;
+                        date?: string;
+                        snippet?: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                } & {
+                    [key: string]: unknown;
+                };
+            };
+            communication: {
+                style: string;
+                habits: string[];
+                suggestions: string[];
+            } & {
+                [key: string]: unknown;
+            };
+            thinking_patterns: {
+                strengths: string[];
+                gaps: string[];
+            } & {
+                [key: string]: unknown;
+            };
+            stats: {
+                total_sessions: number;
+                resume_sessions: number;
+                drill_sessions: number;
+                job_prep_sessions: number;
+                avg_score: number;
+                score_history: ({
+                    date?: string;
+                    mode?: string;
+                    topic?: string | null;
+                    avg_score?: number;
+                    session_id?: string;
+                    dimension_scores?: {
+                        [key: string]: number;
+                    };
+                } & {
+                    [key: string]: unknown;
+                })[];
+                total_answers?: number;
+                recording_sessions?: number;
+                copilot_sessions?: number;
+                drill_avg_score?: number;
+                resume_avg_score?: number;
+                job_prep_avg_score?: number;
+                recording_avg_score?: number;
+                dimension_scores?: {
+                    [key: string]: number;
+                };
+            } & {
+                [key: string]: unknown;
+            };
+            view_marker?: {
+                at?: string;
+                total_sessions?: number;
+                topic_scores?: {
+                    [key: string]: number;
+                };
+            } & {
+                [key: string]: unknown;
+            };
+            due_reviews: {
+                point: string;
+                topic?: string;
+                next_review?: string;
+            }[];
+            /** @description Persisted extraction cache; LLM validation is deferred to phase four. */
+            session_extractions?: {
+                [key: string]: unknown;
+            };
+        } & {
+            [key: string]: unknown;
+        };
+        ProfileViewedResponse: {
+            at: string;
+            total_sessions: number;
+            topic_scores: {
+                [key: string]: number;
+            };
+        };
+        ProfilePatternFeedbackResponse: {
+            point: string;
+            topic?: string;
+            first_seen?: string;
+            last_seen?: string;
+            times_seen?: number;
+            improved?: boolean;
+            improved_at?: string;
+            archived?: boolean;
+            archived_at?: string;
+            archived_reason?: string;
+            source?: string;
+            axis?: string;
+            confidence?: number;
+            history?: ({
+                date?: string;
+                event?: string;
+                evidence?: string;
+                score?: number;
+            } & {
+                [key: string]: unknown;
+            })[];
+            sr?: {
+                interval_days?: number;
+                ease_factor?: number;
+                repetitions?: number;
+                next_review?: string;
+                last_score?: number;
+            } & {
+                [key: string]: unknown;
+            };
+            consolidates?: string[];
+            user_acknowledged?: boolean;
+        } & {
+            [key: string]: unknown;
+        };
+        ProfileDueReviewsResponse: ({
+            point: string;
+            topic?: string;
+            first_seen?: string;
+            last_seen?: string;
+            times_seen?: number;
+            improved?: boolean;
+            improved_at?: string;
+            archived?: boolean;
+            archived_at?: string;
+            archived_reason?: string;
+            source?: string;
+            axis?: string;
+            confidence?: number;
+            history?: ({
+                date?: string;
+                event?: string;
+                evidence?: string;
+                score?: number;
+            } & {
+                [key: string]: unknown;
+            })[];
+            sr?: {
+                interval_days?: number;
+                ease_factor?: number;
+                repetitions?: number;
+                next_review?: string;
+                last_score?: number;
+            } & {
+                [key: string]: unknown;
+            };
+            consolidates?: string[];
+            user_acknowledged?: boolean;
+        } & {
+            [key: string]: unknown;
+        })[];
+        ProfileTopicHistoryResponse: {
+            session_id: string;
+            /** @enum {string} */
+            mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+            topic?: string | null;
+            /** @description Persisted session metadata; legacy/provider extensions are preserved. */
+            meta: {
+                [key: string]: unknown;
+            };
+            questions: ({
+                id: string | number;
+                question: string;
+                difficulty?: number;
+                focus_area?: string;
+                category?: string;
+                intent?: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+            transcript: ({
+                /** @enum {string} */
+                role: "user" | "assistant";
+                content: string;
+                time?: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+            scores: {
+                [key: string]: unknown;
+            }[];
+            weak_points: unknown[];
+            /** @description Unnormalized review content; producer validation is deferred to phase four. */
+            overall: {
+                [key: string]: unknown;
+            };
+            reference_answers: {
+                [key: string]: string;
+            };
+            review?: string | null;
+            /** @enum {string} */
+            status: "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
+            review_error?: string | null;
+            user_id: string;
+            created_at: string;
+            updated_at: string;
+        }[];
         /** ValidationError */
         ValidationError: {
             /** Location */

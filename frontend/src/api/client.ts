@@ -33,8 +33,8 @@ export type ApiRequestBody<
 
 /**
  * 按路径/方法从生成的 openapi schema 提取 200 响应的 JSON 类型。
- * 后端目前未声明 response_model,一律解析为 unknown;
- * 后端补上后运行 `npm run gen:api` 重新生成 schema,这里会自动收窄,api 函数无需改动。
+ * 类型由 contracts 中的响应 schema 生成；修改契约后运行 bun run gen:api。
+ * 未声明具体结构的接口仍保留 unknown，已收紧的接口自动获得对应 DTO。
  */
 export type ApiResponse<
   P extends keyof paths,

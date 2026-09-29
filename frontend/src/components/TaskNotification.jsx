@@ -1,14 +1,7 @@
+import { getTaskNavigationTarget } from "../lib/taskStatus";
 import { useNavigate } from "react-router-dom";
 import { X, Loader2, FileText, AlertCircle } from "lucide-react";
 import useTaskStatus from "../hooks/useTaskStatus";
-
-function getNavTarget(task) {
-  if (task.type === "retrospective" && task.result?.topic) {
-    return `/profile/topic/${task.result.topic}`;
-  }
-  // drill_review, jd_review, recording, resume_review → review page
-  return `/review/${task.id}`;
-}
 
 export default function TaskNotification() {
   const { tasks, dismissTask } = useTaskStatus();
@@ -36,7 +29,7 @@ export default function TaskNotification() {
               <button
                 className="text-[14px] text-primary font-medium hover:underline cursor-pointer"
                 onClick={() => {
-                  navigate(getNavTarget(task));
+                  navigate(getTaskNavigationTarget(task));
                   dismissTask(task.id);
                 }}
               >
