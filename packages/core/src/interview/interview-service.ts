@@ -336,9 +336,9 @@ export class InterviewService implements InterviewUseCases {
     return ({ resume: 'resume_review', topic_drill: 'drill_review', jd_prep: 'jd_review', recording: 'recording_review' } as const)[mode]
   }
 
-  private async dispatch(session: InterviewSession, answersOverride?: InterviewAnswer[]): Promise<InterviewReviewSubmissionResult> {
+  private async dispatch(session: InterviewSession, answersOverride?: InterviewAnswer[], profileOnly = false): Promise<InterviewReviewSubmissionResult> {
     await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'reviewing', { clearError: true })
-    await this.deps.tasks.enqueue({ taskId: session.session_id, userId: session.user_id, type: this.taskType(session.mode), payload: { session_id: session.session_id, ...(answersOverride !== undefined ? { answers_override: answersOverride } : {}) } })
+    await this.deps.tasks.enqueue({ taskId: session.session_id, userId: session.user_id, type: this.taskType(session.mode), payload: { session_id: session.session_id, ...(answersOverride !== undefined ? { answers_override: answersOverride } : {}), ...(profileOnly ? { profile_only: true } : {}) } })
     return { session_id: session.session_id, mode: session.mode, status: 'pending' }
   }
 
@@ -372,7 +372,17 @@ export class InterviewService implements InterviewUseCases {
     if (session.status === 'reviewing') return { session_id: sessionId, mode: session.mode, status: 'pending' }
     if (session.status === 'ongoing') throw new AppError('面试尚未结束，请先结束面试再生成复盘。', 400)
     if (!['ended', 'review_failed', 'reviewed'].includes(session.status)) throw new AppError(`当前状态 ${session.status} 不支持重新生成复盘。`, 400)
-    return this.dispatch(session)
+    return this.dispatch(session, undefined, session.review != null && Boolean(session.meta.profile_extract_failed))
+  }
+
+  private async updateProfile(session: InterviewSession): Promise<void> {
+    if (!this.deps.profile.afterReview) return
+    try {
+      const extraction = await this.deps.profile.afterReview({ userId: session.user_id, session })
+      const metrics = session.mode === 'resume' ? resumeOverall(extraction) : {}
+      if (Object.keys(metrics).length) await this.deps.sessions.saveReview({ sessionId: session.session_id, userId: session.user_id, review: session.review || '', scores: session.scores, weakPoints: session.weak_points, overall: { ...session.overall, ...metrics } })
+      await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: false })
+    } catch { await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: true }) }
   }
 
   async runReviewTask(task: TaskRecord): Promise<Record<string, unknown> | undefined> {
@@ -380,6 +390,12 @@ export class InterviewService implements InterviewUseCases {
     if (!session) throw new Error('Session not found.')
     const context: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: new AbortController().signal }
     try {
+      if (task.payload.profile_only === true) {
+        if (session.review == null) throw new Error('No saved review to synchronize')
+        await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'reviewed', { clearError: true })
+        await this.updateProfile({ ...session, status: 'reviewed' })
+        return { session_id: session.session_id, status: 'done' }
+      }
       if (session.mode === 'resume') {
         const state = await this.deps.states.load(session.session_id, session.user_id)
         if (!state) throw new Error('会话状态已失效，无法恢复')
@@ -407,15 +423,7 @@ export class InterviewService implements InterviewUseCases {
         throw new Error(`Unsupported review mode: ${session.mode}`)
       }
       const reviewed = await this.deps.sessions.get(session.session_id, session.user_id)
-      if (reviewed && this.deps.profile.afterReview) {
-        try {
-          const extraction = await this.deps.profile.afterReview({ userId: session.user_id, session: reviewed })
-          const metrics = session.mode === 'resume' ? resumeOverall(extraction) : {}
-          if (Object.keys(metrics).length) await this.deps.sessions.saveReview({ sessionId: reviewed.session_id, userId: reviewed.user_id, review: reviewed.review || '', scores: reviewed.scores, weakPoints: reviewed.weak_points, overall: { ...reviewed.overall, ...metrics } })
-          await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: false })
-        }
-        catch { await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: true }) }
-      }
+      if (reviewed) await this.updateProfile(reviewed)
       return { session_id: session.session_id, status: 'done' }
     } catch (error) {
       await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })

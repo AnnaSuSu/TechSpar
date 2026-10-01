@@ -5,7 +5,7 @@ import { STRUCTURED_CHAT_OPTIONS } from '../provider/ports.ts'
 import type { CandidateProfilePort } from '../interview/ports.ts'
 import type { InterviewSession, TaskRecord } from '../interview/model.ts'
 import { fill } from '../interview/prompts.ts'
-import { defaultProfile, type CandidateProfile, type ProfileViewMarker, type RetrospectiveResult, type WeakPoint } from './model.ts'
+import { defaultProfile, type CandidateProfile, type PendingProfileMemory, type ProfileViewMarker, type RetrospectiveResult, type WeakPoint } from './model.ts'
 import type { ProfileDependencies, ProfileMemoryEntry, ProfileMemorySearchResult, ProfileUseCases } from './ports.ts'
 
 const INFER_ROLE_PROMPT = `根据以下简历内容，推断候选人最可能应聘的岗位名称。给出一个具体岗位，12 个汉字以内；学生可带实习生或校招后缀。只返回岗位名称，不要解释。\n\n{resume}`
@@ -65,6 +65,24 @@ function id(context: RequestContext): string { if (!context.userId) throw new Au
 function object(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {} }
 function number(value: unknown): number | undefined { return typeof value === 'number' && Number.isFinite(value) ? value : undefined }
 function text(value: unknown): string { return typeof value === 'string' ? value.trim() : '' }
+
+function sessionMemory(extraction: Record<string, unknown>, session: InterviewSession, createdAt: string): PendingProfileMemory {
+  const weak = (Array.isArray(extraction.weak_points) ? extraction.weak_points : []).map(object).filter(item => text(item.point))
+  const strong = (Array.isArray(extraction.strong_points) ? extraction.strong_points : []).map(object).filter(item => text(item.point))
+  const summary = text(extraction.session_summary)
+  const insight = [summary, weak.length ? `薄弱点：${weak.map(item => text(item.point)).join('、')}` : '', strong.length ? `强项：${strong.map(item => text(item.point)).join('、')}` : ''].filter(Boolean).join('\n').slice(0, 2000)
+  const entries: PendingProfileMemory['entries'] = []
+  if (summary) entries.push({ chunkType: 'session_summary', content: summary, topic: session.topic || undefined, metadata: { mode: session.mode } })
+  if (insight) entries.push({ chunkType: 'insight', content: insight, topic: session.topic || undefined, metadata: { mode: session.mode } })
+  for (const item of weak) entries.push({ chunkType: 'weak_point', content: text(item.point), topic: text(item.topic) || session.topic || undefined, metadata: { source: text(item.source) || 'observed' } })
+  return { createdAt, entries }
+}
+
+function trimExtractions(profile: CandidateProfile): void {
+  const extractions = object(profile.session_extractions)
+  const completed = Object.keys(extractions).filter(key => !profile._pending_memory?.[key])
+  for (const stale of completed.slice(0, -100)) delete extractions[stale]
+}
 
 function normalized(value: string): string { return value.toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '') }
 
@@ -314,10 +332,38 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     try { await this.deps.vectors.appendProfileMemories({ userId, entries: stored }) } catch { /* profile.json remains the source of truth */ }
   }
 
+  private async projectSessionMemory(userId: string, sessionId: string, pending: PendingProfileMemory | undefined): Promise<void> {
+    if (!pending) return
+    // Unlike optional semantic matching, this write must succeed as a whole or remain retryable.
+    const vectors = pending.entries.length ? await this.deps.embeddings.embed(this.context(userId, 'memory-write'), pending.entries.map(entry => entry.content)) : []
+    const dimension = vectors[0]?.length || 0
+    if (vectors.length !== pending.entries.length || vectors.some(vector => !dimension || vector.length !== dimension || !vector.every(Number.isFinite))) {
+      throw new Error('Invalid memory embeddings')
+    }
+    await this.deps.vectors.replaceSessionMemories({
+      userId, sessionId,
+      entries: pending.entries.map((entry, index) => ({ ...entry, sessionId, embedding: vectors[index]!, createdAt: pending.createdAt })),
+    })
+    // A crash before this acknowledgement is safe: the next attempt replaces the same session.
+    await this.deps.repository.update(userId, profile => {
+      delete profile._pending_memory?.[sessionId]
+      if (!Object.keys(profile._pending_memory || {}).length) delete profile._pending_memory
+      // Keep a just-recovered session in the recent completed cache, even if it failed long ago.
+      const extractions = object(profile.session_extractions)
+      if (Object.hasOwn(extractions, sessionId)) {
+        const extraction = extractions[sessionId]
+        delete extractions[sessionId]
+        extractions[sessionId] = extraction
+      }
+      trimExtractions(profile)
+    })
+  }
+
   async get(context: RequestContext): Promise<CandidateProfile> {
     const userId = id(context)
     const profile = await this.profile(userId)
-    return { ...profile, due_reviews: (await this.dueReviews(context)).map((point) => ({ point: point.point, topic: point.topic, next_review: object(point.sr).next_review })) }
+    const { _pending_memory: _, ...publicProfile } = profile
+    return { ...publicProfile, due_reviews: (await this.dueReviews(context)).map((point) => ({ point: point.point, topic: point.topic, next_review: object(point.sr).next_review })) }
   }
 
   async targetRole(userId: string): Promise<string> { return (await this.profile(userId)).target_role || '' }
@@ -476,7 +522,10 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
   async afterReview(input: { userId: string; session: InterviewSession }): Promise<Record<string, unknown>> {
     const before = await this.profile(input.userId)
     const cached = object(object(before.session_extractions)[input.session.session_id])
-    if (Object.keys(cached).length) return cached
+    if (Object.hasOwn(object(before.session_extractions), input.session.session_id)) {
+      await this.projectSessionMemory(input.userId, input.session.session_id, before._pending_memory?.[input.session.session_id])
+      return cached
+    }
     const transcript = input.session.transcript.map((message) => `${message.role === 'user' ? '候选人' : '面试官'}: ${message.content}`).join('\n')
     const context = this.context(input.userId, input.session.session_id)
     let extraction: Record<string, unknown> | undefined
@@ -499,7 +548,10 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     const vectors = await this.vectorsFor(input.userId, embeddingTexts, 'profile-update')
     const overallScore = number(object(input.session.overall).avg_score) ?? number(extraction.avg_score) ?? roundedAverage(input.session.scores.map((score) => number(score.score)).filter((score): score is number => score !== undefined)) ?? 5
 
-    await this.deps.repository.update(input.userId, (profile) => {
+    const applied = await this.deps.repository.update(input.userId, (profile) => {
+      // The initial load happens before LLM/embedding I/O; recheck under the repository lock.
+      const existing = object(object(profile.session_extractions)[input.session.session_id])
+      if (Object.hasOwn(object(profile.session_extractions), input.session.session_id)) return { extraction: existing, pending: profile._pending_memory?.[input.session.session_id], fresh: false }
       prepare(profile)
       const reviewed = new Set<WeakPoint>()
       for (const item of weak) {
@@ -546,19 +598,17 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
       updateStats(profile, input.session, extraction!, now)
       const extractions = object(profile.session_extractions)
       extractions[input.session.session_id] = extraction!
-      for (const stale of Object.keys(extractions).slice(0, -100)) delete extractions[stale]
       profile.session_extractions = extractions
+      const pending = sessionMemory(extraction!, input.session, now)
+      profile._pending_memory ||= {}
+      profile._pending_memory[input.session.session_id] = pending
+      trimExtractions(profile)
       profile.updated_at = now
+      return { extraction: extraction!, pending, fresh: true }
     })
 
-    const summary = text(extraction.session_summary)
-    const insight = [summary, weak.length ? `薄弱点：${weak.map((item) => text(item.point)).join('、')}` : '', strong.length ? `强项：${strong.map((item) => text(item.point)).join('、')}` : ''].filter(Boolean).join('\n').slice(0, 2000)
-    const memories: Array<Omit<ProfileMemoryEntry, 'embedding' | 'createdAt'>> = []
-    if (summary) memories.push({ chunkType: 'session_summary', content: summary, topic: input.session.topic || undefined, sessionId: input.session.session_id, metadata: { mode: input.session.mode } })
-    if (insight) memories.push({ chunkType: 'insight', content: insight, topic: input.session.topic || undefined, sessionId: input.session.session_id, metadata: { mode: input.session.mode } })
-    for (const item of weak) memories.push({ chunkType: 'weak_point', content: text(item.point), topic: text(item.topic) || input.session.topic || undefined, sessionId: input.session.session_id, metadata: { source: text(item.source) || 'observed' } })
-    await this.appendMemories(input.userId, memories, now)
-    await this.consolidate(input.userId, now)
-    return extraction
+    await this.projectSessionMemory(input.userId, input.session.session_id, applied.pending)
+    if (applied.fresh) await this.consolidate(input.userId, now)
+    return applied.extraction
   }
 }

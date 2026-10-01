@@ -26,6 +26,7 @@ export type ProfileMemorySearchResult = Omit<ProfileMemoryEntry, 'embedding' | '
 
 export interface ProfileVectorMemoryPort {
   appendProfileMemories(input: { userId: string; entries: readonly ProfileMemoryEntry[] }): Promise<void>
+  replaceSessionMemories(input: { userId: string; sessionId: string; entries: readonly ProfileMemoryEntry[] }): Promise<void>
   listProfileMemories(input: { userId: string; chunkTypes?: readonly ProfileMemoryEntry['chunkType'][]; topic?: string }): Promise<ProfileMemoryEntry[]>
 }
 
