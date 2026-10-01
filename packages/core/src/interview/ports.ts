@@ -1,3 +1,4 @@
+import type { InterviewStreamEvent } from './results.ts'
 import type { IdGenerator } from '../account/ports.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import type { KnowledgeQuery, KnowledgeStore } from '../knowledge/ports.ts'
@@ -76,7 +77,7 @@ export interface InterviewUseCases {
   startJob(context: RequestContext, input: JobPrepInput): Promise<JobPrepStartResult>
   start(context: RequestContext, input: StartInterviewInput): Promise<InterviewStartResult>
   chat(context: RequestContext, sessionId: string, message: string): Promise<{ session_id: string; message: string; is_finished: boolean }>
-  chatStream(context: RequestContext, sessionId: string, message: string): AsyncIterable<{ token?: string; done?: boolean; is_finished?: boolean }>
+  chatStream(context: RequestContext, sessionId: string, message: string): AsyncIterable<InterviewStreamEvent>
   end(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<InterviewReviewSubmissionResult>
   draft(context: RequestContext, sessionId: string, answers: InterviewAnswer[]): Promise<InterviewDraftResult>
   generateReview(context: RequestContext, sessionId: string): Promise<InterviewReviewSubmissionResult>

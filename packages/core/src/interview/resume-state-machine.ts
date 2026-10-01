@@ -1,3 +1,4 @@
+import type { InterviewStreamEvent } from './results.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import type { TextGenerationUseCases } from '../provider/ports.ts'
 import type { CandidateProfilePort, ResumeInterviewStateRepository } from './ports.ts'
@@ -102,7 +103,7 @@ export class ResumeInterviewEngine {
     return { message: clean, isFinished: state.is_finished }
   }
 
-  async *stream(context: RequestContext, sessionId: string, state: ResumeInterviewState, message: string): AsyncIterable<{ token?: string; done?: boolean; is_finished?: boolean }> {
+  async *stream(context: RequestContext, sessionId: string, state: ResumeInterviewState, message: string): AsyncIterable<InterviewStreamEvent> {
     if (!this.applyAnswer(state, message)) {
       await this.states.save(sessionId, context.userId!, state)
       yield { done: true, is_finished: true }

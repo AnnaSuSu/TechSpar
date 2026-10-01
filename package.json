@@ -18,7 +18,7 @@
     "typecheck:node": "tsc -p tsconfig.node-compat.json --noEmit",
     "check:boundaries": "bun scripts/check-boundaries.ts",
     "test": "bun test apps packages tests-ts",
-    "test:contracts": "bun test tests-ts/contracts",
+    "test:contracts": "bun test tests-ts/contracts apps/api/src/copilot-websocket.test.ts",
     "build:api": "bun build apps/api/src/entry.bun.ts --target=bun --outdir=dist/api",
     "build:web": "bun run --cwd frontend build",
     "build:desktop:main": "bun run --cwd apps/desktop build",

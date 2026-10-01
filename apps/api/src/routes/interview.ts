@@ -1,7 +1,8 @@
 import { InterviewChatResponseSchema, InterviewDraftResponseSchema, InterviewHistoryResponseSchema, InterviewResumeResponseSchema, InterviewReviewSubmissionResponseSchema, InterviewSessionResponseSchema, InterviewStartResponseSchema, JobPrepPreviewResponseSchema, JobPrepStartResponseSchema, TaskStatusResponseSchema } from '@techspar/contracts'
 import { validateResponse } from '../http/response.ts'
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi'
-import { streamSSE } from 'hono/streaming'
+import { validatedSse } from '../http/events.ts'
+import { InterviewStreamEventSchema } from '@techspar/contracts/events'
 import { z } from 'zod'
 import {
   EndInterviewSchema,
@@ -39,17 +40,16 @@ export function registerInterviewRoutes(app: OpenAPIHono, deps: { interview: Int
   app.openapi(createRoute({
     method: 'post', path: '/api/interview/chat/stream',
     request: { body: { content: { 'application/json': { schema: InterviewChatSchema } } } },
-    responses: { 200: { content: { 'text/event-stream': { schema: z.string() } }, description: 'Interview response stream' } },
+    responses: { 200: { content: { 'text/event-stream': { schema: z.string(), 'x-event-schema': { $ref: '#/components/schemas/InterviewStreamEvent' } } }, description: 'JSON data frames: token, done/is_finished, or error. See InterviewStreamEvent.' } },
   }), async (c) => {
     const parsed = InterviewChatSchema.safeParse(await c.req.json())
     if (!parsed.success) return c.json({ detail: parsed.error.message }, 422)
     const context = await authenticatedContext(c, deps.tokens)
-    return streamSSE(c, async (stream) => {
-      try {
-        for await (const event of deps.interview.chatStream(context, parsed.data.session_id, parsed.data.message)) await stream.writeSSE({ data: JSON.stringify(event) })
-      } catch (error) {
-        await stream.writeSSE({ data: JSON.stringify({ error: error instanceof Error ? error.message : String(error) }) })
-      }
+    return validatedSse(c, {
+      context, operation: 'POST /api/interview/chat/stream', schema: InterviewStreamEventSchema,
+      events: (streamContext) => deps.interview.chatStream(streamContext, parsed.data.session_id, parsed.data.message),
+      terminal: (event) => 'done' in event || 'error' in event,
+      failure: (message) => ({ error: message }),
     })
   })
 

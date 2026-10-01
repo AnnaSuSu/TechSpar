@@ -1,0 +1,2 @@
+# The final blank line is part of the SSE frame delimiter.
+tests-ts/contracts/fixtures/sse/*.txt whitespace=-blank-at-eof

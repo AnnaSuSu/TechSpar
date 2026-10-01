@@ -10,6 +10,7 @@
     "checkJs": false,
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
     "useDefineForClassFields": true,

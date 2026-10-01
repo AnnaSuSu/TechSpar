@@ -1,1 +1,15 @@
-[{"type":"started","session_id":"session-1"},{"type":"asr_interim","text":"请介绍"},{"type":"asr_final","text":"请介绍一下项目"},{"type":"progress","progress":0.5,"message":"分析中"},{"type":"error","message":"连接已关闭"}]
+[
+  { "type": "started", "session_id": "live-1" },
+  { "type": "progress", "message": "正在预计算策略树 embedding..." },
+  { "type": "asr_interim", "text": "请介绍" },
+  { "type": "asr_final", "text": "请介绍一下项目", "role": "hr" },
+  { "type": "copilot_update", "intent": "technical", "tree_position": "tech", "topic": "TypeScript", "confidence": 1, "recommended_points": ["调用栈"], "children": [{ "topic": "任务队列", "question": "解释微任务" }], "prep_hint": { "safe_talking_points": ["项目"], "redirect_suggestion": "先讲项目" } },
+  { "type": "risk_alert", "message": "先讲项目", "node_id": "tech" },
+  { "type": "answer_meta", "first_token_ms": 0 },
+  { "type": "answer_chunk", "text": "先讲结论" },
+  { "type": "answer_done", "total_ms": 0, "chunk_count": 2 },
+  { "type": "hr_profile_update", "style": "追问细节", "focus": "项目", "satisfaction_signals": "继续追问", "advice": "给出证据" },
+  { "type": "monitor_update", "phase": "technical", "last_answer_feedback": "有实例", "covered_topics": ["项目"], "uncovered_topics": ["并发"], "strategy_tip": "保持结构化" },
+  { "type": "error", "message": "ASR: 合成识别错误" },
+  { "type": "stopped" }
+]

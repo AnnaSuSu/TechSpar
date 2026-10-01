@@ -1,10 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
-export interface CopilotMessage {
-  type: string;
-  text?: string;
-  [key: string]: unknown;
-}
+import { decodeCopilotEvent, type CopilotServerEvent } from '../api/events';
+
+export type CopilotMessage = CopilotServerEvent;
 
 interface CopilotStreamOptions {
   prepId?: string;
@@ -77,35 +75,16 @@ export default function useCopilotStream({
       };
 
       ws.onmessage = (e) => {
-        try {
-          const msg = JSON.parse(e.data) as CopilotMessage;
-          console.log("[Copilot WS]", msg.type, msg);
-          switch (msg.type) {
-            case "asr_interim":
-              setAsrText(msg.text || "");
-              break;
-            case "asr_final":
-              setAsrText("");
-              setLastFinal(msg.text || "");
-              if (onUpdateRef.current) onUpdateRef.current(msg);
-              break;
-            case "copilot_update":
-            case "risk_alert":
-            case "answer_chunk":
-            case "answer_meta":
-            case "answer_done":
-            case "hr_profile_update":
-            case "monitor_update":
-            case "progress":
-            case "started":
-            case "stopped":
-            case "error":
-              if (onUpdateRef.current) onUpdateRef.current(msg);
-              break;
-          }
-        } catch {
-          /* ignore parse errors */
+        if (wsRef.current !== ws || manualClose.current) return;
+        let msg: CopilotServerEvent;
+        try { msg = decodeCopilotEvent(e.data); }
+        catch {
+          onUpdateRef.current?.({ type: 'error', message: 'Invalid Copilot event' });
+          return;
         }
+        if (msg.type === 'asr_interim') { setAsrText(msg.text); return; }
+        if (msg.type === 'asr_final') { setAsrText(''); setLastFinal(msg.text); }
+        onUpdateRef.current?.(msg);
       };
 
       ws.onclose = () => {

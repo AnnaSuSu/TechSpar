@@ -1,3 +1,5 @@
+import { z } from 'zod'
+import { CopilotServerEventSchema, InterviewStreamEventSchema, IndexRebuildEventSchema } from '@techspar/contracts/events'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { SERVICE_VERSION } from '../version.ts'
 
@@ -52,6 +54,11 @@ export function completeOpenApiDocument(document: OpenApiDocument): OpenApiDocum
   const components = document.components ||= {}
   const schemas = components.schemas ||= {}
   const securitySchemes = components.securitySchemes ||= {}
+  // Native JSON Schema conversion also works when browser contracts were
+  // instantiated before Hono installed its Zod extensions. No registry mutation.
+  for (const [name, schema] of Object.entries({ CopilotServerEvent: CopilotServerEventSchema, InterviewStreamEvent: InterviewStreamEventSchema, IndexRebuildEvent: IndexRebuildEventSchema })) {
+    schemas[name] = z.toJSONSchema(schema, { target: 'draft-2020-12' })
+  }
   schemas.ValidationError = VALIDATION_ERROR_SCHEMA
   schemas.HTTPValidationError = HTTP_VALIDATION_ERROR_SCHEMA
   securitySchemes.HTTPBearer = { type: 'http', scheme: 'bearer' }

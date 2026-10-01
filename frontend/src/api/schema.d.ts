@@ -755,7 +755,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Index rebuild progress stream */
+                /** @description JSON data frames: step progress/error, done, or fatal. See IndexRebuildEvent. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1842,7 +1842,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Interview response stream */
+                /** @description JSON data frames: token, done/is_finished, or error. See InterviewStreamEvent. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -4195,6 +4195,127 @@ export interface components {
             created_at: string;
             updated_at: string;
         }[];
+        CopilotServerEvent: {
+            /** @constant */
+            type: "started";
+            session_id: string;
+        } | {
+            /** @constant */
+            type: "stopped";
+        } | {
+            /** @constant */
+            type: "progress";
+            message: string;
+        } | {
+            /** @constant */
+            type: "error";
+            message: string;
+        } | {
+            /** @constant */
+            type: "asr_interim";
+            text: string;
+        } | {
+            /** @constant */
+            type: "asr_final";
+            text: string;
+            /** @enum {string} */
+            role?: "hr" | "candidate";
+        } | {
+            /** @constant */
+            type: "copilot_update";
+            intent: string;
+            tree_position: string | null;
+            topic: string;
+            confidence: number;
+            recommended_points: string[];
+            children: {
+                topic: string;
+                question: string;
+            }[];
+            prep_hint: {
+                safe_talking_points: string[];
+                redirect_suggestion: string;
+            } | null;
+        } | {
+            /** @constant */
+            type: "risk_alert";
+            message: string;
+            node_id: string | null;
+        } | {
+            /** @constant */
+            type: "answer_chunk";
+            text: string;
+        } | {
+            /** @constant */
+            type: "answer_meta";
+            first_token_ms: number;
+        } | {
+            /** @constant */
+            type: "answer_done";
+            total_ms: number;
+            chunk_count: number;
+        } | ({
+            /** @constant */
+            type: "hr_profile_update";
+            style?: string;
+            focus?: string;
+            satisfaction_signals?: string;
+            advice?: string;
+        } & {
+            [key: string]: unknown;
+        }) | ({
+            /** @constant */
+            type: "monitor_update";
+            phase?: string;
+            last_answer_feedback?: string;
+            covered_topics?: string[];
+            uncovered_topics?: string[];
+            strategy_tip?: string;
+        } & {
+            [key: string]: unknown;
+        });
+        InterviewStreamEvent: {
+            token: string;
+        } | {
+            /** @constant */
+            done: true;
+            is_finished: boolean;
+        } | {
+            error: string;
+        };
+        IndexRebuildEvent: ({
+            completed: number;
+            total: number;
+            label: string;
+            /** @constant */
+            status: "running";
+        } | {
+            completed: number;
+            total: number;
+            label: string;
+            /** @constant */
+            status: "done";
+        } | {
+            completed: number;
+            total: number;
+            label: string;
+            /** @constant */
+            status: "error";
+            error: string;
+        }) | {
+            /** @constant */
+            done: true;
+            rebuilt: {
+                weak_points: boolean;
+                personal_documents: boolean;
+                topics: string[];
+            };
+            last_rebuild_at: string;
+        } | {
+            /** @constant */
+            fatal: true;
+            error: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */

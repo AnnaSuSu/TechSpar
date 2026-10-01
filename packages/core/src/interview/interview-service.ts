@@ -1,3 +1,4 @@
+import type { InterviewStreamEvent } from './results.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import { AppError, AuthenticationError, ProviderResponseError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
@@ -321,15 +322,21 @@ export class InterviewService implements InterviewUseCases {
     return { session_id: sessionId, message: reply.message, is_finished: reply.isFinished }
   }
 
-  async *chatStream(context: RequestContext, sessionId: string, message: string): AsyncIterable<{ token?: string; done?: boolean; is_finished?: boolean }> {
+  async *chatStream(context: RequestContext, sessionId: string, message: string): AsyncIterable<InterviewStreamEvent> {
     const id = userId(context)
     const state = await this.deps.states.load(sessionId, id)
     if (!state) throw new AppError('Session not found or no recoverable state.', 404)
     if (state.is_finished) { yield { done: true, is_finished: true }; return }
     await this.deps.sessions.appendMessage(sessionId, id, 'user', message)
     let full = ''
-    for await (const event of this.resumeEngine.stream(context, sessionId, state, message)) { if (event.token) full += event.token; yield event }
+    let completion: Extract<InterviewStreamEvent, { done: true }> | undefined
+    for await (const event of this.resumeEngine.stream(context, sessionId, state, message)) {
+      if ('token' in event) { full += event.token; yield event }
+      else completion = event
+    }
+    // Completion is observable only after both state and transcript are durable.
     if (full) await this.deps.sessions.appendMessage(sessionId, id, 'assistant', full)
+    if (completion) yield completion
   }
 
   private taskType(mode: InterviewMode): string {

@@ -1,5 +1,6 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi'
-import { streamSSE } from 'hono/streaming'
+import { validatedSse } from '../http/events.ts'
+import { IndexRebuildEventSchema } from '@techspar/contracts/events'
 import { z } from 'zod'
 import { EmbeddingSettingsSchema, LlmSettingsSchema, QuotaStatusSchema, SettingsProbeResponseSchema, SettingsUpdateResponseSchema, SettingsViewSchema } from '@techspar/contracts'
 import type { QuotaUseCases, SettingsOperationsUseCases, SettingsUseCases, TokenService } from '@techspar/core'
@@ -67,13 +68,14 @@ export function registerSettingsRoutes(
 
     app.openapi(createRoute({
       method: 'post', path: '/api/settings/rebuild-index',
-      responses: { 200: { content: { 'text/event-stream': { schema: z.string() } }, description: 'Index rebuild progress stream' } },
+      responses: { 200: { content: { 'text/event-stream': { schema: z.string(), 'x-event-schema': { $ref: '#/components/schemas/IndexRebuildEvent' } } }, description: 'JSON data frames: step progress/error, done, or fatal. See IndexRebuildEvent.' } },
     }), async (c) => {
       const context = await authenticatedContext(c, deps.tokens)
-      return streamSSE(c, async (stream) => {
-        for await (const event of deps.settingsOperations!.rebuildIndex(context)) {
-          await stream.writeSSE({ data: JSON.stringify(event) })
-        }
+      return validatedSse(c, {
+        context, operation: 'POST /api/settings/rebuild-index', schema: IndexRebuildEventSchema,
+        events: (streamContext) => deps.settingsOperations!.rebuildIndex(streamContext),
+        terminal: (event) => 'done' in event || 'fatal' in event,
+        failure: (message) => ({ fatal: true as const, error: message }),
       })
     })
   }

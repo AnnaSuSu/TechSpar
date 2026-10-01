@@ -210,21 +210,7 @@ export const CopilotClientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('stop') }),
 ])
 
-export const CopilotServerEventTypeSchema = z.enum([
-  'asr_interim',
-  'asr_final',
-  'copilot_update',
-  'risk_alert',
-  'answer_chunk',
-  'answer_meta',
-  'answer_done',
-  'hr_profile_update',
-  'monitor_update',
-  'progress',
-  'started',
-  'stopped',
-  'error',
-])
+export * from './events.ts'
 
 export type LoginRequest = z.infer<typeof LoginRequestSchema>
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>

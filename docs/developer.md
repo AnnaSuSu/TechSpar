@@ -98,3 +98,5 @@ bun run pack:desktop
 ## 反馈方式
 
 欢迎提交 Issue 和 PR。问题报告请包含运行方式、平台、复现步骤、期望/实际结果和已脱敏日志。
+
+第三阶段的 WS / SSE 事件、兼容范围、关闭语义和验证方式见 [实时事件契约](response-contracts-phase-three.md)。修改事件后应同步服务端发送校验、前端解码、fixture、真实传输测试及生成文件。

@@ -63,6 +63,7 @@
         "@radix-ui/react-tabs": "^1.1.13",
         "@radix-ui/react-tooltip": "^1.2.8",
         "@tailwindcss/vite": "^4.2.2",
+        "@techspar/contracts": "workspace:*",
         "@tiptap/core": "^3.29.2",
         "@tiptap/extension-color": "^3.29.2",
         "@tiptap/extension-highlight": "^3.29.2",

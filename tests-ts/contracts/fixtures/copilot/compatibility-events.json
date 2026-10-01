@@ -1,0 +1,9 @@
+[
+  { "type": "asr_final", "text": "旧版无角色字幕" },
+  { "type": "copilot_update", "intent": "unknown", "tree_position": null, "topic": "", "confidence": -1, "recommended_points": [], "children": [], "prep_hint": null },
+  { "type": "risk_alert", "message": "", "node_id": null },
+  { "type": "answer_chunk", "text": "" },
+  { "type": "answer_done", "total_ms": 0, "chunk_count": 0 },
+  { "type": "hr_profile_update", "style": "", "extension": { "synthetic": true } },
+  { "type": "monitor_update", "phase": "custom_phase", "covered_topics": [], "extension": [1, null] }
+]

@@ -21,9 +21,15 @@ class RealtimeConnection implements CopilotRealtimeConnection {
   private navigator?: StrategyNavigator
   private asr?: RealtimeAsrSession
   private stopped = false
+  private closed = false
   private chain = Promise.resolve()
 
-  constructor(private readonly deps: CopilotDependencies, private readonly context: RequestContext, private readonly sessionId: string, private readonly emit: (event: CopilotServerEvent) => Promise<void>) {}
+  constructor(private readonly deps: CopilotDependencies, private readonly context: RequestContext, private readonly sessionId: string, private readonly sink: (event: CopilotServerEvent) => Promise<void>) {}
+
+  private emit(event: CopilotServerEvent): Promise<void> {
+    if (this.closed || this.context.signal.aborted) return Promise.resolve()
+    return this.sink(event)
+  }
 
   handle(message: CopilotClientMessage): Promise<void> {
     const next = this.chain.then(() => this.route(message))
@@ -32,6 +38,7 @@ class RealtimeConnection implements CopilotRealtimeConnection {
   }
 
   private async route(message: CopilotClientMessage): Promise<void> {
+    if (this.closed || this.context.signal.aborted) return
     if (message.type === 'start') { try { await this.start(message.prep_id || '') } catch (error) { await this.emit({ type: 'error', message: `初始化失败: ${error instanceof Error ? error.message : String(error)}` }) }; return }
     if (message.type === 'stop') { await this.stop(); return }
     if (!this.state || this.stopped) return
@@ -50,6 +57,7 @@ class RealtimeConnection implements CopilotRealtimeConnection {
     this.navigator = new StrategyNavigator(object(this.prep.question_strategy_tree))
     await this.emit({ type: 'progress', message: '正在预计算策略树 embedding...' })
     await this.navigator.prepare(this.context, this.deps.embeddings)
+    if (this.closed || this.context.signal.aborted) return
     const stored = await this.deps.repository.loadSession(this.sessionId, this.userId())
     const now = new Date().toISOString()
     this.state = stored?.prep_id === prepId ? { ...stored, status: 'active', updated_at: now } : { session_id: this.sessionId, user_id: this.userId(), prep_id: prepId, conversation: [], last_node_id: null, turn_count: 0, status: 'active', created_at: now, updated_at: now }
@@ -57,13 +65,19 @@ class RealtimeConnection implements CopilotRealtimeConnection {
     this.stopped = false
     const key = (await this.deps.settings.loadProvider(this.userId())).services.dashscope_api_key
     const roleDetector = await this.deps.voiceprint?.detector(this.context)
+    if (this.closed || this.context.signal.aborted) return
     if (key) {
       try {
         this.asr = this.deps.asr.create({
           apiKey: key,
           ...(roleDetector ? { roleDetector } : {}),
           onInterim: (text) => this.emit({ type: 'asr_interim', text }),
-          onFinal: async (text, detectedRole) => { const role = detectedRole || 'hr'; await this.emit({ type: 'asr_final', text, role }); await this.handle(role === 'candidate' ? { type: 'candidate_response', text } : { type: 'manual', text }) },
+          onFinal: async (text, detectedRole) => {
+            const role = detectedRole || 'hr'
+            await this.emit({ type: 'asr_final', text, role })
+            try { await this.handle(role === 'candidate' ? { type: 'candidate_response', text } : { type: 'manual', text }) }
+            catch (error) { await this.emit({ type: 'error', message: error instanceof Error ? error.message : String(error) }) }
+          },
           onError: (message) => this.emit({ type: 'error', message: `ASR: ${message}` }),
         })
         await this.asr.start()
@@ -115,18 +129,24 @@ class RealtimeConnection implements CopilotRealtimeConnection {
 
   private async hrProfile(turns: CopilotConversationTurn[]): Promise<void> {
     if (turns.length < 3 || this.stopped) return
-    try { const result = parseObject(await this.deps.ai.complete(this.context, [{ role: 'system', content: '只输出 JSON' }, { role: 'user', content: fill(COPILOT_HR_PROFILE_PROMPT, { conversation: conversationText(turns) }) }], STRUCTURED_CHAT_OPTIONS)); if (result && !this.stopped) await this.emit({ type: 'hr_profile_update', ...result }) } catch { /* background analysis is best effort */ }
+    try { const result = parseObject(await this.deps.ai.complete(this.context, [{ role: 'system', content: '只输出 JSON' }, { role: 'user', content: fill(COPILOT_HR_PROFILE_PROMPT, { conversation: conversationText(turns) }) }], STRUCTURED_CHAT_OPTIONS)); if (result && !this.stopped) await this.emit({ ...result, type: 'hr_profile_update' }) } catch { /* background analysis is best effort */ }
   }
 
   private async monitor(turns: CopilotConversationTurn[]): Promise<void> {
     if (!turns.length || this.stopped) return
     const fit = object(this.prep.fit_report); const jd = object(this.prep.jd_analysis); const profile = object(this.prep.profile)
     const skills = items(jd.required_skills).slice(0, 10).map((item) => String(item.skill || JSON.stringify(item))).join('; ') || '无'
-    try { const result = parseObject(await this.deps.ai.complete(this.context, [{ role: 'system', content: '只输出 JSON' }, { role: 'user', content: fill(COPILOT_MONITOR_PROMPT, { conversation: conversationText(turns), required_skills: skills, highlights: summaryPoints(fit.highlights, 5), weak_points: summaryPoints(profile.weak_points, 5) }) }], STRUCTURED_CHAT_OPTIONS)); if (result && !this.stopped) await this.emit({ type: 'monitor_update', ...result }) } catch { /* background analysis is best effort */ }
+    try { const result = parseObject(await this.deps.ai.complete(this.context, [{ role: 'system', content: '只输出 JSON' }, { role: 'user', content: fill(COPILOT_MONITOR_PROMPT, { conversation: conversationText(turns), required_skills: skills, highlights: summaryPoints(fit.highlights, 5), weak_points: summaryPoints(profile.weak_points, 5) }) }], STRUCTURED_CHAT_OPTIONS)); if (result && !this.stopped) await this.emit({ ...result, type: 'monitor_update' }) } catch { /* background analysis is best effort */ }
   }
 
   private async stop(): Promise<void> { this.stopped = true; await this.asr?.stop(); this.asr = undefined; if (this.state) { this.state.status = 'stopped'; await this.persist() }; await this.emit({ type: 'stopped' }) }
-  async close(): Promise<void> { this.stopped = true; await this.asr?.stop(); this.asr = undefined; await this.chain.catch(() => {}) }
+  async close(): Promise<void> {
+    this.closed = true; this.stopped = true
+    await this.chain.catch(() => {})
+    // Startup can still be acquiring ASR when close arrives. Stop it after the
+    // queued command settles, rather than losing a late-created session.
+    await this.asr?.stop(); this.asr = undefined
+  }
 }
 
 export class CopilotRealtimeService implements CopilotRealtimeUseCases {

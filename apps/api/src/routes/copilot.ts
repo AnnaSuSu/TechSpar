@@ -3,6 +3,7 @@ import type { UpgradeWebSocket, WSContext, WSMessageReceive } from 'hono/ws'
 import { z } from 'zod'
 import { CopilotClientMessageSchema, CopilotPrepCreateSchema, CopilotPrepCreatedSchema, CopilotPrepListSchema, CopilotPrepObjectSchema, OkSchema } from '@techspar/contracts'
 import type { CopilotPrepUseCases, CopilotRealtimeConnection, CopilotRealtimeUseCases, RequestContext, TokenService } from '@techspar/core'
+import { copilotSender } from '../http/events.ts'
 import { authenticatedContext } from '../http/context.ts'
 
 const PrepPath = z.object({ prep_id: z.string() })
@@ -32,21 +33,42 @@ export function registerCopilotWebSocket(app: OpenAPIHono, deps: { realtime: Cop
     let socket: WSContext | undefined
     let connection: CopilotRealtimeConnection | undefined
     const controller = new AbortController()
+    const requestId = c.get('requestId') as string
+    let cleanupPromise: Promise<void> | undefined
+    const cleanup = () => {
+      controller.abort()
+      return cleanupPromise ||= Promise.resolve().then(() => connection?.close()).catch(() => {
+        console.error({ operation: 'WS /ws/copilot/{session_id}', requestId, code: 'cleanup_failed' })
+      })
+    }
+    const emit = copilotSender({
+      requestId,
+      closed: () => controller.signal.aborted || !socket || socket.readyState !== 1,
+      send: (data) => socket?.send(data),
+      fail: () => {
+        // Never await connection.close() from inside emit: close waits for the
+        // current handle chain, which may itself be awaiting this callback.
+        void cleanup()
+        socket?.close(1011, 'Internal Server Error')
+      },
+    })
     if (userId) {
-      const context: RequestContext = { requestId: crypto.randomUUID(), userId, signal: controller.signal }
-      connection = deps.realtime.connect(context, c.req.param('session_id') || '', async (event) => { socket?.send(JSON.stringify(event)) })
+      const context: RequestContext = { requestId, userId, signal: controller.signal }
+      connection = deps.realtime.connect(context, c.req.param('session_id') || '', emit)
     }
     return {
       onOpen(_event, ws) { socket = ws; if (!userId) ws.close(1008, 'Authentication required') },
-      async onMessage(event, ws) {
-        if (!connection) return
-        if (typeof event.data !== 'string') { const value = bytes(event.data); if (value) connection.audio(value); return }
-        const parsed = CopilotClientMessageSchema.safeParse((() => { try { return JSON.parse(event.data) } catch { return undefined } })())
-        if (!parsed.success) { ws.send(JSON.stringify({ type: 'error', message: 'Invalid message' })); return }
-        try { await connection.handle(parsed.data) } catch (error) { ws.send(JSON.stringify({ type: 'error', message: error instanceof Error ? error.message : String(error) })) }
+      async onMessage(event) {
+        if (!connection || controller.signal.aborted) return
+        try {
+          if (typeof event.data !== 'string') { const value = bytes(event.data); if (value) connection.audio(value); return }
+          const parsed = CopilotClientMessageSchema.safeParse((() => { try { return JSON.parse(event.data) } catch { return undefined } })())
+          if (!parsed.success) { await emit({ type: 'error', message: 'Invalid message' }); return }
+          await connection.handle(parsed.data)
+        } catch (error) { await emit({ type: 'error', message: error instanceof Error ? error.message : String(error) }) }
       },
-      async onClose() { controller.abort(); await connection?.close() },
-      async onError() { controller.abort(); await connection?.close() },
+      async onClose() { await cleanup() },
+      async onError() { await cleanup() },
     }
   }))
 }

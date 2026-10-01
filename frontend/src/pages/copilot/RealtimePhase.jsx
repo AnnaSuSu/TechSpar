@@ -91,6 +91,8 @@ export default function RealtimePhase({ prepId, onBack }) {
         }
         break;
       case "error":
+        setAnswerLoading(false);
+        setAnswerStreaming(false);
         setProgressMsg(`Error: ${msg.message}`);
         break;
     }
