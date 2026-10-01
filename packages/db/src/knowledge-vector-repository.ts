@@ -102,24 +102,34 @@ export class BunKnowledgeVectorRepository implements KnowledgeVectorRepository, 
     return rows.map((row) => ({ content: row.content, embedding: fromBlob(row.embedding) }))
   }
 
-  async appendProfileMemories(input: { userId: string; entries: readonly ProfileMemoryEntry[] }): Promise<void> {
+  private insertProfileMemories(input: { userId: string; entries: readonly ProfileMemoryEntry[] }): void {
     const statement = this.sqlite.query(`
       INSERT INTO memory_vectors (chunk_type, content, topic, session_id, metadata, embedding, user_id, created_at)
       VALUES ($chunkType, $content, $topic, $sessionId, $metadata, $embedding, $userId, $createdAt)
     `)
-    const transaction = this.sqlite.transaction(() => {
-      for (const entry of input.entries) statement.run({
-        $chunkType: entry.chunkType,
-        $content: entry.content,
-        $topic: entry.topic ?? null,
-        $sessionId: entry.sessionId ?? null,
-        $metadata: JSON.stringify(entry.metadata || {}),
-        $embedding: toBlob(entry.embedding),
-        $userId: input.userId,
-        $createdAt: entry.createdAt,
-      })
+    for (const entry of input.entries) statement.run({
+      $chunkType: entry.chunkType,
+      $content: entry.content,
+      $topic: entry.topic ?? null,
+      $sessionId: entry.sessionId ?? null,
+      $metadata: JSON.stringify(entry.metadata || {}),
+      $embedding: toBlob(entry.embedding),
+      $userId: input.userId,
+      $createdAt: entry.createdAt,
     })
-    transaction()
+  }
+
+  async appendProfileMemories(input: { userId: string; entries: readonly ProfileMemoryEntry[] }): Promise<void> {
+    this.sqlite.transaction(() => this.insertProfileMemories(input))()
+  }
+
+  async replaceSessionMemories(input: { userId: string; sessionId: string; entries: readonly ProfileMemoryEntry[] }): Promise<void> {
+    if (!input.sessionId || input.entries.some(entry => entry.sessionId !== input.sessionId)) throw new Error('Invalid memory session')
+    this.sqlite.transaction(() => {
+      this.sqlite.query("DELETE FROM memory_vectors WHERE user_id = $userId AND session_id = $sessionId AND chunk_type IN ('session_summary', 'insight', 'weak_point')")
+        .run({ $userId: input.userId, $sessionId: input.sessionId })
+      this.insertProfileMemories(input)
+    })()
   }
 
   async listProfileMemories(input: { userId: string; chunkTypes?: readonly ProfileMemoryEntry['chunkType'][]; topic?: string }): Promise<ProfileMemoryEntry[]> {

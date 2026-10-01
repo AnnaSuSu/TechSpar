@@ -476,7 +476,7 @@ function HistoryRow({ session, onOpen, onDelete, onRetry, retrying }) {
 
             {status !== "review_failed" && extractFailed && (
               <div className="mt-2 text-[12px] leading-5 text-orange/90">
-                这场的画像提取失败，观察未收录进个人画像——点右侧"重新生成"可补跑。
+                复盘已保存，但画像或记忆同步未完成——点右侧“重试同步”可补跑未完成步骤。
               </div>
             )}
           </div>
@@ -486,12 +486,12 @@ function HistoryRow({ session, onOpen, onDelete, onRetry, retrying }) {
               <button
                 type="button"
                 className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
-                title="重新生成复盘"
+                title={extractFailed ? "重试画像与记忆同步" : "重新生成复盘"}
                 onClick={(event) => onRetry(event, session)}
                 disabled={retrying}
               >
                 <RotateCw size={13} className={retrying ? "animate-spin" : ""} />
-                {retrying ? "重试中" : "重新生成"}
+                {retrying ? "重试中" : extractFailed ? "重试同步" : "重新生成"}
               </button>
             )}
             <button

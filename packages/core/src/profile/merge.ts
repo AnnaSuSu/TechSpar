@@ -70,8 +70,22 @@ function mergeTopicMastery(local: CandidateProfile['topic_mastery'], archive: Ca
 
 export function mergeProfiles(local: CandidateProfile, archive: CandidateProfile): CandidateProfile {
   const output = clone(local) as CandidateProfile
-  const special = new Set(['weak_points', 'strong_points', 'behavior_signals', 'topic_mastery', 'stats', 'view_marker', 'updated_at', 'last_consolidation_at'])
+  const special = new Set(['weak_points', 'strong_points', 'behavior_signals', 'topic_mastery', 'stats', 'view_marker', 'updated_at', 'last_consolidation_at', '_pending_memory'])
   for (const [key, value] of Object.entries(archive)) if (!special.has(key)) output[key] = mergeGeneric(output[key], value)
+  // A pending snapshot and its extraction must travel together, never merge their entry arrays.
+  for (const [sessionId, pending] of Object.entries(archive._pending_memory || {})) {
+    if (Object.hasOwn((local.session_extractions || {}) as object, sessionId) || local._pending_memory?.[sessionId]) continue
+    if (!Object.hasOwn((archive.session_extractions || {}) as object, sessionId)) continue
+    output._pending_memory ||= {}
+    output._pending_memory[sessionId] = clone(pending)
+  }
+  if (local._pending_memory) {
+    const extractions = (output.session_extractions ||= {}) as Record<string, unknown>
+    for (const sessionId of Object.keys(local._pending_memory)) {
+      const original = (local.session_extractions as Record<string, unknown> | undefined)?.[sessionId]
+      if (original !== undefined) extractions[sessionId] = clone(original)
+    }
+  }
   output.weak_points = mergeFacts(local.weak_points, archive.weak_points, true) as CandidateProfile['weak_points']
   output.strong_points = mergeFacts(local.strong_points, archive.strong_points, false) as CandidateProfile['strong_points']
   output.behavior_signals = mergeBehaviorSignals(local.behavior_signals, archive.behavior_signals)

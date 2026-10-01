@@ -1,4 +1,4 @@
-import type { InterviewAnswer, InterviewQuestion, TaskRecord } from '../interview/model.ts'
+import type { InterviewAnswer, InterviewQuestion, InterviewSession, TaskRecord } from '../interview/model.ts'
 import { fill } from '../interview/prompts.ts'
 import { AppError, AuthenticationError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
@@ -57,6 +57,12 @@ export class RecordingService implements RecordingUseCases {
   async runAnalysisTask(task: TaskRecord): Promise<Record<string, unknown>> {
     const session = await this.deps.sessions.get(task.task_id, task.user_id)
     if (!session) throw new Error('Session not found.')
+    if (task.payload.profile_only === true) {
+      if (session.review == null) throw new Error('No saved review to synchronize')
+      await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'reviewed', { clearError: true })
+      await this.updateProfile({ ...session, status: 'reviewed' })
+      return { session_id: session.session_id, status: 'done' }
+    }
     const transcript = String(session.meta.source_transcript || session.transcript[0]?.content || '').trim()
     if (!transcript) throw new Error('Transcript must not be blank.')
     const request: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: new AbortController().signal }
@@ -99,14 +105,19 @@ export class RecordingService implements RecordingUseCases {
       }
       await this.deps.sessions.saveReview({ sessionId: session.session_id, userId: session.user_id, review, scores, weakPoints: Array.isArray(overall.new_weak_points) ? overall.new_weak_points : [], overall })
       const reviewed = await this.deps.sessions.get(session.session_id, session.user_id)
-      if (reviewed && this.deps.profile.afterReview) {
-        try { await this.deps.profile.afterReview({ userId: session.user_id, session: reviewed }); await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: false }) }
-        catch { await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: true }) }
-      }
+      if (reviewed) await this.updateProfile(reviewed)
       return { session_id: session.session_id, status: 'done' }
     } catch (error) {
       await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })
       throw error
     }
+  }
+
+  private async updateProfile(session: InterviewSession): Promise<void> {
+    if (!this.deps.profile.afterReview) return
+    try {
+      await this.deps.profile.afterReview({ userId: session.user_id, session })
+      await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: false })
+    } catch { await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: true }) }
   }
 }

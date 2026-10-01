@@ -16,6 +16,17 @@ export type WeakPoint = {
 export type ProfileViewMarker = { at: string; total_sessions: number; topic_scores: Record<string, number> }
 export type RetrospectiveResult = { topic: string; topic_name: string; retrospective: string; retrospective_at: string; session_count: number }
 
+/** Saved with the profile until its session memories have been written successfully. */
+export type PendingProfileMemory = {
+  createdAt: string
+  entries: Array<{
+    chunkType: 'session_summary' | 'insight' | 'weak_point'
+    content: string
+    topic?: string
+    metadata?: Record<string, unknown>
+  }>
+}
+
 export type CandidateProfile = {
   name: string
   target_role: string
@@ -38,6 +49,8 @@ export type CandidateProfile = {
   }
   view_marker?: Record<string, unknown>
   due_reviews?: Array<Record<string, unknown>>
+  /** Internal retry state; excluded from profile responses and agent context. */
+  _pending_memory?: Record<string, PendingProfileMemory>
   [key: string]: unknown
 }
 
