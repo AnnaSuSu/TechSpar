@@ -1998,6 +1998,554 @@
           "additionalProperties": false
         }
       },
+      "CopilotServerEvent": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "started"
+              },
+              "session_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "session_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "stopped"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "progress"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "error"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "asr_interim"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "asr_final"
+              },
+              "text": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "hr",
+                  "candidate"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "copilot_update"
+              },
+              "intent": {
+                "type": "string"
+              },
+              "tree_position": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "topic": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "recommended_points": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "topic": {
+                      "type": "string"
+                    },
+                    "question": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "topic",
+                    "question"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "prep_hint": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "safe_talking_points": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "redirect_suggestion": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "safe_talking_points",
+                      "redirect_suggestion"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "intent",
+              "tree_position",
+              "topic",
+              "confidence",
+              "recommended_points",
+              "children",
+              "prep_hint"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "risk_alert"
+              },
+              "message": {
+                "type": "string"
+              },
+              "node_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "message",
+              "node_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "answer_chunk"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "answer_meta"
+              },
+              "first_token_ms": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "type",
+              "first_token_ms"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "answer_done"
+              },
+              "total_ms": {
+                "type": "number"
+              },
+              "chunk_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "type",
+              "total_ms",
+              "chunk_count"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "hr_profile_update"
+              },
+              "style": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "satisfaction_signals": {
+                "type": "string"
+              },
+              "advice": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": {}
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "monitor_update"
+              },
+              "phase": {
+                "type": "string"
+              },
+              "last_answer_feedback": {
+                "type": "string"
+              },
+              "covered_topics": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "uncovered_topics": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "strategy_tip": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": {}
+          }
+        ]
+      },
+      "InterviewStreamEvent": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "token"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "done": {
+                "type": "boolean",
+                "const": true
+              },
+              "is_finished": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "done",
+              "is_finished"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "error"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "IndexRebuildEvent": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "completed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "const": "running"
+                  }
+                },
+                "required": [
+                  "completed",
+                  "total",
+                  "label",
+                  "status"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "completed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "const": "done"
+                  }
+                },
+                "required": [
+                  "completed",
+                  "total",
+                  "label",
+                  "status"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "completed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "const": "error"
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "completed",
+                  "total",
+                  "label",
+                  "status",
+                  "error"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "done": {
+                "type": "boolean",
+                "const": true
+              },
+              "rebuilt": {
+                "type": "object",
+                "properties": {
+                  "weak_points": {
+                    "type": "boolean"
+                  },
+                  "personal_documents": {
+                    "type": "boolean"
+                  },
+                  "topics": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "weak_points",
+                  "personal_documents",
+                  "topics"
+                ],
+                "additionalProperties": false
+              },
+              "last_rebuild_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "done",
+              "rebuilt",
+              "last_rebuild_at"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "fatal": {
+                "type": "boolean",
+                "const": true
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "fatal",
+              "error"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
       "ValidationError": {
         "type": "object",
         "title": "ValidationError",
@@ -3079,9 +3627,12 @@
       "post": {
         "responses": {
           "200": {
-            "description": "Index rebuild progress stream",
+            "description": "JSON data frames: step progress/error, done, or fatal. See IndexRebuildEvent.",
             "content": {
               "text/event-stream": {
+                "x-event-schema": {
+                  "$ref": "#/components/schemas/IndexRebuildEvent"
+                },
                 "schema": {
                   "type": "string"
                 }
@@ -4393,9 +4944,12 @@
         },
         "responses": {
           "200": {
-            "description": "Interview response stream",
+            "description": "JSON data frames: token, done/is_finished, or error. See InterviewStreamEvent.",
             "content": {
               "text/event-stream": {
+                "x-event-schema": {
+                  "$ref": "#/components/schemas/InterviewStreamEvent"
+                },
                 "schema": {
                   "type": "string"
                 }

@@ -15,6 +15,7 @@ import {
   type TextGenerationUseCases,
 } from '@techspar/core'
 import { BunCopilotRepository } from '@techspar/db'
+import { within } from './helpers/realtime-asr.ts'
 
 const directories: string[] = []
 async function databasePath(): Promise<string> { const directory = await mkdtemp(join(tmpdir(), 'techspar-copilot-')); directories.push(directory); return join(directory, 'techspar.db') }
@@ -90,5 +91,101 @@ describe('Copilot realtime', () => {
     await resumed.handle({ type: 'candidate_response', text: '我会结合任务队列解释' })
     expect(await repository.loadSession('live-1', 'user-a')).toMatchObject({ turn_count: 1, conversation: [{ role: 'hr' }, { role: 'candidate' }] })
     await resumed.close(); repository.close()
+  })
+
+  test('preserves unmatched negative confidence and null/empty strategy fields', async () => {
+    const repository = new BunCopilotRepository(await databasePath()); repository.initialize()
+    const tasks: PersistentTaskDispatcher = { async enqueue(input) { return queued(input) }, async get() { return undefined } }
+    await repository.createPrep({ prepId: 'empty', userId: 'user-a', company: '', position: '', jdText: 'JD' })
+    await repository.completePrep('empty', 'user-a', { question_strategy_tree: { nodes: {} } })
+    const events: unknown[] = []
+    const connection = new CopilotRealtimeService(dependencies(repository, tasks)).connect(context, 'unmatched', async (event) => { events.push(event) })
+    try {
+      await connection.handle({ type: 'start', prep_id: 'empty' })
+      await connection.handle({ type: 'manual', text: '问题' })
+      expect(events).toContainEqual({ type: 'copilot_update', intent: 'technical', tree_position: null, topic: '', confidence: -1, recommended_points: [], children: [], prep_hint: null })
+      expect(events).toContainEqual({ type: 'progress', message: '未配置 DashScope API Key，请使用手动输入' })
+    } finally { await connection.close(); repository.close() }
+  })
+
+  test('finishes answer metrics when a provider stream fails after a partial answer', async () => {
+    const repository = new BunCopilotRepository(await databasePath()); repository.initialize()
+    const tasks: PersistentTaskDispatcher = { async enqueue(input) { return queued(input) }, async get() { return undefined } }
+    await repository.createPrep({ prepId: 'ready', userId: 'user-a', company: '', position: '', jdText: 'JD' })
+    await repository.completePrep('ready', 'user-a', { question_strategy_tree: { nodes: {} } })
+    const deps = dependencies(repository, tasks)
+    deps.ai.stream = async function* (_context, messages) {
+      if (messages.some((message) => message.content.includes('说一个字'))) return
+      yield '部分回答'
+      throw new Error('合成流错误')
+    }
+    const events: Array<Record<string, unknown>> = []
+    const connection = new CopilotRealtimeService(deps).connect(context, 'partial', async (event) => { events.push(event) })
+    try {
+      await connection.handle({ type: 'start', prep_id: 'ready' })
+      await expect(connection.handle({ type: 'manual', text: '问题' })).rejects.toThrow('合成流错误')
+      const update = events.findIndex((event) => event.type === 'copilot_update')
+      const answer = events.slice(update).filter((event) => ['answer_chunk', 'answer_done'].includes(String(event.type)))
+      expect(answer[0]).toEqual({ type: 'answer_chunk', text: '部分回答' })
+      expect(answer.at(-1)).toMatchObject({ type: 'answer_done', chunk_count: 1 })
+      expect(events).toContainEqual(expect.objectContaining({ type: 'answer_done', chunk_count: 0 }))
+    } finally { await connection.close(); repository.close() }
+  })
+
+  test('stops ASR before waiting for a handshake that only stop can release', async () => {
+    const repository = new BunCopilotRepository(await databasePath()); repository.initialize()
+    const tasks: PersistentTaskDispatcher = { async enqueue(input) { return queued(input) }, async get() { return undefined } }
+    await repository.createPrep({ prepId: 'ready', userId: 'user-a', company: '', position: '', jdText: 'JD' })
+    await repository.completePrep('ready', 'user-a', { question_strategy_tree: { nodes: {} } })
+    const deps = dependencies(repository, tasks)
+    const config = await deps.settings.loadProvider('user-a')
+    deps.settings.loadProvider = async () => ({ ...config, services: { ...config.services!, dashscope_api_key: 'synthetic' } })
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    let stopped = 0
+    deps.asr = { create() { return { async start() { entered.resolve(); await release.promise }, sendAudio() { return true }, async stop() { stopped += 1; release.resolve() } } } }
+    let warmups = 0
+    deps.ai.stream = async function* () { warmups += 1; yield 'must not start after close' }
+    const events: unknown[] = []
+    const connection = new CopilotRealtimeService(deps).connect(context, 'closing', async (event) => { events.push(event) })
+    const started = connection.handle({ type: 'start', prep_id: 'ready' })
+    try {
+      await entered.promise
+      const count = events.length
+      const closed = connection.close()
+      expect(connection.close()).toBe(closed)
+      await within(Promise.all([started, closed]))
+      await connection.handle({ type: 'start', prep_id: 'ready' })
+      expect(events).toHaveLength(count)
+      expect(stopped).toBe(1)
+      expect(warmups).toBe(0)
+    } finally { release.resolve(); await connection.close(); repository.close() }
+  })
+
+  test('does not create ASR when close arrives before startup dependencies finish', async () => {
+    const repository = new BunCopilotRepository(await databasePath()); repository.initialize()
+    const tasks: PersistentTaskDispatcher = { async enqueue(input) { return queued(input) }, async get() { return undefined } }
+    await repository.createPrep({ prepId: 'ready', userId: 'user-a', company: '', position: '', jdText: 'JD' })
+    await repository.completePrep('ready', 'user-a', { question_strategy_tree: { nodes: {} } })
+    const deps = dependencies(repository, tasks)
+    const config = await deps.settings.loadProvider('user-a')
+    deps.settings.loadProvider = async () => ({ ...config, services: { ...config.services!, dashscope_api_key: 'synthetic' } })
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    deps.voiceprint = { async detector() { entered.resolve(); await release.promise; return undefined } }
+    let created = 0
+    deps.asr = { create() { created += 1; throw new Error('must not create ASR after close') } }
+    const events: unknown[] = []
+    const connection = new CopilotRealtimeService(deps).connect(context, 'closing-before-asr', async (event) => { events.push(event) })
+    const started = connection.handle({ type: 'start', prep_id: 'ready' })
+    try {
+      await within(entered.promise)
+      const count = events.length
+      const closed = connection.close()
+      release.resolve()
+      await within(Promise.all([started, closed]))
+      expect(created).toBe(0)
+      expect(events).toHaveLength(count)
+    } finally { release.resolve(); await connection.close(); repository.close() }
   })
 })

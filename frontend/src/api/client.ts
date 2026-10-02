@@ -102,32 +102,4 @@ export async function authFetch(
   return res;
 }
 
-/** SSE 流式响应逐行解析:data: {json} 格式,每解析出一条调用 onEvent */
-export async function consumeSSE(
-  res: Response,
-  onEvent: (data: Record<string, unknown>) => boolean | void
-): Promise<void> {
-  if (!res.body) return;
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? ""; // keep incomplete line
-
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      try {
-        const data = JSON.parse(line.slice(6));
-        if (onEvent(data) === true) return; // 返回 true 表示流结束
-      } catch {
-        /* ignore malformed lines */
-      }
-    }
-  }
-}
+export { consumeSSE } from './sse';

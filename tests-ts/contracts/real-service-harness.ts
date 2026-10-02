@@ -88,7 +88,7 @@ export async function realServiceHarness(replies: string[] = []) {
   }
 
   return {
-    app, request, interview, profile, repository, sessions, states, tasks, remaining, seedSession, seedTask,
+    app, request, interview, profile, repository, sessions, states, tasks, ai, remaining, seedSession, seedTask,
     async dispose() { sqlite.close(); sessions.close(); states.close(); tasks.close(); await rm(directory, { recursive: true, force: true }) },
   }
 }

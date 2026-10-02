@@ -30,6 +30,7 @@
 - [TypeScript 迁移完整性收尾清单](typescript-migration-closeout.md)
 - [TypeScript 后端架构](typescript-backend-architecture.md)
 - [第二阶段响应契约与兼容规则](response-contracts-phase-two.md)
+- [第三阶段 WS / SSE 事件契约](response-contracts-phase-three.md)
 - [v0.3.2 发布说明](releases/v0.3.2.md)
 - [v0.3.1 发布说明](releases/v0.3.1.md)
 - [v0.3.0 发布说明](releases/v0.3.0.md)

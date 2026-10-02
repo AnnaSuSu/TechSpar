@@ -1,3 +1,4 @@
+import type { IndexRebuildEvent } from './events.ts'
 import { AuthenticationError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
 import type { RequestContext } from '../kernel/context.ts'
@@ -83,7 +84,7 @@ export class SettingsOperationsService implements SettingsOperationsUseCases {
     } catch (error) { return { ok: false, error: message(error) } }
   }
 
-  async *rebuildIndex(context: RequestContext): AsyncIterable<Record<string, unknown>> {
+  async *rebuildIndex(context: RequestContext): AsyncIterable<IndexRebuildEvent> {
     const id = userId(context)
     try {
       const topics = await this.deps.knowledge.loadTopics(id)

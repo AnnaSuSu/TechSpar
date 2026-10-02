@@ -22,7 +22,6 @@ import {
   type VoiceprintCredentials,
   type VoiceprintDriver,
   type VoiceprintDriverFactory,
-  type VoiceRoleDetector,
   type ChatUsage,
 } from '@techspar/core'
 
@@ -359,31 +358,75 @@ export class PcmSpeechSegmenter {
   reset(): void { this.residual = new Uint8Array(); this.speech = []; this.silence = 0 }
 }
 
+type RealtimeAsrInput = Parameters<RealtimeAsrFactory['create']>[0]
+type RealtimeAsrOptions = {
+  createWebSocket?: (url: string, options: { headers: Record<string, string> }) => WebSocket
+  handshakeTimeoutMs?: number
+}
+
 class DashScopeRealtimeAsrSession implements RealtimeAsrSession {
   private socket?: WebSocket
+  private stopped = false
+  private stopping?: Promise<void>
+  private cancelStart?: (reason: unknown) => void
+  private removeListeners?: () => void
   private ready = false
   private sequence = 0
   private readonly pending: Uint8Array[] = []
   private readonly deduper = new TranscriptDeduper()
   private readonly segmenter = new PcmSpeechSegmenter()
   private readonly roles: Array<{ at: number; role: 'hr' | 'candidate' }> = []
-  constructor(private readonly input: { apiKey: string; roleDetector?: VoiceRoleDetector; onInterim(text: string): Promise<void>; onFinal(text: string, role?: 'hr' | 'candidate'): Promise<void>; onError(message: string): Promise<void> }) {}
+  constructor(private readonly input: RealtimeAsrInput, private readonly options: RealtimeAsrOptions) {}
   private eventId(): string { this.sequence += 1; return `asr-${this.sequence}` }
-  async start(): Promise<void> {
+  async start(signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted()
+    if (this.stopped || this.socket) throw new Error('DashScope ASR session already started or stopped')
     const WebSocketWithHeaders = WebSocket as unknown as new (url: string, options: { headers: Record<string, string> }) => WebSocket
-    const socket = new WebSocketWithHeaders('wss://dashscope.aliyuncs.com/api-ws/v1/realtime?model=qwen3-asr-flash-realtime', { headers: { Authorization: `Bearer ${this.input.apiKey}`, 'OpenAI-Beta': 'realtime=v1', 'X-DashScope-DataInspection': 'enable' } })
+    const createWebSocket = this.options.createWebSocket || ((url, options) => new WebSocketWithHeaders(url, options))
+    const socket = createWebSocket('wss://dashscope.aliyuncs.com/api-ws/v1/realtime?model=qwen3-asr-flash-realtime', { headers: { Authorization: `Bearer ${this.input.apiKey}`, 'OpenAI-Beta': 'realtime=v1', 'X-DashScope-DataInspection': 'enable' } })
     this.socket = socket
-    await new Promise<void>((resolve, reject) => {
-      const failed = (event: Event) => reject(new Error(`DashScope ASR WebSocket failed: ${event.type}`))
-      socket.addEventListener('error', failed, { once: true })
-      socket.addEventListener('open', () => {
-        socket.removeEventListener('error', failed)
-        socket.send(JSON.stringify({ event_id: this.eventId(), type: 'session.update', session: { modalities: ['text'], input_audio_format: 'pcm', sample_rate: 16000, turn_detection: { type: 'server_vad', threshold: 0.45, silence_duration_ms: 320 } } }))
-        resolve()
-      }, { once: true })
-    })
-    socket.addEventListener('message', (event) => void this.receive(event.data))
-    socket.addEventListener('error', () => void this.input.onError('DashScope realtime ASR connection error'))
+    const onAbort = () => { this.cancelStart?.(signal.reason || new Error('Request aborted')); void this.stop() }
+    const onMessage = (event: MessageEvent) => { if (!this.stopped) void this.receive(event.data) }
+    const onError = () => {
+      if (this.cancelStart) this.cancelStart(new Error('DashScope ASR WebSocket failed: error'))
+      else if (!this.stopped) void this.input.onError('DashScope realtime ASR connection error')
+    }
+    const onClose = () => { this.cancelStart?.(new Error('DashScope ASR WebSocket closed during startup')); void this.stop() }
+    signal.addEventListener('abort', onAbort, { once: true })
+    socket.addEventListener('message', onMessage)
+    socket.addEventListener('error', onError)
+    socket.addEventListener('close', onClose)
+    this.removeListeners = () => {
+      signal.removeEventListener('abort', onAbort)
+      socket.removeEventListener('message', onMessage)
+      socket.removeEventListener('error', onError)
+      socket.removeEventListener('close', onClose)
+    }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let settled = false
+        const finish = (error?: unknown) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          socket.removeEventListener('open', onOpen)
+          this.cancelStart = undefined
+          if (error === undefined) resolve(); else reject(error)
+        }
+        const onOpen = () => {
+          try {
+            socket.send(JSON.stringify({ event_id: this.eventId(), type: 'session.update', session: { modalities: ['text'], input_audio_format: 'pcm', sample_rate: 16000, turn_detection: { type: 'server_vad', threshold: 0.45, silence_duration_ms: 320 } } }))
+            finish()
+          } catch (error) { finish(error) }
+        }
+        const timer = setTimeout(() => finish(new Error('DashScope ASR WebSocket handshake timed out')), this.options.handshakeTimeoutMs ?? 10_000)
+        this.cancelStart = finish
+        socket.addEventListener('open', onOpen)
+        if (signal.aborted) onAbort()
+      })
+      signal.throwIfAborted()
+      if (this.stopped) throw new Error('DashScope ASR session stopped')
+    } catch (error) { await this.stop(); throw error }
   }
   private async receive(raw: unknown): Promise<void> {
     if (typeof raw !== 'string') return
@@ -396,7 +439,7 @@ class DashScopeRealtimeAsrSession implements RealtimeAsrSession {
   }
   sendAudio(bytes: Uint8Array): boolean {
     if (!bytes.length || !this.socket || this.socket.readyState > WebSocket.OPEN) return false
-    if (this.input.roleDetector) for (const segment of this.segmenter.feed(bytes)) void this.input.roleDetector.verify(segment).then((role) => { if (role) { this.roles.push({ at: Date.now(), role }); if (this.roles.length > 64) this.roles.shift() } }).catch(() => undefined)
+    if (this.input.roleDetector) for (const segment of this.segmenter.feed(bytes)) void this.input.roleDetector.verify(segment).then((role) => { if (role && !this.stopped) { this.roles.push({ at: Date.now(), role }); if (this.roles.length > 64) this.roles.shift() } }).catch(() => undefined)
     if (!this.ready) { if (this.pending.length >= 512) return false; this.pending.push(bytes.slice()); return true }
     if (this.socket.bufferedAmount > 4 * 1024 * 1024) return false
     for (let offset = 0; offset < bytes.length; offset += 3200) {
@@ -405,17 +448,28 @@ class DashScopeRealtimeAsrSession implements RealtimeAsrSession {
     }
     return true
   }
-  async stop(): Promise<void> {
+  stop(): Promise<void> { return this.stopping ||= this.stopSocket() }
+  private async stopSocket(): Promise<void> {
+    this.stopped = true
+    // Settle startup directly: a CONNECTING socket need not emit error on close.
+    this.cancelStart?.(new Error('DashScope ASR session stopped'))
+    this.removeListeners?.(); this.removeListeners = undefined
     const socket = this.socket; this.socket = undefined; this.ready = false; this.pending.splice(0); this.segmenter.reset(); this.roles.splice(0)
     if (!socket) return
     try { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ event_id: this.eventId(), type: 'session.finish' })) } catch {}
     if (socket.readyState === WebSocket.CLOSED) return
-    await new Promise<void>((resolve) => { const timer = setTimeout(() => { try { socket.close() } catch {}; resolve() }, 1000); socket.addEventListener('close', () => { clearTimeout(timer); resolve() }, { once: true }); try { socket.close() } catch { clearTimeout(timer); resolve() } })
+    await new Promise<void>((resolve) => {
+      const finish = () => { clearTimeout(timer); socket.removeEventListener('close', finish); resolve() }
+      const timer = setTimeout(() => { try { socket.close() } catch {}; finish() }, 1000)
+      socket.addEventListener('close', finish)
+      try { socket.close() } catch { finish() }
+    })
   }
 }
 
 export class DashScopeRealtimeAsrFactory implements RealtimeAsrFactory {
-  create(input: { apiKey: string; roleDetector?: VoiceRoleDetector; onInterim(text: string): Promise<void>; onFinal(text: string, role?: 'hr' | 'candidate'): Promise<void>; onError(message: string): Promise<void> }): RealtimeAsrSession { return new DashScopeRealtimeAsrSession(input) }
+  constructor(private readonly options: RealtimeAsrOptions = {}) {}
+  create(input: RealtimeAsrInput): RealtimeAsrSession { return new DashScopeRealtimeAsrSession(input, this.options) }
 }
 
 function wav(pcm: Uint8Array): Uint8Array {

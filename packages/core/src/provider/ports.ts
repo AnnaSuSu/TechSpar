@@ -1,3 +1,4 @@
+import type { IndexRebuildEvent } from './events.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import type {
   ResolvedLlmConfig,
@@ -65,7 +66,7 @@ export interface SettingsUseCases {
 export interface SettingsOperationsUseCases {
   testLlm(context: RequestContext, value: LlmSettings): Promise<{ ok: boolean; error?: string }>
   testEmbedding(context: RequestContext, value: EmbeddingSettings): Promise<{ ok: boolean; error?: string }>
-  rebuildIndex(context: RequestContext): AsyncIterable<Record<string, unknown>>
+  rebuildIndex(context: RequestContext): AsyncIterable<IndexRebuildEvent>
 }
 
 export interface UsageRepository {

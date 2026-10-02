@@ -1,7 +1,7 @@
+import { consumeInterviewStream, consumeIndexRebuildStream, type ChatStreamCallbacks, type RebuildIndexCallbacks } from './events';
 import {
   API_BASE,
   authFetch,
-  consumeSSE,
   type ApiRequestBody,
   type ApiResponse,
 } from "./client";
@@ -185,12 +185,6 @@ export async function sendMessage(
   return res.json();
 }
 
-interface ChatStreamCallbacks {
-  onToken?: (token: string) => void;
-  onDone?: (data: Record<string, unknown>) => void;
-  onError?: (error: Error) => void;
-}
-
 export async function sendMessageStream(
   sessionId: string,
   message: string,
@@ -203,17 +197,7 @@ export async function sendMessageStream(
   });
   if (!res.ok) throw new Error(await res.text());
 
-  await consumeSSE(res, (data) => {
-    if (data.error) {
-      onError?.(new Error(String(data.error)));
-      return true;
-    }
-    if (data.token) onToken?.(String(data.token));
-    if (data.done) {
-      onDone?.(data);
-      return true;
-    }
-  });
+  await consumeInterviewStream(res, { onToken, onDone, onError });
 }
 
 export async function endInterview(
@@ -606,13 +590,6 @@ export async function testEmbeddingConnection(
   return res.json();
 }
 
-interface RebuildIndexCallbacks {
-  /** data: { completed, total, label, status } */
-  onProgress?: (data: Record<string, unknown>) => void;
-  onDone?: (data: Record<string, unknown>) => void;
-  onError?: (error: Error) => void;
-}
-
 export async function rebuildEmbeddingIndex({
   onProgress,
   onDone,
@@ -623,15 +600,5 @@ export async function rebuildEmbeddingIndex({
   });
   if (!res.ok) throw new Error(await res.text());
 
-  await consumeSSE(res, (data) => {
-    if (data.fatal) {
-      onError?.(new Error(String(data.error)));
-      return true;
-    }
-    if (data.done) {
-      onDone?.(data);
-      return true;
-    }
-    onProgress?.(data);
-  });
+  await consumeIndexRebuildStream(res, { onProgress, onDone, onError });
 }

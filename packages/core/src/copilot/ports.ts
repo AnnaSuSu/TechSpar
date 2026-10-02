@@ -33,7 +33,8 @@ export interface CopilotPrepUseCases {
 }
 
 export interface RealtimeAsrSession {
-  start(): Promise<void>
+  /** Abort cancels startup and closes the session; stop must settle pending startup. */
+  start(signal: AbortSignal): Promise<void>
   sendAudio(bytes: Uint8Array): boolean
   stop(): Promise<void>
 }

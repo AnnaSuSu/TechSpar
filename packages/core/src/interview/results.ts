@@ -1,5 +1,7 @@
 import type { InterviewMessage, InterviewMode, InterviewQuestion, SessionStatus } from './model.ts'
 
+export type InterviewStreamEvent = { token: string } | { done: true; is_finished: boolean }
+
 /** Application results stay independent of HTTP/Zod; adapters validate the wire. */
 export type JobPrepPreview = {
   company: string
