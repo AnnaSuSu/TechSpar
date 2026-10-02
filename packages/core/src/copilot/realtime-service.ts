@@ -22,6 +22,7 @@ class RealtimeConnection implements CopilotRealtimeConnection {
   private asr?: RealtimeAsrSession
   private stopped = false
   private closed = false
+  private closing?: Promise<void>
   private chain = Promise.resolve()
 
   constructor(private readonly deps: CopilotDependencies, private readonly context: RequestContext, private readonly sessionId: string, private readonly sink: (event: CopilotServerEvent) => Promise<void>) {}
@@ -50,7 +51,7 @@ class RealtimeConnection implements CopilotRealtimeConnection {
 
   private async start(prepId: string): Promise<void> {
     if (!prepId) throw new AppError('Prep session not ready', 400)
-    if (this.asr) await this.asr.stop()
+    await this.stopAsr()
     const record = await this.deps.repository.getPrep(prepId, this.userId())
     if (!record || record.status !== 'done' || !record.result) throw new AppError('Prep session not ready', 400)
     this.prep = record.result
@@ -80,12 +81,13 @@ class RealtimeConnection implements CopilotRealtimeConnection {
           },
           onError: (message) => this.emit({ type: 'error', message: `ASR: ${message}` }),
         })
-        await this.asr.start()
+        await this.asr.start(this.context.signal)
         await this.emit({ type: 'progress', message: roleDetector ? '语音识别 + 声纹自动识别已就绪' : '语音识别已就绪' })
-      } catch { this.asr = undefined; await this.emit({ type: 'progress', message: '语音识别不可用，请使用手动输入' }) }
+      } catch { await this.stopAsr(); await this.emit({ type: 'progress', message: '语音识别不可用，请使用手动输入' }) }
     } else await this.emit({ type: 'progress', message: '未配置 DashScope API Key，请使用手动输入' })
+    if (this.closed || this.context.signal.aborted) return
     await this.emit({ type: 'started', session_id: this.sessionId })
-    void this.warmup()
+    if (!this.closed && !this.context.signal.aborted) void this.warmup()
   }
 
   audio(bytes: Uint8Array): void { this.asr?.sendAudio(bytes) }
@@ -139,13 +141,26 @@ class RealtimeConnection implements CopilotRealtimeConnection {
     try { const result = parseObject(await this.deps.ai.complete(this.context, [{ role: 'system', content: '只输出 JSON' }, { role: 'user', content: fill(COPILOT_MONITOR_PROMPT, { conversation: conversationText(turns), required_skills: skills, highlights: summaryPoints(fit.highlights, 5), weak_points: summaryPoints(profile.weak_points, 5) }) }], STRUCTURED_CHAT_OPTIONS)); if (result && !this.stopped) await this.emit({ ...result, type: 'monitor_update' }) } catch { /* background analysis is best effort */ }
   }
 
-  private async stop(): Promise<void> { this.stopped = true; await this.asr?.stop(); this.asr = undefined; if (this.state) { this.state.status = 'stopped'; await this.persist() }; await this.emit({ type: 'stopped' }) }
-  async close(): Promise<void> {
+  private async stopAsr(): Promise<void> {
+    const asr = this.asr; this.asr = undefined
+    await asr?.stop()
+  }
+
+  private async stop(): Promise<void> { this.stopped = true; await this.stopAsr(); if (this.state) { this.state.status = 'stopped'; await this.persist() }; await this.emit({ type: 'stopped' }) }
+  close(): Promise<void> {
     this.closed = true; this.stopped = true
-    await this.chain.catch(() => {})
-    // Startup can still be acquiring ASR when close arrives. Stop it after the
-    // queued command settles, rather than losing a late-created session.
-    await this.asr?.stop(); this.asr = undefined
+    return this.closing ||= this.finishClose()
+  }
+
+  private async finishClose(): Promise<void> {
+    // A pending handshake may need stop() to settle, so stop existing ASR first.
+    try { await this.stopAsr() }
+    finally {
+      await this.chain.catch(() => {})
+      // Also cover startup that was still acquiring dependencies when close began.
+      await this.stopAsr()
+      this.stopped = true
+    }
   }
 }
 

@@ -15,6 +15,7 @@ import {
   type TextGenerationUseCases,
 } from '@techspar/core'
 import { BunCopilotRepository } from '@techspar/db'
+import { within } from './helpers/realtime-asr.ts'
 
 const directories: string[] = []
 async function databasePath(): Promise<string> { const directory = await mkdtemp(join(tmpdir(), 'techspar-copilot-')); directories.push(directory); return join(directory, 'techspar.db') }
@@ -131,7 +132,7 @@ describe('Copilot realtime', () => {
     } finally { await connection.close(); repository.close() }
   })
 
-  test('closes a late-starting ASR session and suppresses all post-close events', async () => {
+  test('stops ASR before waiting for a handshake that only stop can release', async () => {
     const repository = new BunCopilotRepository(await databasePath()); repository.initialize()
     const tasks: PersistentTaskDispatcher = { async enqueue(input) { return queued(input) }, async get() { return undefined } }
     await repository.createPrep({ prepId: 'ready', userId: 'user-a', company: '', position: '', jdText: 'JD' })
@@ -142,7 +143,9 @@ describe('Copilot realtime', () => {
     const entered = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
     let stopped = 0
-    deps.asr = { create() { return { async start() { entered.resolve(); await release.promise }, sendAudio() { return true }, async stop() { stopped += 1 } } } }
+    deps.asr = { create() { return { async start() { entered.resolve(); await release.promise }, sendAudio() { return true }, async stop() { stopped += 1; release.resolve() } } } }
+    let warmups = 0
+    deps.ai.stream = async function* () { warmups += 1; yield 'must not start after close' }
     const events: unknown[] = []
     const connection = new CopilotRealtimeService(deps).connect(context, 'closing', async (event) => { events.push(event) })
     const started = connection.handle({ type: 'start', prep_id: 'ready' })
@@ -150,11 +153,39 @@ describe('Copilot realtime', () => {
       await entered.promise
       const count = events.length
       const closed = connection.close()
-      release.resolve()
-      await Promise.all([started, closed])
+      expect(connection.close()).toBe(closed)
+      await within(Promise.all([started, closed]))
       await connection.handle({ type: 'start', prep_id: 'ready' })
       expect(events).toHaveLength(count)
       expect(stopped).toBe(1)
+      expect(warmups).toBe(0)
+    } finally { release.resolve(); await connection.close(); repository.close() }
+  })
+
+  test('does not create ASR when close arrives before startup dependencies finish', async () => {
+    const repository = new BunCopilotRepository(await databasePath()); repository.initialize()
+    const tasks: PersistentTaskDispatcher = { async enqueue(input) { return queued(input) }, async get() { return undefined } }
+    await repository.createPrep({ prepId: 'ready', userId: 'user-a', company: '', position: '', jdText: 'JD' })
+    await repository.completePrep('ready', 'user-a', { question_strategy_tree: { nodes: {} } })
+    const deps = dependencies(repository, tasks)
+    const config = await deps.settings.loadProvider('user-a')
+    deps.settings.loadProvider = async () => ({ ...config, services: { ...config.services!, dashscope_api_key: 'synthetic' } })
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    deps.voiceprint = { async detector() { entered.resolve(); await release.promise; return undefined } }
+    let created = 0
+    deps.asr = { create() { created += 1; throw new Error('must not create ASR after close') } }
+    const events: unknown[] = []
+    const connection = new CopilotRealtimeService(deps).connect(context, 'closing-before-asr', async (event) => { events.push(event) })
+    const started = connection.handle({ type: 'start', prep_id: 'ready' })
+    try {
+      await within(entered.promise)
+      const count = events.length
+      const closed = connection.close()
+      release.resolve()
+      await within(Promise.all([started, closed]))
+      expect(created).toBe(0)
+      expect(events).toHaveLength(count)
     } finally { release.resolve(); await connection.close(); repository.close() }
   })
 })

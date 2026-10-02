@@ -77,7 +77,8 @@ last_rebuild_at 保留现有秒精度、不带时区的字符串。局部失败�
 - 非法主要 WS 事件不下发，尽可能发送合法的通用 error，然后以 1011 关闭连接。
 - 非法后台分析事件不下发，记录脱敏诊断，主回答流继续。
 - 清理只执行一次；emit 错误路径不等待当前命令链的 close，避免相互等待。
-- 断连取消上下文，丢弃晚到的输出。Core close 等待正在启动的命令收尾，再停止 ASR，避免启动期间断连遗留资源。
+- 断连取消上下文，丢弃晚到的输出。Core close 先停止已创建的 ASR，解除握手等待，再等待命令链并执行最后一次 ASR 清理；启动依赖晚到时检查关闭状态，不再创建识别连接或启动模型预热。
+- DashScope ASR 启动显式接收取消信号，WebSocket 握手默认最多等待 10 秒；stop 主动结束启动等待，不依赖 socket 发送 error。超时、取消和启动失败均关闭 socket、清理定时器与监听器；关闭等待保留 1 秒上限。超时仍按现有语义降级到手动输入。
 - 未授权 WS 保留 1008；非法客户端命令保留 Invalid message。
 - 音频帧处理异常及 ASR 回调触发的回答失败，同样经过 error 事件边界；部分回答失败仍保留 answer_done 耗时/片段统计。
 - SSE 建立前保留 HTTP 鉴权和 422；建立后契约错误使用原有 error/fatal 事件及通用 Internal Server Error，不尝试改写成 HTTP 500。
@@ -103,7 +104,8 @@ SSE HTTP 响应仍描述为流字符串，`x-event-schema` 指向具体的具名
 - apps/api/src/copilot-websocket.test.ts：真实 WS 收发、鉴权、PCM、错误映射、脱敏、断开、真实 ASR 回调/后台模型事件、SQLite 会话恢复和用户隔离。
 - phase-three-frontend.test.ts：共享解码、分块读取、终止分发、截断/格式/业务回调/网络错误及 reader 清理。
 - phase-three-openapi.test.ts：事件组件、兼容范围、SSE 文档关联、生成物一致性和重复生成稳定性。
-- copilot.test.ts：未匹配、部分回答失败、零片段预热、ASR 启动期间断开。
+- copilot.test.ts：未匹配、部分回答失败、零片段预热、必须由 stop 解除的 ASR 启动等待、依赖晚到时不创建 ASR。
+- realtime-asr.test.ts：真实 DashScope 适配器配合可控 WebSocket，覆盖取消、超时、仅 close 无 error、关闭不发事件或抛错、启动发送失败、正常音频流及晚到回调。真实 Bun WS 测试另验证断连清理和超时后的手动输入、持久化。
 
 Bun 1.3.14 存在可独立复现的测试清理现象：服务端主动 close 后，即使客户端已收到关闭事件，pendingWebSockets 计数和 stop() Promise 仍可能不归零/不结束。因此测试清理等待每个客户端真实关闭，调用 stop(true)，并断言原监听地址连接失败；不跳过关闭状态、关闭码或资源清理断言。
 
@@ -133,3 +135,14 @@ bun run check
 | 补丁格式 | git diff --check 通过；SSE fixture 末尾空行是协议分隔符，使用限定到 SSE fixture 的 Git whitespace 属性保留 |
 
 第一次完整检查的打包步骤等待 GitHub 下载校验文件；给验证进程显式配置当前 macOS 系统代理后，完整检查成功，最终代码再次全量复验成功。没有关闭下载校验或修改仓库打包配置。macOS 目录包沿用现有无签名证书环境，未执行发行签名；本次验证不包含 Windows 安装器或真实商业 LLM/ASR 账号调用。
+
+### ASR 生命周期审查修复验证（2026-10-02）
+
+原先 close 先等命令链，ASR 握手不返回时无法执行 stop。先将回归测试改成只有 stop 才能解除启动等待，确认旧代码因清理不能完成而失败，再修复关闭顺序及适配器取消、超时和监听器清理。测试不会主动放行停滞握手；仅测试失败的 finally 会解除测试替身以释放资源。
+
+- Copilot、真实 WebSocket 与 DashScope 适配器定向测试：26 通过，0 失败。
+- 完整 `bun run check`：退出码 0；后端 264 通过，0 失败；前端 7 通过，0 失败。Bun/Node/前端类型检查、架构边界、API/Web/Electron 构建与 darwin-arm64 目录打包全部通过；ESLint 0 错误、41 条存量警告。
+- 再次 `bun run gen:api` 后两份生成物无差异，`git diff --check` 通过。
+- 最终打包应用在独立临时 userData 下运行 `--smoke-test`：退出码 0，返回 `techspar:desktop-smoke-ok`、`packaged=true`。
+
+ASR 测试使用真实 DashScope 适配器和可控 WebSocket，覆盖仅 close 不发 error、完全不发关闭事件、关闭抛错、取消前后竞态和超时后的手动输入；没有请求外部 ASR 服务。

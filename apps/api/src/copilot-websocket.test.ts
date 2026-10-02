@@ -6,6 +6,8 @@ import { join } from 'node:path'
 import { CopilotRealtimeService, type CopilotDependencies, type CopilotRealtimeUseCases, type CopilotServerEvent, type RequestContext } from '@techspar/core'
 import { CopilotServerEventSchema } from '@techspar/contracts/events'
 import { BunCopilotRepository } from '@techspar/db'
+import { DashScopeRealtimeAsrFactory } from '@techspar/providers'
+import { ControlledAsrSocket, within } from '../../../tests-ts/helpers/realtime-asr.ts'
 import { boundaryApp } from '../../../tests-ts/contracts/test-app.ts'
 import { dependencyStub } from '../../../tests-ts/contracts/real-service-harness.ts'
 import { loadTextFixture } from '../../../tests-ts/contracts/fixture.ts'
@@ -162,6 +164,67 @@ describe('Copilot contracts over real Bun WebSockets', () => {
     await emitLate!({ type: 'error', message: 'late callback' })
     expect(context?.signal.aborted).toBeTrue()
     expect(h.events).toEqual([{ type: 'progress', message: 'working' }])
+  })
+
+  test.each(['disconnect', 'timeout'] as const)('real service and DashScope adapter handle a stalled handshake on %s', async (action) => {
+    const directory = await mkdtemp(join(tmpdir(), 'techspar-ws-asr-'))
+    disposers.push(() => rm(directory, { recursive: true, force: true }))
+    const repository = new BunCopilotRepository(join(directory, 'test.db'))
+    repository.initialize()
+    disposers.push(() => repository.close())
+    await repository.createPrep({ prepId: 'ready', userId: 'user-a', company: '', position: '', jdText: '合成JD' })
+    await repository.completePrep('ready', 'user-a', { question_strategy_tree: { nodes: {} } })
+    const asrSocket = new ControlledAsrSocket()
+    const created = Promise.withResolvers<void>()
+    const cleaned = Promise.withResolvers<void>()
+    let context: RequestContext | undefined
+    let modelStreams = 0
+    const deps = dependencyStub<CopilotDependencies>({
+      repository, voiceprint: undefined,
+      embeddings: dependencyStub<CopilotDependencies['embeddings']>({ async embed(_context: RequestContext, texts: readonly string[]) { return texts.map(() => Float32Array.from([1, 0])) } }),
+      settings: dependencyStub<CopilotDependencies['settings']>({ async loadProvider() { return { services: { dashscope_api_key: 'synthetic', tavily_api_key: '', oss_access_key_id: '', oss_access_key_secret: '', oss_bucket: '', oss_endpoint: '' } } } }),
+      asr: new DashScopeRealtimeAsrFactory({
+        createWebSocket() { created.resolve(); return asrSocket.asWebSocket() },
+        handshakeTimeoutMs: action === 'timeout' ? 20 : 10_000,
+      }),
+      ai: { async complete() { return '{}' }, async *stream() { modelStreams += 1; yield '合成回答' } },
+    })
+    const service = new CopilotRealtimeService(deps)
+    const h = await socketHarness({ connect(ctx, id, emit) {
+      context = ctx
+      const connection = service.connect(ctx, id, emit)
+      return {
+        handle: (message) => connection.handle(message), audio: (bytes) => connection.audio(bytes),
+        async close() { await connection.close(); cleaned.resolve() },
+      }
+    } })
+    h.send({ type: 'start', prep_id: 'ready' })
+    await within(created.promise)
+    await h.until(() => h.events.length > 0)
+    if (action === 'disconnect') {
+      expect(asrSocket.readyState).toBe(WebSocket.CONNECTING)
+      h.ws.close()
+      await within(cleaned.promise)
+      await h.until(() => h.closeCode !== undefined)
+      expect(context?.signal.aborted).toBeTrue()
+      expect(modelStreams).toBe(0)
+      expect(h.events).toEqual([{ type: 'progress', message: '正在预计算策略树 embedding...' }])
+    } else {
+      await h.until(() => h.events.some((event) => (event as { type: string }).type === 'answer_done'))
+      expect(h.events).toContainEqual({ type: 'progress', message: '语音识别不可用，请使用手动输入' })
+      expect(h.events).toContainEqual({ type: 'started', session_id: 'live-1' })
+      h.send({ type: 'manual', text: '手动输入的问题' })
+      await h.until(() => h.events.filter((event) => (event as { type: string }).type === 'answer_done').length === 2)
+      expect(h.events).toContainEqual({ type: 'answer_chunk', text: '合成回答' })
+      expect((await repository.loadSession('live-1', 'user-a'))?.conversation).toMatchObject([{ role: 'hr', text: '手动输入的问题' }])
+      for (const event of h.events) expect(CopilotServerEventSchema.safeParse(event).success).toBeTrue()
+      h.ws.close()
+      await within(cleaned.promise)
+    }
+    expect(asrSocket.closeCalls).toBe(1)
+    expect(asrSocket.listenerCount).toBe(0)
+    asrSocket.open()
+    expect(asrSocket.sent).toEqual([])
   })
 
   test('real service matches every fixture, preserves roles and recovers the user conversation', async () => {
