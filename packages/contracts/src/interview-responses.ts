@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import { InterviewModeSchema, InterviewQuestionSchema, SessionStatusSchema } from './interview-shared.ts'
 
-// These persisted/provider-owned JSON slots retain their wire contents. Phase four
-// validates the LLM producers; response validation must not strip legacy fields.
+// Persisted/provider-owned JSON slots retain their wire contents. New LLM output
+// is checked by core producers; response validation must not strip legacy fields.
 export const InterviewMetadataSchema = z.record(z.string(), z.unknown()).describe('Persisted session metadata; legacy/provider extensions are preserved.')
-const ReviewObjectSchema = z.record(z.string(), z.unknown()).describe('Unnormalized review content; producer validation is deferred to phase four.')
+const ReviewObjectSchema = z.record(z.string(), z.unknown()).describe('Persisted review content; new LLM output is validated before writes while legacy fields are preserved.')
 export const JobPrepPreviewCompatibilitySchema = z.record(z.string(), z.unknown()).describe('Caller-supplied preview_data is echoed unchanged, including legacy partial previews.')
 
 export const InterviewMessageSchema = z.object({
@@ -21,7 +21,7 @@ export const JobPrepPreviewResultSchema = z.strictObject({
     recommended_stories: z.array(z.strictObject({ project: z.string(), reason: z.string() })),
   }),
   prep_priorities: z.array(z.string()),
-  question_blueprint: z.array(z.unknown()).describe('Raw provider blueprint items; structured validation is deferred to phase four.'),
+  question_blueprint: z.array(z.unknown()).describe('New model-produced blueprint items are validated in core; persisted and caller-supplied legacy items remain compatible.'),
   jd_excerpt: z.string(),
 })
 export const JobPrepPreviewResponseSchema = z.strictObject({ preview: JobPrepPreviewResultSchema })

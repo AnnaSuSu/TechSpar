@@ -50,9 +50,11 @@ describe('real services through HTTP and SQLite', () => {
     expect<unknown>(h.remaining).toEqual([])
   })
 
-  test('normalizes JD preview and keeps supplied partial preview_data intact when starting', async () => {
+  test('validates generated JD preview and keeps supplied partial preview_data intact when starting', async () => {
     const previewEntry = phaseTwoCases.find((entry) => entry.useCase === 'previewJob')!
     const expected = JobPrepPreviewResponseSchema.parse(await caseFixture(previewEntry))
+    // Imported previews still accept legacy blueprints; new model output has a defined shape.
+    expected.preview.question_blueprint = [{ category: '技术', focus_area: '异步执行', intent: '验证理解', difficulty: 3 }]
     const fixture = JobPrepStartResponseSchema.parse(await loadResponseFixture('interview-start-jd.json'))
     const h = await setup([JSON.stringify(expected.preview), JSON.stringify({ questions: fixture.questions }), JSON.stringify(expected.preview), JSON.stringify({ questions: fixture.questions })])
     const preview = await json(await h.request('/api/job-prep/preview', 'POST', { jd_text: jdText, company: '示例公司', position: '后端工程师' }))

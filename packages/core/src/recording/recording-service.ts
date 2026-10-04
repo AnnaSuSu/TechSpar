@@ -2,6 +2,8 @@ import type { InterviewAnswer, InterviewQuestion, InterviewSession, TaskRecord }
 import { fill } from '../interview/prompts.ts'
 import { AppError, AuthenticationError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
+import { finiteNumber, identifier, record, requiredText, stringArray, StructuredOutputError, uniqueIds } from '../kernel/structured-output.ts'
+import { validateOverall, validateScoreDetails } from '../interview/structured-review.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import { STRUCTURED_CHAT_OPTIONS } from '../provider/ports.ts'
 import { formatDualReview, formatSoloReview } from './formatters.ts'
@@ -10,11 +12,51 @@ import type { RecordingDependencies, RecordingUseCases } from './ports.ts'
 import { RECORDING_DUAL_EVAL_PROMPT, RECORDING_SOLO_EVAL_PROMPT, RECORDING_STRUCTURE_PROMPT } from './prompts.ts'
 
 function id(context: RequestContext): string { if (!context.userId) throw new AuthenticationError(); return context.userId }
-function object(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new SyntaxError('Expected JSON object')
-  return value as Record<string, unknown>
+function arrayOfObjects(value: unknown, path: string): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) throw new StructuredOutputError('expected an array', path)
+  return value.map((item, index) => record(item, `${path}[${index}]`))
 }
-function arrayOfObjects(value: unknown): Array<Record<string, unknown>> { return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item)) : [] }
+function validateRecordingStructure(value: unknown): Array<Record<string, unknown>> {
+  const source = record(value)
+  const pairs = arrayOfObjects(source.qa_pairs, 'qa_pairs')
+  const output = pairs.map((pair, index) => {
+    identifier(pair.id, `qa_pairs[${index}].id`)
+    requiredText(pair.question, `qa_pairs[${index}].question`)
+    if (typeof pair.answer !== 'string') throw new StructuredOutputError('expected a string', `qa_pairs[${index}].answer`)
+    for (const field of ['focus_area', 'topic']) if (pair[field] !== undefined) requiredText(pair[field], `qa_pairs[${index}].${field}`)
+    return pair
+  })
+  uniqueIds(output.map((pair) => pair.id as string | number), 'qa_pairs.id')
+  return output
+}
+function validateDualEvaluation(value: unknown, questionIds: ReadonlySet<string>): { scores: Array<Record<string, unknown>>; overall: Record<string, unknown> } {
+  const source = record(value)
+  const scores = arrayOfObjects(source.scores, 'scores').map((score, index) => {
+    identifier(score.question_id, `scores[${index}].question_id`)
+    if (!questionIds.has(String(score.question_id))) throw new StructuredOutputError('unknown question_id', `scores[${index}].question_id`)
+    finiteNumber(score.score, `scores[${index}].score`, 0, 10)
+    validateScoreDetails(score, `scores[${index}]`)
+    return score
+  })
+  uniqueIds(scores.map((score) => score.question_id as string | number), 'scores.question_id')
+  const overall = validateOverall(source.overall)
+  return { scores, overall }
+}
+function validateSoloEvaluation(value: unknown): { topics: Array<Record<string, unknown>>; overall: Record<string, unknown> } {
+  const source = record(value)
+  const topics = arrayOfObjects(source.topics_covered, 'topics_covered').map((topic, index) => {
+    identifier(topic.id, `topics_covered[${index}].id`)
+    requiredText(topic.topic, `topics_covered[${index}].topic`)
+    finiteNumber(topic.score, `topics_covered[${index}].score`, 0, 10)
+    for (const field of ['domain', 'assessment', 'understanding']) if (topic[field] !== undefined) requiredText(topic[field], `topics_covered[${index}].${field}`)
+    if (topic.errors !== undefined) stringArray(topic.errors, `topics_covered[${index}].errors`, false)
+    if (topic.missing !== undefined) stringArray(topic.missing, `topics_covered[${index}].missing`, false)
+    return topic
+  })
+  uniqueIds(topics.map((topic) => topic.id as string | number), 'topics_covered.id')
+  const overall = validateOverall(source.overall)
+  return { topics, overall }
+}
 function contextSuffix(company: unknown, position: unknown): string {
   const lines = [["公司", company], ["岗位", position]].flatMap(([label, value]) => typeof value === 'string' && value.trim() ? [`${label}: ${value.trim()}`] : [])
   return lines.length ? `\n\n## 面试背景\n${lines.join('\n')}` : ''
@@ -71,34 +113,33 @@ export class RecordingService implements RecordingUseCases {
       let overall: Record<string, unknown> = {}
       let review = ''
       if (session.meta.recording_mode === 'dual') {
-        const structured = object(parseJsonResponse(await this.deps.ai.complete(request, [
+        const structured = parseJsonResponse(await this.deps.ai.complete(request, [
           { role: 'system', content: '你是面试记录分析引擎。只返回 JSON，不要其他内容。' },
           { role: 'user', content: fill(RECORDING_STRUCTURE_PROMPT, { transcript }) },
-        ], STRUCTURED_CHAT_OPTIONS)))
-        const pairs = arrayOfObjects(structured.qa_pairs)
-        const questions: InterviewQuestion[] = pairs.flatMap((pair, index) => {
-          const question = String(pair.question || '').trim()
-          return question ? [{ id: pair.id as string | number ?? index + 1, question, difficulty: 3, focus_area: String(pair.focus_area || '') }] : []
-        })
-        const answers: InterviewAnswer[] = pairs.slice(0, questions.length).map((pair, index) => ({ question_id: questions[index]!.id, answer: String(pair.answer || '') }))
+        ], STRUCTURED_CHAT_OPTIONS))
+        const pairs = validateRecordingStructure(structured)
+        const questions: InterviewQuestion[] = pairs.map((pair) => ({ id: pair.id as string | number, question: String(pair.question), difficulty: 3, focus_area: typeof pair.focus_area === 'string' ? pair.focus_area : '' }))
+        const answers: InterviewAnswer[] = pairs.map((pair) => ({ question_id: pair.id as string | number, answer: pair.answer as string }))
         await this.deps.sessions.saveQuestions(session.session_id, session.user_id, questions)
         await this.deps.sessions.saveAnswers(session.session_id, session.user_id, answers)
         const qa = questions.map((question, index) => `### Q${question.id} (${question.focus_area || ''})\n**题目**: ${question.question}\n**回答**: ${answers[index]?.answer || ''}`).join('\n\n')
-        const evaluated = object(parseJsonResponse(await this.deps.ai.complete(request, [
+        const evaluated = parseJsonResponse(await this.deps.ai.complete(request, [
           { role: 'system', content: '你是面试评估引擎。只返回 JSON，不要其他内容。' },
           { role: 'user', content: fill(RECORDING_DUAL_EVAL_PROMPT, { qa_pairs: qa, profile_summary: await this.deps.profile.summary(session.user_id) }) + contextSuffix(session.meta.company, session.meta.position) },
-        ], STRUCTURED_CHAT_OPTIONS)))
-        scores = arrayOfObjects(evaluated.scores)
+        ], STRUCTURED_CHAT_OPTIONS))
+        const validated = validateDualEvaluation(evaluated, new Set(questions.map((question) => String(question.id))))
+        scores = validated.scores
         for (const score of scores) if (score.difficulty === undefined) score.difficulty = 3
-        overall = object(evaluated.overall || {})
+        overall = validated.overall
         review = formatDualReview(questions, answers, scores, overall)
       } else {
-        const evaluated = object(parseJsonResponse(await this.deps.ai.complete(request, [
+        const evaluated = parseJsonResponse(await this.deps.ai.complete(request, [
           { role: 'system', content: '你是录音评估引擎。只返回 JSON，不要其他内容。' },
           { role: 'user', content: fill(RECORDING_SOLO_EVAL_PROMPT, { transcript, profile_summary: await this.deps.profile.summary(session.user_id) }) + contextSuffix(session.meta.company, session.meta.position) },
-        ], STRUCTURED_CHAT_OPTIONS)))
-        const topics = arrayOfObjects(evaluated.topics_covered)
-        overall = object(evaluated.overall || {})
+        ], STRUCTURED_CHAT_OPTIONS))
+        const validated = validateSoloEvaluation(evaluated)
+        const topics = validated.topics
+        overall = validated.overall
         overall.topics_covered = topics
         scores = topics.map((topic, index) => ({ question_id: topic.id ?? index + 1, score: topic.score, difficulty: 3 }))
         review = formatSoloReview(topics, overall)

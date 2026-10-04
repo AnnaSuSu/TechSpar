@@ -4,6 +4,7 @@ import type { TextGenerationUseCases } from '../provider/ports.ts'
 import type { CandidateProfilePort, ResumeInterviewStateRepository } from './ports.ts'
 import { INTERVIEW_PHASES, type InlineEvaluation, type ResumeInterviewState } from './model.ts'
 import { fill, RESUME_INTERVIEWER_SYSTEM } from './prompts.ts'
+import { finiteNumber, isRecord, optionalText, StructuredOutputError } from '../kernel/structured-output.ts'
 
 const SCORED_PHASES = new Set(['technical', 'project_deep_dive', 'behavioral'])
 const HARD_MAX_PER_PHASE = 10
@@ -11,9 +12,20 @@ const EVAL_PATTERN = /<!--EVAL:(.*?)-->/s
 
 export function parseInlineEvaluation(content: string): { content: string; evaluation?: InlineEvaluation } {
   const match = content.match(EVAL_PATTERN)
-  if (!match) return { content }
+  if (!match) {
+    const marker = content.indexOf('<!--EVAL:')
+    return { content: marker < 0 ? content : content.slice(0, marker).trimEnd() }
+  }
   const clean = content.replace(EVAL_PATTERN, '').trimEnd()
-  try { return { content: clean, evaluation: JSON.parse(match[1]!) as InlineEvaluation } } catch { return { content: clean } }
+  try {
+    const raw: unknown = JSON.parse(match[1]!)
+    if (!isRecord(raw)) throw new StructuredOutputError('expected an object', 'evaluation')
+    if (raw.should_advance !== undefined && typeof raw.should_advance !== 'boolean') throw new StructuredOutputError('expected a boolean', 'evaluation.should_advance')
+    const score = raw.score === undefined ? undefined : finiteNumber(raw.score, 'evaluation.score', 0, 10)
+    const brief = optionalText(raw.brief, 'evaluation.brief')
+    const evidence = optionalText(raw.evidence, 'evaluation.evidence')
+    return { content: clean, evaluation: { ...(raw.should_advance === undefined ? {} : { should_advance: raw.should_advance as boolean }), ...(score === undefined ? {} : { score }), ...(brief === undefined ? {} : { brief }), ...(evidence === undefined ? {} : { evidence }) } }
+  } catch { return { content: clean } }
 }
 
 export function routeAfterAnswer(state: ResumeInterviewState, maxQuestionsPerPhase = 4): 'ask' | 'advance' | 'end' {
@@ -87,6 +99,7 @@ export class ResumeInterviewEngine {
     state.messages.push({ role: 'assistant', content: parsed.content })
     state.questions_asked.push(parsed.content.slice(0, 100))
     state.phase_question_count += 1
+    state.last_eval = {}
     if (parsed.evaluation) {
       const evaluation = { ...parsed.evaluation, phase: state.phase, question_index: questionIndex }
       state.last_eval = evaluation

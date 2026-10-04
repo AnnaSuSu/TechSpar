@@ -45,7 +45,7 @@ export type CopilotServerEvent =
   | { type: 'answer_chunk'; text: string }
   | { type: 'answer_meta'; first_token_ms: number }
   | { type: 'answer_done'; total_ms: number; chunk_count: number }
-  // Model-owned compatibility islands. The transport validates known fields;
-  // raw model completeness and semantic validation belong to phase four.
+  // Transport compatibility permits partial historical events. Live producers
+  // validate all required model fields before creating these events.
   | { type: 'hr_profile_update'; style?: string; focus?: string; satisfaction_signals?: string; advice?: string; [key: string]: unknown }
   | { type: 'monitor_update'; phase?: string; last_answer_feedback?: string; covered_topics?: string[]; uncovered_topics?: string[]; strategy_tip?: string; [key: string]: unknown }

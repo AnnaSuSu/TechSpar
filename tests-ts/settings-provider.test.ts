@@ -142,6 +142,17 @@ describe('settings persistence', () => {
 })
 
 describe('settings operations', () => {
+  for (const questions of [
+    [{ id: 1, question: '问题', difficulty: 3, focus_area: '知识点' }],
+    [{ id: 1, question: '问题', difficulty: 3, focus_area: '知识点' }, { id: '1', question: '问题二', difficulty: 3, focus_area: '知识点' }],
+    [{ id: 1, question: '问题', difficulty: 6, focus_area: '知识点' }, { id: 2, question: '问题二', difficulty: 3, focus_area: '知识点' }],
+  ]) test(`rejects invalid probe questions ${JSON.stringify(questions)}`, async () => {
+    const service = new SettingsOperationsService({
+      chats: { create() { return { async complete() { return { text: JSON.stringify({ questions }), promptTokens: 1, completionTokens: 1 } }, async *stream() {} } } },
+    } as never)
+    expect(await service.testLlm({ requestId: 'test', userId: 'user', signal: new AbortController().signal }, { api_base: 'https://example.test/v1', api_key: 'synthetic', model: 'model', temperature: 0.2, compatibility: 'generic', use_platform: false })).toMatchObject({ ok: false })
+  })
+
   test('tests submitted provider values without reading persisted settings', async () => {
     let llmConfig: Record<string, unknown> | undefined
     let llmMessages: Array<Record<string, unknown>> | undefined

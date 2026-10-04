@@ -1,7 +1,8 @@
 import { z } from 'zod'
 
 // Stable program-owned events reject unknown fields. Only the two model-owned
-// updates retain extensions/partial output until producer validation in phase four.
+// updates retain extensions and historical partial payloads; live producers
+// validate their required fields before creating these events.
 export const CopilotServerEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('started'), session_id: z.string() }).strict(),
   z.object({ type: z.literal('stopped') }).strict(),

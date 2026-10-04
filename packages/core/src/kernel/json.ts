@@ -1,3 +1,5 @@
+import { ProviderResponseError } from './errors.ts'
+
 export function parseJsonResponse(content: string): Record<string, unknown> | unknown[] {
   const value = content.trim()
   const attempts = [value]
@@ -13,5 +15,5 @@ export function parseJsonResponse(content: string): Record<string, unknown> | un
       // Try the next compatible representation.
     }
   }
-  throw new SyntaxError('No valid JSON found')
+  throw new ProviderResponseError('模型未返回有效 JSON，请重试或更换模型。')
 }

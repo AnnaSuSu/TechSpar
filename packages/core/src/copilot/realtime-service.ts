@@ -1,5 +1,6 @@
 import { AppError, AuthenticationError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
+import { isRecord, stringArray, textValue, StructuredOutputError } from '../kernel/structured-output.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import { fill } from '../interview/prompts.ts'
 import { STRUCTURED_CHAT_OPTIONS } from '../provider/ports.ts'
@@ -11,7 +12,23 @@ import { StrategyNavigator } from './strategy.ts'
 function object(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {} }
 function items(value: unknown): Array<Record<string, unknown>> { return Array.isArray(value) ? value.map(object) : [] }
 function strings(value: unknown): string[] { return Array.isArray(value) ? value.map(String) : [] }
-function parseObject(text: string): Record<string, unknown> | undefined { try { const value = parseJsonResponse(text); return value && typeof value === 'object' && !Array.isArray(value) ? value : undefined } catch { return undefined } }
+function stringFields(value: Record<string, unknown>, fields: readonly string[]): void {
+  for (const field of fields) textValue(value[field], field)
+}
+function validateHrProfile(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) throw new StructuredOutputError('expected an object')
+  stringFields(value, ['style', 'focus', 'satisfaction_signals', 'advice'])
+  return value
+}
+function validateMonitor(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) throw new StructuredOutputError('expected an object')
+  stringFields(value, ['phase', 'last_answer_feedback', 'strategy_tip'])
+  for (const field of ['covered_topics', 'uncovered_topics']) value[field] = stringArray(value[field], field)
+  return value
+}
+function parseObject<T extends Record<string, unknown>>(text: string, validate: (value: unknown) => T): T | undefined {
+  try { return validate(parseJsonResponse(text)) } catch { return undefined }
+}
 function conversationText(turns: CopilotConversationTurn[]): string { return turns.map((turn) => `${turn.role === 'hr' ? 'HR' : '候选人'}: ${turn.text}`).join('\n') }
 function summaryPoints(values: unknown, limit: number): string { return items(values).slice(0, limit).map((item) => String(item.point || JSON.stringify(item))).join('; ') || '无' }
 
@@ -131,14 +148,14 @@ class RealtimeConnection implements CopilotRealtimeConnection {
 
   private async hrProfile(turns: CopilotConversationTurn[]): Promise<void> {
     if (turns.length < 3 || this.stopped) return
-    try { const result = parseObject(await this.deps.ai.complete(this.context, [{ role: 'system', content: '只输出 JSON' }, { role: 'user', content: fill(COPILOT_HR_PROFILE_PROMPT, { conversation: conversationText(turns) }) }], STRUCTURED_CHAT_OPTIONS)); if (result && !this.stopped) await this.emit({ ...result, type: 'hr_profile_update' }) } catch { /* background analysis is best effort */ }
+    try { const result = parseObject(await this.deps.ai.complete(this.context, [{ role: 'system', content: '只输出 JSON' }, { role: 'user', content: fill(COPILOT_HR_PROFILE_PROMPT, { conversation: conversationText(turns) }) }], STRUCTURED_CHAT_OPTIONS), validateHrProfile); if (result && !this.stopped) await this.emit({ ...result, type: 'hr_profile_update' }) } catch { /* background analysis is best effort */ }
   }
 
   private async monitor(turns: CopilotConversationTurn[]): Promise<void> {
     if (!turns.length || this.stopped) return
     const fit = object(this.prep.fit_report); const jd = object(this.prep.jd_analysis); const profile = object(this.prep.profile)
     const skills = items(jd.required_skills).slice(0, 10).map((item) => String(item.skill || JSON.stringify(item))).join('; ') || '无'
-    try { const result = parseObject(await this.deps.ai.complete(this.context, [{ role: 'system', content: '只输出 JSON' }, { role: 'user', content: fill(COPILOT_MONITOR_PROMPT, { conversation: conversationText(turns), required_skills: skills, highlights: summaryPoints(fit.highlights, 5), weak_points: summaryPoints(profile.weak_points, 5) }) }], STRUCTURED_CHAT_OPTIONS)); if (result && !this.stopped) await this.emit({ ...result, type: 'monitor_update' }) } catch { /* background analysis is best effort */ }
+    try { const result = parseObject(await this.deps.ai.complete(this.context, [{ role: 'system', content: '只输出 JSON' }, { role: 'user', content: fill(COPILOT_MONITOR_PROMPT, { conversation: conversationText(turns), required_skills: skills, highlights: summaryPoints(fit.highlights, 5), weak_points: summaryPoints(profile.weak_points, 5) }) }], STRUCTURED_CHAT_OPTIONS), validateMonitor); if (result && !this.stopped) await this.emit({ ...result, type: 'monitor_update' }) } catch { /* background analysis is best effort */ }
   }
 
   private async stopAsr(): Promise<void> {

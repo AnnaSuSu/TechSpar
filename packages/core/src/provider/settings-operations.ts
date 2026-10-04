@@ -1,6 +1,7 @@
 import type { IndexRebuildEvent } from './events.ts'
 import { AuthenticationError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
+import { finiteNumber, identifier, record, requiredText, uniqueIds, StructuredOutputError } from '../kernel/structured-output.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import type { KnowledgeVectorRepository, KnowledgeStore } from '../knowledge/ports.ts'
 import type { PersonalAgentUseCases } from '../personal-agent/ports.ts'
@@ -36,13 +37,16 @@ function validateLlmProbe(text: string): void {
       : value && typeof value === 'object' && !Array.isArray(value) && Array.isArray((value as Record<string, unknown>).questions)
         ? (value as { questions: unknown[] }).questions
         : undefined
-    if (!questions || questions.length !== 2 || !questions.every((item) => {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) return false
-      const question = item as Record<string, unknown>
-      return typeof question.question === 'string' && question.question.trim().length > 0
-        && typeof question.focus_area === 'string' && question.focus_area.trim().length > 0
-        && Number.isFinite(Number(question.difficulty))
-    })) throw new SyntaxError('Unexpected structured probe response')
+    if (!questions || questions.length !== 2) throw new StructuredOutputError('must contain exactly two questions', 'questions')
+    const parsed = questions.map((item, index) => {
+      const question = record(item, `questions[${index}]`)
+      const rawId = identifier(question.id, `questions[${index}].id`)
+      requiredText(question.question, `questions[${index}].question`)
+      requiredText(question.focus_area, `questions[${index}].focus_area`)
+      finiteNumber(question.difficulty, `questions[${index}].difficulty`, 1, 5)
+      return rawId
+    })
+    uniqueIds(parsed, 'questions.id')
   } catch (error) {
     throw new Error('模型已连接，但未返回完整的专项训练结构化结果；请换用支持长文本 JSON 输出的模型。', { cause: error })
   }

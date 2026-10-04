@@ -1,6 +1,7 @@
 export * from './kernel/context.ts'
 export * from './kernel/errors.ts'
 export * from './kernel/json.ts'
+export * from './kernel/structured-output.ts'
 export * from './account/model.ts'
 export * from './account/ports.ts'
 export * from './account/auth-service.ts'

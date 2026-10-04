@@ -1,6 +1,7 @@
 import { AppError, AuthenticationError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
 import { STRUCTURED_CHAT_OPTIONS } from '../provider/ports.ts'
+import { record, stringArray, StructuredOutputError } from '../kernel/structured-output.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import type { ResumeDependencies, ResumeUseCases } from './ports.ts'
 
@@ -33,6 +34,33 @@ JSON 结构:
 
 function plainFilename(value: string): boolean {
   return Boolean(value) && !value.includes('/') && !value.includes('\\') && value !== '.' && value !== '..'
+}
+
+function validateResume(value: unknown): Record<string, unknown> {
+  const source = record(value)
+  const basic = record(source.basic, 'basic')
+  const textField = (value: unknown, path: string): string => {
+    if (typeof value !== 'string') throw new StructuredOutputError('expected a string', path)
+    return value.trim()
+  }
+  for (const field of ['name', 'title', 'email', 'phone', 'location', 'birthDate', 'employementStatus']) if (basic[field] !== undefined) basic[field] = textField(basic[field], `basic.${field}`)
+  for (const [name, fields] of [['education', ['school', 'major', 'degree', 'startDate', 'endDate', 'gpa']], ['experience', ['company', 'position', 'date']], ['projects', ['name', 'role', 'date']]] as const) {
+    if (source[name] === undefined || source[name] === null) source[name] = []
+    if (!Array.isArray(source[name])) throw new StructuredOutputError('expected an array', name)
+    source[name] = source[name]!.map((item, index) => {
+      const row = record(item, `${name}[${index}]`)
+      for (const field of fields) if (row[field] !== undefined) row[field] = textField(row[field], `${name}[${index}].${field}`)
+      const listField = name === 'experience' ? 'details' : 'description'
+      if (row[listField] === undefined || row[listField] === null) row[listField] = []
+      row[listField] = stringArray(row[listField], `${name}[${index}].${listField}`)
+      return row
+    })
+  }
+  if (source.skills === undefined || source.skills === null) source.skills = []
+  if (source.selfEvaluation === undefined || source.selfEvaluation === null) source.selfEvaluation = []
+  source.skills = stringArray(source.skills, 'skills')
+  source.selfEvaluation = stringArray(source.selfEvaluation, 'selfEvaluation')
+  return source
 }
 
 export class ResumeService implements ResumeUseCases {
@@ -89,7 +117,7 @@ export class ResumeService implements ResumeUseCases {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const parsed = parseJsonResponse(await this.deps.ai.complete(context, messages, STRUCTURED_CHAT_OPTIONS))
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return { ok: true as const, parsed }
+        return { ok: true as const, parsed: validateResume(parsed) }
       } catch (error) {
         if (attempt === 1) throw new AppError('简历解析失败，请重试', 500)
       }
