@@ -3656,7 +3656,7 @@ export interface components {
                     }[];
                 };
                 prep_priorities: string[];
-                /** @description Raw provider blueprint items; structured validation is deferred to phase four. */
+                /** @description New model-produced blueprint items are validated in core; persisted and caller-supplied legacy items remain compatible. */
                 question_blueprint: unknown[];
                 jd_excerpt: string;
             };
@@ -3808,7 +3808,7 @@ export interface components {
                 [key: string]: unknown;
             }[];
             weak_points: unknown[];
-            /** @description Unnormalized review content; producer validation is deferred to phase four. */
+            /** @description Persisted review content; new LLM output is validated before writes while legacy fields are preserved. */
             overall: {
                 [key: string]: unknown;
             };
@@ -4063,7 +4063,7 @@ export interface components {
                 topic?: string;
                 next_review?: string;
             }[];
-            /** @description Persisted extraction cache; LLM validation is deferred to phase four. */
+            /** @description Persisted extraction cache; new LLM extractions are validated before writes. */
             session_extractions?: {
                 [key: string]: unknown;
             };
@@ -4180,7 +4180,7 @@ export interface components {
                 [key: string]: unknown;
             }[];
             weak_points: unknown[];
-            /** @description Unnormalized review content; producer validation is deferred to phase four. */
+            /** @description Persisted review content; new LLM output is validated before writes while legacy fields are preserved. */
             overall: {
                 [key: string]: unknown;
             };

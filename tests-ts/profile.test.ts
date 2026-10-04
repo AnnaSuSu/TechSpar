@@ -111,6 +111,29 @@ describe('spaced repetition', () => {
 })
 
 describe('long-term profile loop', () => {
+  for (const pattern of [
+    { supporting_wp_indices: [0, 9] }, { supporting_wp_indices: [0, 0] },
+    { supporting_wp_indices: [0, 1] }, { supporting_wp_indices: [0, 2.5] },
+    { supporting_wp_indices: [0, 2], confidence: 2 },
+  ]) test(`invalid consolidation does not archive observations: ${JSON.stringify(pattern)}`, async () => {
+    const extraction = { session_summary: '本次复盘', weak_points: [], strong_points: [], behavior_signals: [], avg_score: 7 }
+    const { service, repository, sessions, vectors } = await fixture([JSON.stringify(extraction), JSON.stringify({ patterns: [
+      { statement: '这一批的有效规律也不能部分提交', supporting_wp_indices: [0, 2], confidence: 0.8 },
+      { statement: '非法规律', ...pattern },
+    ] })])
+    const initial = defaultProfile()
+    initial.weak_points = ['事务机制', '索引机制', '缓存机制', '网络机制', 'GIL 机制'].map((point, index) => ({ point, topic: index < 2 ? 'database' : 'distributed', source: 'observed', improved: false }))
+    await repository.save('user-a', initial)
+    try {
+      await service.afterReview({ userId: 'user-a', session: reviewedSession() })
+      const stored = await repository.load('user-a')
+      expect(stored.weak_points.some(point => point.source === 'consolidated' || point.archived_reason === 'superseded_by_consolidation')).toBeFalse()
+      expect(stored.last_consolidation_at).toBe(initial.last_consolidation_at)
+      expect((await vectors.listProfileMemories({ userId: 'user-a' })).some(row => row.content === '非法规律')).toBeFalse()
+      expect(stored.stats.total_sessions).toBe(1)
+    } finally { sessions.close(); vectors.close() }
+  })
+
   test('uses actual scores for semantic weak-point review and preserves improve/regress evidence', async () => {
     const improvedExtraction = JSON.stringify({
       session_summary: 'GIL 回答已经较清晰', weak_points: [], strong_points: [{ point: 'GIL 机制讲解清晰', topic: 'python' }],

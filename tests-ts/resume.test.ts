@@ -59,19 +59,37 @@ describe('resume compatibility', () => {
   test('retries JSON parsing once and returns a structured object', async () => {
     await service.upload(context, 'resume.pdf', pdf)
     responses.push('not json', '```json\n{"basic":{"name":"张三"}}\n```')
-    expect(await service.parse(context)).toEqual({ ok: true, parsed: { basic: { name: '张三' } } })
+    expect(await service.parse(context)).toEqual({ ok: true, parsed: { basic: { name: '张三' }, education: [], experience: [], projects: [], skills: [], selfEvaluation: [] } })
   })
 
   test('rejects scalar JSON responses and retries for an object', async () => {
     await service.upload(context, 'resume.pdf', pdf)
     responses.push('"not-an-object"', '{"basic":{"name":"李四"}}')
-    expect(await service.parse(context)).toEqual({ ok: true, parsed: { basic: { name: '李四' } } })
+    expect(await service.parse(context)).toEqual({ ok: true, parsed: { basic: { name: '李四' }, education: [], experience: [], projects: [], skills: [], selfEvaluation: [] } })
   })
 
   test('deletes the PDF and returns 404 when repeated', async () => {
     await service.upload(context, 'resume.pdf', pdf)
     expect(await service.delete(context)).toEqual({ ok: true })
     await expect(service.delete(context)).rejects.toThrow('还没有上传过简历')
+  })
+
+  for (const invalid of [{}, { basic: [] }, { basic: { name: 3 } }, { basic: {}, education: {} }, { basic: {}, experience: [{ details: 'text' }] }, { basic: {}, projects: [{ name: {} }] }, { basic: {}, skills: [3] }, { basic: {}, selfEvaluation: {} }]) {
+    test(`rejects invalid parsed resume ${JSON.stringify(invalid)} after two attempts`, async () => {
+      await service.upload(context, 'resume.pdf', pdf)
+      responses.push(JSON.stringify(invalid), JSON.stringify(invalid))
+      await expect(service.parse(context)).rejects.toThrow('简历解析失败')
+      expect(responses).toEqual([])
+      expect((await service.file(context)).bytes).toEqual(pdf)
+    })
+  }
+
+  test('retries structurally invalid JSON and keeps valid nested resume content', async () => {
+    await service.upload(context, 'resume.pdf', pdf)
+    const parsed = { basic: { name: '张三' }, education: [{ school: '示例学校', description: ['研究数据库'] }], experience: [{ company: '示例公司', details: ['开发服务'] }], projects: [{ name: '项目', description: ['改善性能'] }], skills: ['TypeScript'], selfEvaluation: [] }
+    responses.push('{"basic":[]}', JSON.stringify(parsed))
+    expect(await service.parse(context)).toEqual({ ok: true, parsed })
+    expect(responses).toEqual([])
   })
 
   test('preserves the short transcription response shape', async () => {

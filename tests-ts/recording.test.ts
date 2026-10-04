@@ -44,6 +44,51 @@ describe('long recording transcription', () => {
 })
 
 describe('recording review', () => {
+  const pair = { id: 1, question: '解释事件循环', answer: '任务队列', focus_area: '运行时' }
+  const failures: Array<{ name: string; mode: 'dual' | 'solo'; replies: unknown[]; preservesQa?: boolean }> = [
+    { name: 'duplicate question IDs', mode: 'dual', replies: [{ qa_pairs: [pair, { ...pair, id: '1' }] }] },
+    { name: 'empty question ID', mode: 'dual', replies: [{ qa_pairs: [{ ...pair, id: '' }] }] },
+    { name: 'invalid answer', mode: 'dual', replies: [{ qa_pairs: [{ ...pair, answer: {} }] }] },
+    { name: 'unknown score ID', mode: 'dual', replies: [{ qa_pairs: [pair] }, { scores: [{ question_id: 2, score: 8 }], overall: { avg_score: 8 } }], preservesQa: true },
+    { name: 'duplicate score IDs', mode: 'dual', replies: [{ qa_pairs: [pair] }, { scores: [{ question_id: 1, score: 8 }, { question_id: '1', score: 8 }], overall: { avg_score: 8 } }], preservesQa: true },
+    { name: 'out of range score', mode: 'dual', replies: [{ qa_pairs: [pair] }, { scores: [{ question_id: 1, score: 11 }], overall: { avg_score: 8 } }], preservesQa: true },
+    { name: 'invalid topics container', mode: 'solo', replies: [{ topics_covered: {}, overall: { avg_score: 8 } }] },
+    { name: 'out of range topic score', mode: 'solo', replies: [{ topics_covered: [{ id: 1, topic: '运行时', score: -1 }], overall: { avg_score: 8 } }] },
+    { name: 'duplicate topic IDs', mode: 'solo', replies: [{ topics_covered: [{ id: 1, topic: '运行时', score: 8 }, { id: '1', topic: '缓存', score: 8 }], overall: { avg_score: 8 } }] },
+    { name: 'invalid nested overall', mode: 'solo', replies: [{ topics_covered: [], overall: { avg_score: 8, thinking_patterns: { new_gaps: [{}] } } }] },
+  ]
+  for (const failure of failures) test(`fails ${failure.name} without saving a review or updating the profile`, async () => {
+    const sessions = new BunInterviewSessionRepository(await databasePath()); sessions.initialize()
+    let profileWrites = 0
+    const tasks: PersistentTaskDispatcher = { async enqueue(input) { return task(input.taskId) }, async get() { return undefined } }
+    const profile: CandidateProfilePort = { async summary() { return '' }, async targetRole() { return '' }, async updateTargetRole() {}, async afterReview() { profileWrites++; return {} } }
+    const ai = new Replies(failure.replies.map(value => JSON.stringify(value)))
+    const service = new RecordingService({ sessions, tasks, ids: { next: () => 'bad' }, ai, profile, transcription: { async transcribe() { return '' } } })
+    try {
+      await service.analyze(context, { transcript: '面试官：解释事件循环。候选人：任务队列。', recording_mode: failure.mode })
+      await expect(service.runAnalysisTask(task('bad'))).rejects.toThrow()
+      const stored = await sessions.get('bad', 'user-a')
+      expect(stored).toMatchObject({ status: 'review_failed', scores: [], overall: {} })
+      expect(stored?.review).toBeNull()
+      expect(stored?.review_error).toBeString()
+      expect(stored?.questions).toHaveLength(failure.preservesQa ? 1 : 0)
+      if (failure.preservesQa) expect(stored?.transcript).toContainEqual(expect.objectContaining({ role: 'user', content: pair.answer }))
+      expect(profileWrites).toBe(0)
+    } finally { sessions.close() }
+  })
+
+  test('fails truncated JSON without changing a recording task into a completed review', async () => {
+    const sessions = new BunInterviewSessionRepository(await databasePath()); sessions.initialize()
+    const tasks: PersistentTaskDispatcher = { async enqueue(input) { return task(input.taskId) }, async get() { return undefined } }
+    const profile: CandidateProfilePort = { async summary() { return '' }, async targetRole() { return '' }, async updateTargetRole() {}, async afterReview() { throw new Error('must not update profile') } }
+    const service = new RecordingService({ sessions, tasks, ids: { next: () => 'truncated' }, ai: new Replies(['{"qa_pairs":']), profile, transcription: { async transcribe() { return '' } } })
+    try {
+      await service.analyze(context, { transcript: '合成面试对话', recording_mode: 'dual' })
+      await expect(service.runAnalysisTask(task('truncated'))).rejects.toThrow()
+      expect(await sessions.get('truncated', 'user-a')).toMatchObject({ status: 'review_failed', questions: [], scores: [], overall: {} })
+    } finally { sessions.close() }
+  })
+
   test('creates a durable dual-mode task and writes a compatible review', async () => {
     const path = await databasePath()
     const sessions = new BunInterviewSessionRepository(path); sessions.initialize()

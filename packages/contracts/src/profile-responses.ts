@@ -49,7 +49,7 @@ export const CandidateProfileResponseSchema = z.object({
   communication: z.object({ style: z.string(), habits: z.array(z.string()), suggestions: z.array(z.string()) }).passthrough(),
   thinking_patterns: z.object({ strengths: z.array(z.string()), gaps: z.array(z.string()) }).passthrough(),
   stats: ProfileStatsSchema, view_marker: ProfileStoredViewMarkerSchema.optional(), due_reviews: z.array(DueReviewSummarySchema),
-  session_extractions: z.record(z.string(), z.unknown()).optional().describe('Persisted extraction cache; LLM validation is deferred to phase four.'),
+  session_extractions: z.record(z.string(), z.unknown()).optional().describe('Persisted extraction cache; new LLM extractions are validated before writes.'),
 }).passthrough()
 export const ProfilePatternFeedbackResponseSchema = ProfileWeakPointSchema
 export const ProfileDueReviewsResponseSchema = z.array(ProfileWeakPointSchema)

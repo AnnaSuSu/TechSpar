@@ -139,6 +139,24 @@ describe('interview persistence', () => {
 })
 
 describe('resume interview state machine', () => {
+  for (const output of ['{"score":11,"should_advance":true}', '{"score":7,"should_advance":"true"}', '{"score":null}', '{"brief":[]}', 'null', '{"score":']) {
+    for (const streaming of [false, true]) test(`discards invalid evaluation ${output} (stream=${streaming}) before state persistence`, async () => {
+      const states = new BunResumeInterviewStateRepository(await databasePath()); states.initialize()
+      const engine = new ResumeInterviewEngine(new FakeAi([`继续介绍项目。<!--EVAL:${output}${output.endsWith(':') ? '' : '-->'}`]), states, profile)
+      const state = { messages: [], phase: 'technical' as const, target_role: '后端', job_description: '', resume_context: '', questions_asked: [], phase_question_count: 0, is_finished: false, last_eval: { score: 8, should_advance: true }, eval_history: [] }
+      try {
+        let visible = ''
+        if (streaming) {
+          for await (const event of engine.stream(context, 'invalid-eval', state, '回答')) if ('token' in event) visible += event.token
+        } else visible = (await engine.turn(context, 'invalid-eval', state, '回答')).message
+        expect(visible).toBe('继续介绍项目。')
+        const stored = await states.load('invalid-eval', 'user-a')
+        expect(stored).toMatchObject({ phase: 'technical', last_eval: {}, eval_history: [] })
+        expect(stored?.messages.at(-1)?.content).toBe('继续介绍项目。')
+      } finally { states.close() }
+    })
+  }
+
   test('injects target role and JD and persists them in state', async () => {
     const path = await databasePath()
     const states = new BunResumeInterviewStateRepository(path)
@@ -172,23 +190,24 @@ describe('resume interview state machine', () => {
 })
 
 describe('interview application service', () => {
-  test('normalizes structured JD preview fields returned by the model', async () => {
+  test('validates structured JD preview and derives resume usage from actual context', async () => {
     const path = await databasePath()
     const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
     const states = new BunResumeInterviewStateRepository(path); states.initialize()
     const ai = new FakeAi([JSON.stringify({
       company: '跨越速运',
       position: '高级 Java 工程师',
-      role_summary: { overview: '负责物流核心系统开发', level: '高级岗位' },
-      focus_areas: [{ area: 'Java', importance: '高', expected_capabilities: ['JVM 调优', '并发编程'] }],
-      prep_priorities: [{ priority: 1, topic: '分布式系统', actions: ['准备高并发案例', '复习一致性方案'] }],
-      likely_question_groups: [{ group: '系统设计', questions: ['如何设计物流订单系统？'] }],
+      role_summary: '负责物流核心系统开发',
+      focus_areas: [{ area: 'Java', priority: '高', reason: 'JVM 调优和并发编程' }],
+      prep_priorities: ['准备高并发案例'],
+      likely_question_groups: [{ title: '系统设计', reason: '岗位要求', sample_questions: ['如何设计物流订单系统？'] }],
+      question_blueprint: [{ category: '技术', focus_area: 'Java', intent: '验证原理', difficulty: 3 }],
       resume_alignment: {
         resume_used: true,
-        fit_assessment: { conclusion: '基本匹配', basis: ['Java 经验吻合', '物流经验不足'] },
-        matching_evidence: [{ evidence: '有 Java 项目经验', relevance: '高' }],
-        risk_gaps: [{ gap: '缺少物流经验', reason: '简历未体现物流行业项目' }],
-        recommended_stories: [{ story: '订单系统改造', evidence_to_prepare: ['吞吐量提升', '故障率下降'] }],
+        fit_assessment: '没有可用简历',
+        matching_evidence: [],
+        risk_gaps: ['需要补充项目证据'],
+        recommended_stories: [],
       },
     })])
     const service = new InterviewService(interviewDependencies({ sessions, states, ai }))
@@ -200,15 +219,13 @@ describe('interview application service', () => {
     sessions.close(); states.close()
 
     expect(result.preview).toMatchObject({
-      role_summary: '负责物流核心系统开发；高级岗位',
-      focus_areas: [{ area: 'Java', priority: '高', reason: 'JVM 调优；并发编程' }],
-      prep_priorities: ['分布式系统：准备高并发案例；复习一致性方案'],
-      likely_question_groups: [{ title: '系统设计', reason: '', sample_questions: ['如何设计物流订单系统？'] }],
+      role_summary: '负责物流核心系统开发',
+      focus_areas: [{ area: 'Java', priority: '高', reason: 'JVM 调优和并发编程' }],
+      prep_priorities: ['准备高并发案例'],
+      likely_question_groups: [{ title: '系统设计', reason: '岗位要求', sample_questions: ['如何设计物流订单系统？'] }],
       resume_alignment: {
-        fit_assessment: '基本匹配；Java 经验吻合；物流经验不足',
-        matching_evidence: ['有 Java 项目经验（高）'],
-        risk_gaps: ['缺少物流经验：简历未体现物流行业项目'],
-        recommended_stories: [{ project: '订单系统改造', reason: '吞吐量提升；故障率下降' }],
+        resume_used: false, fit_assessment: '没有可用简历',
+        matching_evidence: [], risk_gaps: ['需要补充项目证据'], recommended_stories: [],
       },
     })
   })

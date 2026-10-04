@@ -11,7 +11,7 @@ import { boundaryApp, jsonHeaders, unavailable } from './contracts/test-app.ts'
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => { while (cleanups.length) await cleanups.pop()!() })
 
-const extraction = { session_summary: 'GIL needs practice', weak_points: [{ point: 'GIL', topic: 'python', score: 7 }], strong_points: [], avg_score: 7 }
+const extraction = { session_summary: 'GIL needs practice', weak_points: [{ point: 'GIL', topic: 'python', score: 7 }], strong_points: [], behavior_signals: [], avg_score: 7 }
 function session(sessionId = 'session-1'): InterviewSession {
   return { session_id: sessionId, user_id: 'user-a', mode: 'topic_drill', topic: 'python', questions: [{ id: 1, question: 'GIL?', focus_area: 'GIL', difficulty: 3 }], transcript: [{ role: 'user', content: 'Partial answer' }], scores: [{ question_id: 1, score: 7 }], overall: { avg_score: 7 }, review: 'Saved review', status: 'reviewed', meta: {}, weak_points: [], reference_answers: {}, review_error: null, created_at: '', updated_at: '' }
 }
@@ -53,6 +53,38 @@ async function fixture() {
 }
 
 describe('retryable profile memory projection', () => {
+  for (const patch of [
+    { avg_score: 11 }, { dimension_scores: { technical_depth: '8' } },
+    { weak_points: [{ point: '知识点', confidence: 2 }] },
+    { topic_mastery: { python: { score: 101 } } },
+    { behavior_signals: [{ action: 'DELETE', id: 'reasoning.example' }] },
+    { behavior_signals: [{ action: 'ADD', id: 'invalid.example' }] },
+    { behavior_signals: [{ action: 'ADD', id: 'reasoning.example', namespace: 'narrative' }] },
+    { behavior_signals: [{ action: 'NOOP', id: 'reasoning.example', polarity: 'neutral' }] },
+    { behavior_signals: [{ action: 'NOOP', id: 'reasoning.example' }, { action: 'NOOP', id: 'reasoning.example' }] },
+  ]) test(`rejects malformed extraction without profile or memory effects: ${JSON.stringify(patch)}`, async () => {
+    const f = await fixture()
+    const before = await f.repository.load('user-a')
+    let calls = 0; let embeddings = 0
+    f.deps.ai.complete = async () => { calls++; return JSON.stringify({ ...extraction, ...patch }) }
+    f.deps.embeddings.embed = async () => { embeddings++; throw new Error('must not embed malformed extraction') }
+    await expect(f.service.afterReview({ userId: 'user-a', session: session() })).rejects.toThrow('画像提取失败')
+    expect(await f.repository.load('user-a')).toEqual(before)
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toEqual([])
+    expect(calls).toBe(2)
+    expect(embeddings).toBe(0)
+  })
+
+  test('retries a malformed extraction then writes valid profile and memory exactly once', async () => {
+    const f = await fixture()
+    let calls = 0
+    f.deps.ai.complete = async () => JSON.stringify(++calls === 1 ? { ...extraction, avg_score: '7' } : extraction)
+    await f.service.afterReview({ userId: 'user-a', session: session() })
+    expect(calls).toBe(2)
+    expect((await f.repository.load('user-a')).stats.total_sessions).toBe(1)
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(3)
+  })
+
   for (const failure of ['embedding', 'storage', 'partial', 'nan', 'dimension'] as const) {
     test(`recovers from ${failure} failure without applying the profile twice`, async () => {
       const f = await fixture(); f.fail(failure)
@@ -139,27 +171,26 @@ describe('retryable profile memory projection', () => {
     expect(mergeProfiles(completed, conflicting)._pending_memory).toBeUndefined()
   })
 
-  test('completes an empty memory projection without calling an embedding provider', async () => {
+  test('rejects an extraction missing required arrays without changing the profile', async () => {
     const f = await fixture()
     f.deps.ai.complete = async () => JSON.stringify({ avg_score: 7 })
     f.deps.embeddings.embed = async () => { throw new Error('unconfigured') }
-    await f.service.afterReview({ userId: 'user-a', session: session() })
+    await expect(f.service.afterReview({ userId: 'user-a', session: session() })).rejects.toThrow('画像提取失败')
+    expect((await f.repository.load('user-a')).stats.total_sessions).toBe(0)
     expect((await f.repository.load('user-a'))._pending_memory).toBeUndefined()
     expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(0)
   })
 
-  test('an empty extraction still records that profile updates were applied', async () => {
+  test('does not apply an invalid extraction after either retry', async () => {
     const f = await fixture(); f.fail('storage')
     let calls = 0
     f.deps.ai.complete = async () => { calls++; return '{}' }
     const input = { userId: 'user-a', session: session() }
     await expect(f.service.afterReview(input)).rejects.toThrow()
-    f.fail('none')
-    await f.service.afterReview(input)
-    await f.service.afterReview(input)
-    expect((await f.repository.load('user-a')).stats.total_sessions).toBe(1)
+    expect((await f.repository.load('user-a')).stats.total_sessions).toBe(0)
     expect((await f.repository.load('user-a'))._pending_memory).toBeUndefined()
-    expect(calls).toBe(1)
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(0)
+    expect(calls).toBe(2)
   })
 
   for (const mode of ['topic_drill', 'jd_prep', 'resume', 'recording'] as const) {

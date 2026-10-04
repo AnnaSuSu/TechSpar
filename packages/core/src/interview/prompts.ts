@@ -79,7 +79,9 @@ JD：
 历史画像：
 {user_profile}
 
-只返回 JSON，包含 company、position、role_summary、focus_areas、likely_question_groups、resume_alignment（resume_used、fit_assessment、matching_evidence、risk_gaps、recommended_stories）、prep_priorities、question_blueprint。不得从 JD 推断候选人拥有未在简历中出现的经历。`
+只返回以下结构的 JSON，所有字段必须提供；没有证据的列表用 []。company/position 未知时用空字符串，其余说明必须为字符串，不能返回嵌套摘要对象。每个 question_blueprint 条目代表一道计划题，difficulty 为 1-5 的数字。
+{"company":"公司","position":"岗位","role_summary":"职责概述","focus_areas":[{"area":"能力","priority":"高","reason":"依据"}],"likely_question_groups":[{"title":"题组","reason":"依据","sample_questions":["示例问题"]}],"resume_alignment":{"resume_used":false,"fit_assessment":"匹配说明或未启用简历","matching_evidence":[],"risk_gaps":[],"recommended_stories":[{"project":"简历项目","reason":"推荐原因"}]},"prep_priorities":["准备行动"],"question_blueprint":[{"category":"技术","focus_area":"能力","intent":"考察意图","difficulty":3}]}
+不得从 JD 推断候选人拥有未在简历中出现的经历。`
 
 export const JOB_QUESTION_PROMPT = `根据下面的 JD 分析生成 4-8 道定向面试题，覆盖岗位核心能力、项目证据、风险缺口和行为问题。
 
