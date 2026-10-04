@@ -1,7 +1,7 @@
 import type { RequestContext } from '../kernel/context.ts'
 import { AppError, AuthenticationError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
-import { enumValue, finiteNumber, record, requiredText, StructuredOutputError } from '../kernel/structured-output.ts'
+import { enumValue, finiteNumber, objectArray, record, requiredText, textValue, StructuredOutputError } from '../kernel/structured-output.ts'
 import { STRUCTURED_CHAT_OPTIONS } from '../provider/ports.ts'
 import type { CandidateProfilePort } from '../interview/ports.ts'
 import type { InterviewSession, TaskRecord } from '../interview/model.ts'
@@ -10,7 +10,7 @@ import { defaultProfile, type CandidateProfile, type PendingProfileMemory, type 
 import type { ProfileDependencies, ProfileMemoryEntry, ProfileMemorySearchResult, ProfileUseCases } from './ports.ts'
 
 const INFER_ROLE_PROMPT = `根据以下简历内容，推断候选人最可能应聘的岗位名称。给出一个具体岗位，12 个汉字以内；学生可带实习生或校招后缀。只返回岗位名称，不要解释。\n\n{resume}`
-const EXTRACT_PROMPT = `你是面试教练分析引擎。根据本次面试记录提取结构化洞察。不要把表达习惯混入知识弱点，不得编造记录中没有的事实。\n\n模式：{mode}\n领域：{topic}\n对话：\n{transcript}\n\n逐题评分：\n{scores}\n\n现有行为信号（尽量复用 ID）：\n{existing_behavior_signals}\n\n复盘：\n{review}\n\n只返回 JSON：{"session_summary":"摘要","weak_points":[{"point":"具体知识薄弱点","topic":"领域"}],"strong_points":[{"point":"具体知识强项","topic":"领域"}],"behavior_signals":[{"action":"ADD|UPDATE|IMPROVE|NOOP","id":"reasoning.example","namespace":"reasoning","polarity":"negative","description":"行为描述","snippet":"本次新证据","evidence_snippet":"改善证据"}],"topic_mastery":{"notes":"掌握情况"},"avg_score":7,"dimension_scores":{"technical_depth":7,"project_articulation":7,"communication":7,"problem_solving":7}}。仅 resume 模式返回四维 dimension_scores，其他模式省略。avg_score 为有效维度的平均分，保留一位小数。`
+const EXTRACT_PROMPT = `你是面试教练分析引擎。根据本次面试记录提取结构化洞察。不要把表达习惯混入知识弱点，不得编造记录中没有的事实。\n\n模式：{mode}\n领域：{topic}\n对话：\n{transcript}\n\n逐题评分：\n{scores}\n\n现有行为信号（尽量复用 ID）：\n{existing_behavior_signals}\n\n复盘：\n{review}\n\n只返回 JSON：{"session_summary":"摘要","weak_points":[{"point":"具体知识薄弱点","topic":"领域"}],"strong_points":[{"point":"具体知识强项","topic":"领域"}],"behavior_signals":[{"action":"ADD|UPDATE|IMPROVE|NOOP","id":"reasoning.example","namespace":"reasoning","polarity":"negative","description":"行为描述","snippet":"本次新证据","evidence_snippet":"改善证据"}],"topic_mastery":{"notes":"掌握情况"},"avg_score":7,"dimension_scores":{"technical_depth":7,"project_articulation":7,"communication":7,"problem_solving":7}}。仅 resume 模式返回四维 dimension_scores，其他模式省略。avg_score 为有效维度的平均分，保留一位小数。行为信号按 action 提供内容：ADD 必须有非空 description 和 snippet；UPDATE 必须有非空 snippet；IMPROVE 必须有非空 evidence_snippet；NOOP 不应用变更。各 action 不适用的文本字段可以省略或填空字符串，但不能使用 null、对象或数组。`
 const RETROSPECTIVE_PROMPT = `你是面试教练，请基于「{topic_name}」的多次训练历史生成一份适合窄卡片阅读的 Markdown 回顾。总结整体诊断、逐题得分与依据、进步趋势、稳定强项、反复薄弱点，并给出下一轮训练计划。每个判断必须能在历史中找到依据，不得编造训练记录之外的事实。
 
 当前掌握度：{mastery}
@@ -67,6 +67,38 @@ function object(value: unknown): Record<string, unknown> { return value && typeo
 function number(value: unknown): number | undefined { return typeof value === 'number' && Number.isFinite(value) ? value : undefined }
 function text(value: unknown): string { return typeof value === 'string' ? value.trim() : '' }
 
+function validateProfileObservation(value: unknown, path: string, weak: boolean): void {
+  const item = record(value, path)
+  requiredText(item.point, `${path}.point`)
+  if (item.topic !== undefined) requiredText(item.topic, `${path}.topic`)
+  if (item.score !== undefined) finiteNumber(item.score, `${path}.score`, 0, 10)
+  if (item.confidence !== undefined) finiteNumber(item.confidence, `${path}.confidence`, 0, 1)
+  // These known persisted fields survive observation spreads. Check them before
+  // any write, while preserving genuinely unknown provider extensions.
+  for (const field of ['first_seen', 'last_seen', 'improved_at', 'archived_at', 'archived_reason', 'source', 'axis']) {
+    if (item[field] !== undefined) textValue(item[field], `${path}.${field}`)
+  }
+  if (item.times_seen !== undefined) finiteNumber(item.times_seen, `${path}.times_seen`)
+  for (const field of ['improved', 'archived', ...(weak ? ['user_acknowledged'] : [])]) {
+    if (item[field] !== undefined && typeof item[field] !== 'boolean') throw new StructuredOutputError('expected a boolean', `${path}.${field}`)
+  }
+  if (item.history !== undefined) {
+    objectArray(item.history, `${path}.history`).forEach((event, index) => {
+      for (const field of ['date', 'event', 'evidence']) if (event[field] !== undefined) textValue(event[field], `${path}.history[${index}].${field}`)
+      if (event.score !== undefined) finiteNumber(event.score, `${path}.history[${index}].score`, 0, 10)
+    })
+  }
+  if (weak && item.sr !== undefined) {
+    const sr = record(item.sr, `${path}.sr`)
+    for (const field of ['interval_days', 'ease_factor', 'repetitions', 'last_score']) if (sr[field] !== undefined) finiteNumber(sr[field], `${path}.sr.${field}`)
+    if (sr.next_review !== undefined) textValue(sr.next_review, `${path}.sr.next_review`)
+  }
+  if (weak && item.consolidates !== undefined) {
+    if (!Array.isArray(item.consolidates)) throw new StructuredOutputError('expected an array', `${path}.consolidates`)
+    item.consolidates.forEach((point, index) => textValue(point, `${path}.consolidates[${index}]`))
+  }
+}
+
 function validateProfileExtraction(value: unknown): Record<string, unknown> {
   const source = record(value)
   requiredText(source.session_summary, 'session_summary')
@@ -74,19 +106,13 @@ function validateProfileExtraction(value: unknown): Record<string, unknown> {
   const weakPoints = source.weak_points as unknown[]
   const strongPoints = source.strong_points as unknown[]
   for (const [name, items] of [['weak_points', weakPoints], ['strong_points', strongPoints] ] as const) {
-    items.forEach((raw, index) => {
-      const item = record(raw, `${name}[${index}]`)
-      requiredText(item.point, `${name}[${index}].point`)
-      if (item.topic !== undefined) requiredText(item.topic, `${name}[${index}].topic`)
-      if (item.score !== undefined) finiteNumber(item.score, `${name}[${index}].score`, 0, 10)
-      if (item.confidence !== undefined) finiteNumber(item.confidence, `${name}[${index}].confidence`, 0, 1)
-    })
+    items.forEach((raw, index) => validateProfileObservation(raw, `${name}[${index}]`, name === 'weak_points'))
   }
   const behaviorSignals = source.behavior_signals as unknown[]
   const behaviorIds = new Set<string>()
   behaviorSignals.forEach((raw, index) => {
     const item = record(raw, `behavior_signals[${index}]`)
-    enumValue(item.action, ['ADD', 'UPDATE', 'IMPROVE', 'NOOP'] as const, `behavior_signals[${index}].action`)
+    const action = enumValue(item.action, ['ADD', 'UPDATE', 'IMPROVE', 'NOOP'] as const, `behavior_signals[${index}].action`)
     const signalId = requiredText(item.id, `behavior_signals[${index}].id`)
     if (behaviorIds.has(signalId)) throw new StructuredOutputError('IDs must be unique', `behavior_signals[${index}].id`)
     behaviorIds.add(signalId)
@@ -97,7 +123,10 @@ function validateProfileExtraction(value: unknown): Record<string, unknown> {
       if (item.namespace !== match[1]) throw new StructuredOutputError('namespace must match id', `behavior_signals[${index}].namespace`)
     } else item.namespace = match[1]
     if (item.polarity !== undefined) enumValue(item.polarity, ['positive', 'negative'] as const, `behavior_signals[${index}].polarity`)
-    for (const field of ['description', 'snippet', 'evidence_snippet']) if (item[field] !== undefined) requiredText(item[field], `behavior_signals[${index}].${field}`)
+    for (const field of ['description', 'snippet', 'evidence_snippet']) if (item[field] !== undefined) textValue(item[field], `behavior_signals[${index}].${field}`)
+    if (action === 'ADD') requiredText(item.description, `behavior_signals[${index}].description`)
+    if (action === 'ADD' || action === 'UPDATE') requiredText(item.snippet, `behavior_signals[${index}].snippet`)
+    if (action === 'IMPROVE') requiredText(item.evidence_snippet, `behavior_signals[${index}].evidence_snippet`)
   })
   if (source.avg_score !== undefined) finiteNumber(source.avg_score, 'avg_score', 0, 10)
   if (source.dimension_scores !== undefined) {

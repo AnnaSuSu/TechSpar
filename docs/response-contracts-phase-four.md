@@ -25,14 +25,30 @@
 - 三类成本受控的既有重试（专项训练、画像提取、简历解析）最多执行两次；Prep 与复盘依赖持久化任务失败/重试机制。实时 HR/monitor 分析为后台辅助，不因模型格式错误中断主要对话。
 - Prep 策略树验证所有根与子节点存在、ID 与键一致、depth 为 0–3 并与实际路径一致，无环、无孤立节点、无多父节点。风险/提示中的 node_id 必须存在。策略质量目标“15–30 节点”不作为硬性结构限制，避免把较小但合法的树直接判成错误。
 
+## PR #79 画像校验复核
+
+维护者指出了两个不同的问题，均已用 `tests-ts/contracts/phase-four-profile.test.ts` 的真实文件仓储、SQLite 向量仓储与 Hono HTTP 请求覆盖：
+
+1. [不适用的空行为字段](https://github.com/AnnaSuSu/TechSpar/pull/79#discussion_r4177988945)：此前对每个已提供文本调用 `requiredText`，会让 ADD 的空改善证据、NOOP 的空说明连带拒绝整份提取，这是本 PR 新增的回归。现在先检查所有已提供文本的类型，再按 action 要求实际会应用的内容非空；提示词同步说明这些规则。
+2. [未校验的已知画像字段落盘](https://github.com/AnnaSuSu/TechSpar/pull/79#discussion_r4177988946)：强弱项通过 `...item` 保留字段，仅验证 point/topic/score/confidence 无法阻止 `archived: "false"`、`times_seen: "two"` 等污染后续 HTTP 响应。这是基线已有、阶段四尚未封住的入口。现在补齐所有会保留的已知 observation 字段，以及 history、弱项 sr/consolidates/user_acknowledged 的嵌套类型校验；未知扩展仍保留，不回写或迁移历史档案。
+
+| 行为 | 必须非空的文本 | 其他文本 |
+| --- | --- | --- |
+| ADD | description、snippet | evidence_snippet 可省略或为空字符串 |
+| UPDATE | snippet | description、evidence_snippet 可省略或为空字符串 |
+| IMPROVE | evidence_snippet | description、snippet 可省略或为空字符串 |
+| NOOP | 无 | 均可省略或为空字符串 |
+
+所有 action 的已提供文本仍拒绝 null、对象、数组和数字。已知可选画像字段允许契约中合法的 false、0 和空字符串；无效字段在 embedding、画像 update/save、向量 replace/append 之前被拒绝。测试同时验证失败后的画像文件字节不变、重复 GET /api/profile 仍为 200，以及合法提取重放不会重复增加统计或记忆。
+
 ## 验证记录
 
 本地最终使用 Bun 1.3.14 运行：
 
 | 命令 | 结果 |
 | --- | --- |
-| `bun run check` | 370 个后端/跨模块测试、7 个前端 Node 测试通过；Bun/Node 类型检查、架构边界、前端 TS/ESLint、API/Web/Electron/sidecar 构建与 macOS arm64 目录打包通过 |
-| `bun run test:contracts` | 131 个测试通过，包括真实 Hono 请求和 Bun WebSocket 边界 |
+| `bun run check` | 429 个后端/跨模块测试、7 个前端 Node 测试通过；Bun/Node 类型检查、架构边界、前端 TS/ESLint、API/Web/Electron/sidecar 构建与 macOS arm64 目录打包通过 |
+| `bun run test:contracts` | 190 个测试通过，包括真实 Hono 请求和 Bun WebSocket 边界；其中新增 59 个画像校验回归测试 |
 | `bun run gen:api` | 已生成；OpenAPI 和前端类型的差异仅为描述/注释 |
 | `git diff --check` | 通过 |
 
