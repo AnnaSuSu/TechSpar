@@ -11,7 +11,6 @@
 [![Electron](https://img.shields.io/badge/Electron-43-47848F.svg)](https://www.electronjs.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](LICENSE)
 
 ![TechSpar product overview](images/techspar-overview.png)
 </div>
@@ -148,9 +147,3 @@ Electron uses the operating system's standard application-data directory for dat
 ## Contributing
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions.
-
-## License
-
-CC BY-NC 4.0.
-
-The resume editor and templates under `frontend/src/resume/` are adapted from [Magic Resume](https://github.com/JOYCEQL/magic-resume) and retain the licenses and additional terms stored in that directory.

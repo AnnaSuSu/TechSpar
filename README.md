@@ -7,7 +7,6 @@
 [在线体验](https://techspar.cn/) · [下载桌面端](https://github.com/AnnaSuSu/TechSpar/releases) · [快速开始](#快速开始) · [English](README.en.md)
 
 [![Release](https://img.shields.io/github/v/release/AnnaSuSu/TechSpar?color=6E56CF)](https://github.com/AnnaSuSu/TechSpar/releases)
-[![License](https://img.shields.io/badge/License-AGPL--3.0-6E56CF.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/状态-持续开发中-2EA043.svg)](https://github.com/AnnaSuSu/TechSpar/commits/main)
 
 ![TechSpar 产品总览](images/techspar-overview.png)
@@ -206,14 +205,6 @@ bun run restore:system -- --archive=/safe/backups/techspar-system.tar.gz --data-
 
 Electron 使用系统标准的应用数据目录，数据库、用户文件、模型缓存和每次安装随机生成的运行密钥都放在那里；本地 Hono sidecar 只监听 `127.0.0.1` 的动态端口。
 
-## 支持与更新节奏
-
-这是一个人在维护的项目，所以把话说在前面：
-
-- **Bug 会修**，[Issue](https://github.com/AnnaSuSu/TechSpar/issues) 和 PR 我都会看。
-- **功能按我自己的路线走**，不接定制需求；有想法欢迎开 Issue 讨论，但不承诺排期。
-- **更新节奏取决于我有多少时间**，不保证频率。
-
 ## 参与贡献
 
 欢迎提交 [Issue](https://github.com/AnnaSuSu/TechSpar/issues) 或 PR。开发约定和流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。
@@ -221,14 +212,6 @@ Electron 使用系统标准的应用数据目录，数据库、用户文件、�
 ## 旧版本
 
 `legacy/python-backend` 是迁移前最后一个 Python + FastAPI 版本，固定在提交 `73d1a7c`，只作为历史归档，不再接收新功能。查看方式见 [旧版本分支说明](docs/legacy-python-backend.md)。
-
-## License
-
-[AGPL-3.0](LICENSE)。你可以自由使用、修改、自托管；如果你把修改后的版本作为网络服务提供给他人，需要同样开源你的改动。
-
-**TechSpar 这个名称和 logo 不随代码授权**，请不要用它们命名你的分发版本。
-
-例外：`frontend/src/resume/` 的简历编辑与模板代码移植自 [Magic Resume](https://github.com/JOYCEQL/magic-resume)，保留该目录内的原始协议与附加条款。
 
 ## 致谢
 
