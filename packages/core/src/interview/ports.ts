@@ -65,7 +65,7 @@ export interface PersistentTaskDispatcher {
 }
 
 export interface CandidateProfilePort {
-  summary(userId: string, topic?: string): Promise<string>
+  summary(userId: string, topic?: string, memoryQuery?: string): Promise<string>
   targetRole(userId: string): Promise<string>
   updateTargetRole(userId: string, role: string): Promise<void>
   afterReview?(input: { userId: string; session: InterviewSession }): Promise<Record<string, unknown> | undefined>

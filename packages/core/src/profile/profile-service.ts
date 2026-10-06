@@ -59,6 +59,9 @@ const WEAK_POINT_SIMILARITY = 0.75
 const REVIEW_SIMILARITY = 0.6
 const MEMORY_HALF_LIFE_DAYS = 14
 const MEMORY_DECAY_WEIGHT = 0.3
+const MEMORY_CANDIDATE_COUNT = 20
+const MEMORY_ITEM_CHARS = 600
+const MEMORY_CONTEXT_CHARS = 2000
 const CONSOLIDATION_MIN_ACTIVE = 5
 const CONSOLIDATION_COOLDOWN_MS = 24 * 60 * 60 * 1000
 
@@ -410,17 +413,40 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
 
   async semanticHistory(userId: string, topic: string, query = `${topic} 面试薄弱点 常见错误`, topK = 3): Promise<ProfileMemorySearchResult[]> {
     try {
-      const rows = await this.deps.vectors.listProfileMemories({ userId, chunkTypes: ['session_summary', 'insight'], topic })
+      const rows = await this.deps.vectors.listProfileMemories({ userId, chunkTypes: ['session_summary', 'insight'] })
       if (!rows.length) return []
       const queryVector = (await this.deps.embeddings.embed(this.context(userId, 'memory-search'), [query]))[0]
       if (!queryVector) return []
       const now = Date.now()
-      return rows.map((row) => {
+      const ranked = rows.map((row) => {
         const timestamp = Date.parse(row.createdAt)
         const age = Number.isFinite(timestamp) ? Math.max(0, (now - timestamp) / 86_400_000) : 0
         const decay = MEMORY_DECAY_WEIGHT * (0.5 ** (age / MEMORY_HALF_LIFE_DAYS)) + (1 - MEMORY_DECAY_WEIGHT)
         return { chunkType: row.chunkType, content: row.content, ...(row.topic ? { topic: row.topic } : {}), ...(row.sessionId ? { sessionId: row.sessionId } : {}), createdAt: row.createdAt, score: cosine(queryVector, row.embedding) * decay }
-      }).sort((left, right) => right.score - left.score).slice(0, Math.max(1, topK))
+      }).filter((row) => Number.isFinite(row.score) && row.score > 0 && row.content.trim()).sort((left, right) => right.score - left.score).slice(0, MEMORY_CANDIDATE_COUNT)
+      const sessions = new Map<string, ProfileMemorySearchResult>()
+      const candidates: ProfileMemorySearchResult[] = []
+      for (const row of ranked) {
+        const existing = row.sessionId ? sessions.get(row.sessionId) : undefined
+        if (existing) {
+          // An insight already contains its session summary. Keep that richer
+          // representation at the session's best decayed relevance score.
+          if (row.chunkType === 'insight' && existing.chunkType !== 'insight') {
+            Object.assign(existing, row, { score: existing.score })
+          }
+        } else {
+          const candidate = { ...row }
+          candidates.push(candidate)
+          if (row.sessionId) sessions.set(row.sessionId, candidate)
+        }
+      }
+      const seen = new Set<string>()
+      return candidates.filter((row) => {
+        const content = row.content.trim()
+        if (seen.has(content)) return false
+        seen.add(content)
+        return true
+      }).slice(0, Math.max(1, topK))
     } catch { return [] }
   }
 
@@ -486,7 +512,7 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     })
   }
 
-  async summary(userId: string, topic?: string): Promise<string> {
+  async summary(userId: string, topic?: string, memoryQuery?: string): Promise<string> {
     const profile = await this.profile(userId)
     const parts: string[] = []
     const weak = profile.weak_points.filter((point) => point.source !== 'consolidated' && !point.improved && !point.archived && point.axis !== 'performance' && (!topic || point.topic === topic)).sort((a, b) => salience(b) - salience(a)).slice(0, topic ? 10 : 6)
@@ -504,8 +530,17 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
       const today = new Date().toISOString().slice(0, 10)
       const due = profile.weak_points.filter((point) => point.topic === topic && point.source !== 'consolidated' && !point.improved && !point.archived && point.axis !== 'performance' && String(object(point.sr).next_review || '2000-01-01') <= today).sort((left, right) => Number(object(left.sr).ease_factor || 2.5) - Number(object(right.sr).ease_factor || 2.5)).slice(0, 5)
       if (due.length) parts.push(`本轮到期复习：${due.map((point) => point.point).join('、')}`)
-      const insights = (await this.semanticHistory(userId, topic)).filter((item) => item.score > 0.3).filter((item, index, values) => values.findIndex((candidate) => candidate.content === item.content) === index)
-      if (insights.length) parts.push(`历史语义洞察：\n${insights.map((item) => `- ${item.content}`).join('\n')}`)
+      const query = [
+        `检索有助于本轮专项训练的历史表现。训练主题：${topic}`,
+        memoryQuery?.trim().slice(0, 1500),
+        due.length ? `优先复习：${due.map((point) => point.point).join('、').slice(0, 400)}` : '',
+        weak.length ? `当前薄弱点：${weak.map((point) => point.point).join('、').slice(0, 400)}` : '',
+      ].filter(Boolean).join('\n')
+      const insights = await this.semanticHistory(userId, topic, query)
+      if (insights.length) {
+        const history = insights.map((item) => `- [${item.topic || '未分类'} · ${item.createdAt.slice(0, 10)}] ${item.content.slice(0, MEMORY_ITEM_CHARS)}`).join('\n').slice(0, MEMORY_CONTEXT_CHARS)
+        parts.push(`历史语义洞察（历史表现，以当前画像的改善和纠正状态为准）：\n${history}`)
+      }
     }
     return parts.join('\n') || '新用户，暂无历史数据'
   }

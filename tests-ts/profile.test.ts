@@ -46,7 +46,8 @@ async function fixture(replies: string[]) {
   const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
   const vectors = new BunKnowledgeVectorRepository(path); vectors.initialize()
   const ai = new ReplyAi(replies)
-  const embeddings = { async embed(_context: RequestContext, texts: readonly string[]) { return texts.map(embedding) }, async signature() { return 'test' }, reset() {} }
+  const embeddingInputs: string[][] = []
+  const embeddings = { async embed(_context: RequestContext, texts: readonly string[]) { embeddingInputs.push([...texts]); return texts.map(embedding) }, async signature() { return 'test' }, reset() {} }
   const tasks: ProfileDependencies['tasks'] = {
     async enqueue(input) { return { task_id: input.taskId, user_id: input.userId, type: input.type, status: 'pending', payload: input.payload, result: null, error: null, attempts: 0, created_at: '', updated_at: '' } },
     async get() { return undefined },
@@ -54,7 +55,7 @@ async function fixture(replies: string[]) {
   const resume: ProfileDependencies['resume'] = { async status() { return { has_resume: false } }, async file() { throw new Error() }, async upload() { throw new Error() }, async delete() { throw new Error() }, async text() { return '' }, async parse() { throw new Error() }, async transcribe() { throw new Error() } }
   const knowledgeStore: ProfileDependencies['knowledgeStore'] = { async loadTopics() { return {} }, async saveTopics() {}, async ensureTopic() {}, async listCore() { return [] }, async writeCore() {}, async deleteCore() { return false }, async readHighFrequency() { return '' }, async writeHighFrequency() {} }
   const service = new ProfileService({ repository, sessions, tasks, ai, embeddings, vectors, resume, knowledgeStore })
-  return { service, repository, sessions, vectors }
+  return { service, repository, sessions, vectors, embeddings, embeddingInputs }
 }
 
 function reviewedSession(input: Partial<InterviewSession> = {}): InterviewSession {
@@ -215,9 +216,66 @@ describe('long-term profile loop', () => {
     const results = await service.semanticHistory('user-a', 'python', '记忆检索', 5)
     expect(results.map((item) => item.content)).toEqual(['近期洞察', '较早洞察'])
     expect(results[0]!.score).toBeGreaterThan(results[1]!.score)
+    expect(results[1]!.score).toBeCloseTo(0.7 + 0.3 * 0.5 ** (60 / 14), 5)
     const summary = await service.summary('user-a', 'python')
     expect(summary).toContain('本轮到期复习：GIL 机制需要复习')
     expect(summary.indexOf('近期洞察')).toBeLessThan(summary.indexOf('较早洞察'))
     sessions.close(); vectors.close()
+  })
+
+  test('retrieves across topics within one user and deduplicates before filling three slots', async () => {
+    const { service, sessions, vectors } = await fixture([])
+    const createdAt = new Date().toISOString()
+    const memory = (content: string, sessionId?: string, chunkType: 'session_summary' | 'insight' = 'session_summary') => ({
+      content, sessionId, chunkType, topic: 'distributed', createdAt, embedding: embedding('记忆检索'),
+    })
+    await vectors.appendProfileMemories({ userId: 'user-a', entries: [
+      memory('共享状态解释不足', 'one'),
+      memory('共享状态解释不足\n薄弱点：锁的边界', 'one', 'insight'),
+      memory('共享状态解释不足\n薄弱点：锁的边界', 'duplicate'),
+      memory('事务隔离讲解不完整', 'two'),
+      memory('无会话编号的有效历史'),
+    ] })
+    await vectors.appendProfileMemories({ userId: 'user-b', entries: [memory('其他用户的私密历史', 'foreign')] })
+    try {
+      const result = await service.semanticHistory('user-a', 'python', '记忆检索')
+      expect(result.map(row => row.content)).toEqual(['共享状态解释不足\n薄弱点：锁的边界', '事务隔离讲解不完整', '无会话编号的有效历史'])
+      expect(result.map(row => row.topic)).toEqual(['distributed', 'distributed', 'distributed'])
+      expect(result[0]!.chunkType).toBe('insight')
+    } finally { sessions.close(); vectors.close() }
+  })
+
+  test('uses only active training needs in the query and bounds historical context', async () => {
+    const { service, repository, sessions, vectors, embeddingInputs, embeddings } = await fixture([])
+    const profile = defaultProfile()
+    profile.weak_points.push(
+      { point: 'GIL 调度机制', topic: 'python', improved: false, sr: { next_review: '2020-01-01' } },
+      { point: '已经改善的知识点', topic: 'python', improved: true },
+      { point: '已归档知识点', topic: 'python', archived: true },
+    )
+    await repository.save('user-a', profile)
+    await vectors.appendProfileMemories({ userId: 'user-a', entries: Array.from({ length: 3 }, (_, index) => ({
+      chunkType: 'session_summary' as const, content: `历史${index}：${'有效证据'.repeat(300)}`, topic: 'concurrency', sessionId: `session-${index}`,
+      // Positive but below the old 0.3 cutoff: ranked candidates must still be exposed.
+      embedding: Float32Array.from([0.2, Math.sqrt(0.96), 0, 0, 0, 0]), createdAt: new Date().toISOString(),
+    })) })
+    try {
+      const summary = await service.summary('user-a', 'python', '训练 Python 多线程与共享状态')
+      const query = embeddingInputs.at(-1)![0]!
+      expect(query).toContain('训练 Python 多线程与共享状态')
+      expect(query).toContain('优先复习：GIL 调度机制')
+      expect(query).not.toContain('已经改善')
+      expect(query).not.toContain('已归档')
+      const history = summary.split('历史语义洞察')[1]!
+      expect(history).toContain('历史0：')
+      expect(history).toContain('历史1：')
+      expect(history).toContain('历史2：')
+      expect(history.length).toBeLessThanOrEqual(2040)
+      expect(history).toContain('concurrency')
+      embeddings.embed = async () => { throw new Error('Embedding unavailable') }
+      const fallback = await service.summary('user-a', 'python')
+      expect(fallback).toContain('已知知识薄弱点：GIL 调度机制')
+      expect(fallback).not.toContain('历史语义洞察')
+    } finally { sessions.close(); vectors.close() }
   })
 })

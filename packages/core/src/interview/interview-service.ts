@@ -231,12 +231,18 @@ export class InterviewService implements InterviewUseCases {
       const training = await this.deps.settings.loadTraining(id)
       const count = input.num_questions || training.num_questions
       const divergence = input.divergence || training.divergence
-      const [knowledge, highFrequency, recent, profile] = await Promise.all([
+      const [knowledge, highFrequency, recent] = await Promise.all([
         this.deps.knowledge.context(context, input.topic, [`${topics[input.topic]!.name} 核心知识点 面试常见问题`], { charBudget: 8000 }),
         this.deps.knowledgeStore.readHighFrequency(id, input.topic),
         this.deps.sessions.recentQuestions(id, input.topic),
-        this.deps.profile.summary(id, input.topic),
       ])
+      // Build retrieval intent from information available before generating questions.
+      const memoryQuery = [
+        `专项训练：${topics[input.topic]!.name}`,
+        knowledge.trim() ? `本轮知识点：${knowledge.slice(0, 1000)}` : '',
+        highFrequency.trim() ? `高频考点：${highFrequency.slice(0, 400)}` : '',
+      ].filter(Boolean).join('\n')
+      const profile = await this.deps.profile.summary(id, input.topic, memoryQuery)
       const messages = [
         { role: 'system', content: '你是专项训练出题引擎。只返回 JSON 对象，题目放在 questions 数组中。' },
         { role: 'user', content: fill(DRILL_QUESTION_PROMPT, { topic_name: topics[input.topic]!.name, num_questions: count, knowledge_context: knowledge, user_profile: profile, high_frequency: highFrequency.slice(0, 4000) || '暂无', recent_questions: recent.map((value) => `- ${value}`).join('\n') || '暂无', divergence }) },

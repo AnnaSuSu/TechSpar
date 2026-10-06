@@ -263,15 +263,20 @@ describe('interview application service', () => {
     const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
     const states = new BunResumeInterviewStateRepository(path); states.initialize()
     const ai = new FakeAi([JSON.stringify([{ id: 1, question: '解释事件循环', difficulty: 3 }])])
+    const profileRequests: unknown[][] = []
     const drillProfile: CandidateProfilePort = {
-      async summary() { return '本轮到期复习：微任务队列\n历史语义洞察：上次忽略了饿饿问题' },
+      async summary(...args) { profileRequests.push(args); expect(ai.calls).toHaveLength(0); return '本轮到期复习：微任务队列\n历史语义洞察：上次忽略了饿饿问题' },
       async targetRole() { return '' }, async updateTargetRole() {},
     }
-    const service = new InterviewService(interviewDependencies({
+    const deps = interviewDependencies({
       sessions, states, ai, candidateProfile: drillProfile,
       knowledgeStore: emptyKnowledgeStore({ typescript: { name: 'TypeScript', icon: '', dir: 'typescript' } }),
-    }))
+    })
+    deps.knowledge.context = async () => '事件循环与微任务队列'
+    deps.knowledgeStore.readHighFrequency = async () => '任务调度顺序'
+    const service = new InterviewService(deps)
     await service.start(context, { mode: 'topic_drill', topic: 'typescript', num_questions: 1 })
+    expect(profileRequests).toEqual([['user-a', 'typescript', '专项训练：TypeScript\n本轮知识点：事件循环与微任务队列\n高频考点：任务调度顺序']])
     expect(ai.calls[0]![1]!.content).toContain('本轮到期复习：微任务队列')
     expect(ai.calls[0]![1]!.content).toContain('历史语义洞察：上次忽略了饿饿问题')
     sessions.close(); states.close()
