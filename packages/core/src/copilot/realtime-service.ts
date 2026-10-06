@@ -36,11 +36,14 @@ class RealtimeConnection implements CopilotRealtimeConnection {
   private state?: CopilotSessionState
   private prep: Record<string, unknown> = {}
   private navigator?: StrategyNavigator
-  private asr?: RealtimeAsrSession
+  private asrs = new Map<string, RealtimeAsrSession>()
+  private audioEpoch = 0
+  private dualAudio = false
   private stopped = false
   private closed = false
   private closing?: Promise<void>
   private chain = Promise.resolve()
+  private answer?: AbortController
 
   constructor(private readonly deps: CopilotDependencies, private readonly context: RequestContext, private readonly sessionId: string, private readonly sink: (event: CopilotServerEvent) => Promise<void>) {}
 
@@ -50,23 +53,31 @@ class RealtimeConnection implements CopilotRealtimeConnection {
   }
 
   handle(message: CopilotClientMessage): Promise<void> {
-    const next = this.chain.then(() => this.route(message))
+    let answer: AbortController | undefined
+    if (message.type === 'manual' && message.text?.trim()) {
+      this.answer?.abort()
+      answer = new AbortController()
+      this.answer = answer
+    } else if (message.type === 'stop' || message.type === 'start') this.answer?.abort()
+    const next = this.chain.then(() => this.route(message, answer)).catch((error) => {
+      if (!answer?.signal.aborted) throw error
+    })
     this.chain = next.catch(() => {})
     return next
   }
 
-  private async route(message: CopilotClientMessage): Promise<void> {
+  private async route(message: CopilotClientMessage, answer?: AbortController): Promise<void> {
     if (this.closed || this.context.signal.aborted) return
-    if (message.type === 'start') { try { await this.start(message.prep_id || '') } catch (error) { await this.emit({ type: 'error', message: `初始化失败: ${error instanceof Error ? error.message : String(error)}` }) }; return }
+    if (message.type === 'start') { try { await this.start(message.prep_id || '', message.audio_mode === 'dual') } catch (error) { await this.emit({ type: 'error', message: `初始化失败: ${error instanceof Error ? error.message : String(error)}` }) }; return }
     if (message.type === 'stop') { await this.stop(); return }
     if (!this.state || this.stopped) return
-    if (message.type === 'manual' && message.text?.trim()) await this.utterance(message.text.trim(), 'hr')
+    if (message.type === 'manual' && message.text?.trim()) await this.utterance(message.text.trim(), 'hr', answer)
     if (message.type === 'candidate_response' && message.text.trim()) await this.utterance(message.text.trim(), 'candidate')
   }
 
   private userId(): string { if (!this.context.userId) throw new AuthenticationError(); return this.context.userId }
 
-  private async start(prepId: string): Promise<void> {
+  private async start(prepId: string, dualAudio: boolean): Promise<void> {
     if (!prepId) throw new AppError('Prep session not ready', 400)
     await this.stopAsr()
     const record = await this.deps.repository.getPrep(prepId, this.userId())
@@ -81,42 +92,70 @@ class RealtimeConnection implements CopilotRealtimeConnection {
     this.state = stored?.prep_id === prepId ? { ...stored, status: 'active', updated_at: now } : { session_id: this.sessionId, user_id: this.userId(), prep_id: prepId, conversation: [], last_node_id: null, turn_count: 0, status: 'active', created_at: now, updated_at: now }
     await this.deps.repository.saveSession(this.state)
     this.stopped = false
-    const key = (await this.deps.settings.loadProvider(this.userId())).services.dashscope_api_key
-    const roleDetector = await this.deps.voiceprint?.detector(this.context)
+    const services = (await this.deps.settings.loadProvider(this.userId())).services
+    const key = this.deps.asrConfig?.apiKey || services.dashscope_api_key
+    const workspaceId = this.deps.asrConfig?.apiKey ? this.deps.asrConfig.workspaceId : services.dashscope_workspace_id
     if (this.closed || this.context.signal.aborted) return
+    this.dualAudio = dualAudio
+    const epoch = this.audioEpoch
+    const active = () => epoch === this.audioEpoch && !this.stopped && !this.closed && !this.context.signal.aborted
     if (key) {
       try {
-        this.asr = this.deps.asr.create({
-          apiKey: key,
-          ...(roleDetector ? { roleDetector } : {}),
-          onInterim: (text) => this.emit({ type: 'asr_interim', text }),
-          onFinal: async (text, detectedRole) => {
-            const role = detectedRole || 'hr'
-            await this.emit({ type: 'asr_final', text, role })
-            try { await this.handle(role === 'candidate' ? { type: 'candidate_response', text } : { type: 'manual', text }) }
-            catch (error) { await this.emit({ type: 'error', message: error instanceof Error ? error.message : String(error) }) }
-          },
-          onError: (message) => this.emit({ type: 'error', message: `ASR: ${message}` }),
-        })
-        await this.asr.start(this.context.signal)
-        await this.emit({ type: 'progress', message: roleDetector ? '语音识别 + 声纹自动识别已就绪' : '语音识别已就绪' })
+        for (const source of dualAudio ? ['system', 'microphone'] : ['system']) {
+          if (!active()) return
+          const sourceRole = source === 'microphone' ? 'candidate' : 'hr'
+          const asr = this.deps.asr.create({
+            apiKey: key,
+            workspaceId,
+            onInterim: (text) => active() ? this.emit({ type: 'asr_interim', text, ...(dualAudio ? { role: sourceRole } : {}) }) : Promise.resolve(),
+            onFinal: async (text, legacyRole) => {
+              if (!active()) return
+              const role = dualAudio ? sourceRole : legacyRole || 'hr'
+              await this.emit({ type: 'asr_final', text, role })
+              if (!active()) return
+              try { await this.handle(role === 'candidate' ? { type: 'candidate_response', text } : { type: 'manual', text }) }
+              catch (error) { await this.emit({ type: 'error', message: error instanceof Error ? error.message : String(error) }) }
+            },
+            onError: async (message) => {
+              if (!active()) return
+              await this.emit({ type: 'error', message: dualAudio ? `ASR (${source === 'system' ? '对方' : '自己'}): ${message}` : `ASR: ${message}` })
+              // Do not silently continue with only one speaker after a channel fails.
+              if (dualAudio) await this.stopAsr()
+            },
+          })
+          this.asrs.set(source, asr)
+          await asr.start(this.context.signal)
+        }
+        if (active()) await this.emit({ type: 'progress', message: dualAudio ? '双路语音识别已就绪' : '语音识别已就绪' })
       } catch { await this.stopAsr(); await this.emit({ type: 'progress', message: '语音识别不可用，请使用手动输入' }) }
     } else await this.emit({ type: 'progress', message: '未配置 DashScope API Key，请使用手动输入' })
     if (this.closed || this.context.signal.aborted) return
-    await this.emit({ type: 'started', session_id: this.sessionId })
-    if (!this.closed && !this.context.signal.aborted) void this.warmup()
+    await this.emit({ type: 'started', session_id: this.sessionId, ...(dualAudio ? { audio_ready: this.asrs.size === 2 } : {}) })
   }
 
-  audio(bytes: Uint8Array): void { this.asr?.sendAudio(bytes) }
+  audio(bytes: Uint8Array, source: 'system' | 'microphone' = 'system'): void {
+    if (this.closed || this.stopped || this.context.signal.aborted) return
+    if (this.dualAudio && this.asrs.size !== 2) return
+    const asr = this.asrs.get(source)
+    if (asr && !asr.sendAudio(bytes)) {
+      void this.emit({ type: 'error', message: 'ASR: 语音连接拥堵或已断开，请重新进入' })
+      void this.stopAsr()
+    }
+  }
 
   private async persist(): Promise<void> { if (this.state) { this.state.updated_at = new Date().toISOString(); await this.deps.repository.saveSession(this.state) } }
 
-  private async utterance(text: string, role: 'hr' | 'candidate'): Promise<void> {
+  private async utterance(text: string, role: 'hr' | 'candidate', answer?: AbortController): Promise<void> {
     if (!this.state || !this.navigator) return
     this.state.conversation.push({ role, text, at: new Date().toISOString() })
     if (role === 'candidate') { await this.persist(); void this.monitor([...this.state.conversation]); return }
     this.state.turn_count += 1
-    const matched = await this.navigator.match(this.context, this.deps.embeddings, text, this.state.last_node_id)
+    await this.persist()
+    const signal = answer ? AbortSignal.any([this.context.signal, answer.signal]) : this.context.signal
+    signal.throwIfAborted()
+    const answerContext = { ...this.context, signal }
+    const matched = await this.navigator.match(answerContext, this.deps.embeddings, text, this.state.last_node_id)
+    signal.throwIfAborted()
     if (matched.nodeId) this.state.last_node_id = matched.nodeId
     await this.persist()
     const node = this.navigator.node(matched.nodeId)
@@ -130,20 +169,16 @@ class RealtimeConnection implements CopilotRealtimeConnection {
     if (turnCount >= 3 && turnCount % 3 === 0) void this.hrProfile(snapshot)
     void this.monitor(snapshot)
     const fit = object(this.prep.fit_report); const profile = object(this.prep.profile)
-    const prior = snapshot.slice(0, -1).map((turn) => `  ${turn.role === 'hr' ? 'HR' : '候选人'}: ${turn.text}`).join('\n')
+    const prior = snapshot.slice(-13, -1).map((turn) => `  ${turn.role === 'hr' ? 'HR' : '候选人'}: ${turn.text}`).join('\n').slice(-8000)
     const prompt = fill(COPILOT_ADVICE_PROMPT, { conversation_section: prior ? `对话历史:\n${prior}\n\n` : '', utterance: text, highlights: summaryPoints(fit.highlights, 3), weak_points: summaryPoints(profile.weak_points, 5), key_points: [...strings(node?.recommended_points), ...strings(hint?.safe_talking_points)].slice(0, 5).join('; ') || '无' })
     const started = Date.now(); let first: number | undefined; let chunks = 0
     try {
-      for await (const token of this.deps.ai.stream(this.context, [{ role: 'system', content: '直接输出答案，不要 JSON 格式' }, { role: 'user', content: prompt }])) {
+      for await (const token of this.deps.ai.stream(answerContext, [{ role: 'system', content: '直接输出答案，不要 JSON 格式' }, { role: 'user', content: prompt }], { reasoningEffort: 'none', maxTokens: 600 })) {
+        signal.throwIfAborted()
         chunks += 1; if (first === undefined) { first = Date.now() - started; await this.emit({ type: 'answer_meta', first_token_ms: first }) }
         await this.emit({ type: 'answer_chunk', text: token })
       }
     } finally { await this.emit({ type: 'answer_done', total_ms: Date.now() - started, chunk_count: chunks }) }
-  }
-
-  private async warmup(): Promise<void> {
-    const started = Date.now(); let first: number | undefined; let chunks = 0
-    try { for await (const _ of this.deps.ai.stream(this.context, [{ role: 'user', content: '说一个字：好' }])) { chunks += 1; if (first === undefined) first = Date.now() - started } await this.emit({ type: 'answer_meta', first_token_ms: first ?? Date.now() - started }); await this.emit({ type: 'answer_done', total_ms: Date.now() - started, chunk_count: chunks }) } catch { /* warmup is optional */ }
   }
 
   private async hrProfile(turns: CopilotConversationTurn[]): Promise<void> {
@@ -159,13 +194,18 @@ class RealtimeConnection implements CopilotRealtimeConnection {
   }
 
   private async stopAsr(): Promise<void> {
-    const asr = this.asr; this.asr = undefined
-    await asr?.stop()
+    this.audioEpoch += 1
+    const sessions = [...this.asrs.values()]
+    this.asrs.clear()
+    const results = await Promise.allSettled(sessions.map((asr) => asr.stop()))
+    const failed = results.find((result) => result.status === 'rejected')
+    if (failed?.status === 'rejected') throw failed.reason
   }
 
   private async stop(): Promise<void> { this.stopped = true; await this.stopAsr(); if (this.state) { this.state.status = 'stopped'; await this.persist() }; await this.emit({ type: 'stopped' }) }
   close(): Promise<void> {
     this.closed = true; this.stopped = true
+    this.answer?.abort()
     return this.closing ||= this.finishClose()
   }
 

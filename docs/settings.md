@@ -4,7 +4,7 @@
 
 ## LLM
 
-填写 OpenAI-compatible API Base、API Key、Model、API 兼容模式和 Temperature。普通平台选择“通用 OpenAI 兼容”；DeepSeek V4 选择“DeepSeek V4”。先点击测试，确认账号确实能调用该模型，再保存。训练、面试、复盘、个人 Agent 和 Copilot 都使用这套生效中的配置。DeepSeek 模式只会对结构化请求附加 JSON 输出和低推理参数，普通文本请求及其他平台不会收到这些字段。
+填写 OpenAI-compatible API Base、API Key、Model、API 兼容模式和 Temperature。普通平台选择“通用 OpenAI 兼容”；DeepSeek V4 选择“DeepSeek V4”。先点击测试，确认账号确实能调用该模型，再保存。训练、面试、复盘和个人 Agent 使用这套配置。Copilot 优先使用部署方的独立 `COPILOT_LLM_*` 配置，未配置时才沿用这里的设置。DeepSeek 模式对结构化请求附加 JSON 输出和低推理参数，Copilot 实时回答使用非思考流式输出。
 
 ## Embedding
 
@@ -23,9 +23,9 @@ DashScope、Tavily 和阿里云 OSS 在服务配置中按用户保存。DashScop
 
 专项训练默认值包括每轮题数和题目发散度，只影响之后新建的会话。Copilot 预测 Agent 按面试需要选择技术追问、项目经验、压力质疑、行为考察或横向扩展；全部开启不一定更聚焦。
 
-## 声纹识别
+## 桌面音频
 
-腾讯云 VPR 凭据和候选人声纹独立保存。先测试凭据，再录制 6–15 秒候选人语音。声纹只辅助 Copilot 标注说话角色，不用于登录或身份认证。
+Copilot 按麦克风和系统音频区分自己与对方，无需录入声纹。进入桌面端实时页面后授权并检查两路音量。旧声纹数据仅保留供历史数据迁移。
 
 ## 账户
 
@@ -39,6 +39,6 @@ DashScope、Tavily 和阿里云 OSS 在服务配置中按用户保存。DashScop
 
 1. 测试并保存 LLM。
 2. 选择并测试 Embedding，必要时重建索引。
-3. 按实际功能补 DashScope、Tavily、OSS 和声纹。
+3. 按实际功能补 DashScope、Tavily 和 OSS；Copilot 专用服务配置见 [Copilot](copilot.md)。
 4. 调整训练参数和 Copilot Agent。
 5. 在大版本升级前导出备份。

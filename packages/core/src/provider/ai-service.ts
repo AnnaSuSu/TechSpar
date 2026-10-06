@@ -1,7 +1,7 @@
 import type { RequestContext } from '../kernel/context.ts'
 import { ProviderNotConfigured } from '../kernel/errors.ts'
 import { resolveLlmConfig } from './config.ts'
-import type { PlatformProviderConfig } from './model.ts'
+import type { PlatformProviderConfig, ResolvedLlmConfig } from './model.ts'
 import type {
   ChatDriverFactory,
   ChatMessage,
@@ -18,9 +18,14 @@ export class AiService implements TextGenerationUseCases {
     private readonly platform: PlatformProviderConfig,
     private readonly quota: QuotaUseCases,
     private readonly chats: ChatDriverFactory,
+    private readonly configOverride?: ResolvedLlmConfig,
   ) {}
 
   private async resolved(context: RequestContext) {
+    if (this.configOverride) {
+      if (!this.configOverride.api_key || !this.configOverride.model) throw new ProviderNotConfigured('LLM')
+      return this.configOverride
+    }
     const stored = context.userId ? await this.settings.loadProvider(context.userId) : undefined
     const config = resolveLlmConfig(stored?.llm, this.platform)
     if (!config.api_key || !config.model) throw new ProviderNotConfigured('LLM')

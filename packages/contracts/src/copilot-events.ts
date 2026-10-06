@@ -4,11 +4,11 @@ import { z } from 'zod'
 // updates retain extensions and historical partial payloads; live producers
 // validate their required fields before creating these events.
 export const CopilotServerEventSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('started'), session_id: z.string() }).strict(),
+  z.object({ type: z.literal('started'), session_id: z.string(), audio_ready: z.boolean().optional() }).strict(),
   z.object({ type: z.literal('stopped') }).strict(),
   z.object({ type: z.literal('progress'), message: z.string() }).strict(),
   z.object({ type: z.literal('error'), message: z.string() }).strict(),
-  z.object({ type: z.literal('asr_interim'), text: z.string() }).strict(),
+  z.object({ type: z.literal('asr_interim'), text: z.string(), role: z.enum(['hr', 'candidate']).optional() }).strict(),
   // Older clients/fixtures default a missing role to HR.
   z.object({ type: z.literal('asr_final'), text: z.string(), role: z.enum(['hr', 'candidate']).optional() }).strict(),
   z.object({

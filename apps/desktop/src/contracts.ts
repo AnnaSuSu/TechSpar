@@ -8,6 +8,7 @@ export type DesktopRuntimeInfo = {
 }
 
 export const DESKTOP_RUNTIME_CHANNEL = 'techspar:runtime-info'
+export const DESKTOP_AUDIO_SETTINGS_CHANNEL = 'techspar:audio-settings'
 
 export type DesktopBootstrapSession = {
   token: string

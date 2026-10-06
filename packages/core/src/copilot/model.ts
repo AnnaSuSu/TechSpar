@@ -28,17 +28,17 @@ export type CopilotSessionState = {
 }
 
 export type CopilotClientMessage =
-  | { type: 'start'; prep_id?: string }
+  | { type: 'start'; prep_id?: string; audio_mode?: 'dual' }
   | { type: 'manual'; text?: string }
   | { type: 'candidate_response'; text: string }
   | { type: 'stop' }
 
 export type CopilotServerEvent =
-  | { type: 'started'; session_id: string }
+  | { type: 'started'; session_id: string; audio_ready?: boolean }
   | { type: 'stopped' }
   | { type: 'progress'; message: string }
   | { type: 'error'; message: string }
-  | { type: 'asr_interim'; text: string }
+  | { type: 'asr_interim'; text: string; role?: 'hr' | 'candidate' }
   | { type: 'asr_final'; text: string; role?: 'hr' | 'candidate' }
   | { type: 'copilot_update'; intent: string; tree_position: string | null; topic: string; confidence: number; recommended_points: string[]; children: Array<{ topic: string; question: string }>; prep_hint: { safe_talking_points: string[]; redirect_suggestion: string } | null }
   | { type: 'risk_alert'; message: string; node_id: string | null }

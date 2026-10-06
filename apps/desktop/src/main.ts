@@ -2,9 +2,10 @@ import { access } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { createServer } from 'node:net'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { BackendSupervisor, type BackendLaunch, type BackendReady } from './backend-supervisor.ts'
-import { DESKTOP_BOOTSTRAP_CHANNEL, DESKTOP_RUNTIME_CHANNEL, type DesktopBootstrapSession, type DesktopRuntimeInfo } from './contracts.ts'
+import { DESKTOP_AUDIO_SETTINGS_CHANNEL, DESKTOP_BOOTSTRAP_CHANNEL, DESKTOP_RUNTIME_CHANNEL, type DesktopBootstrapSession, type DesktopRuntimeInfo } from './contracts.ts'
+import { configureAudioPermissions, openAudioSettings, sameOrigin } from './audio-permissions.ts'
 import { loadOrCreateRuntimeSecrets } from './runtime-secrets.ts'
 
 app.enableSandbox()
@@ -20,10 +21,6 @@ let backendReady: BackendReady | undefined
 let rendererOrigin = ''
 let quitting = false
 let bootstrapCredentials: { email: string; password: string } | undefined
-
-function sameOrigin(candidate: string, expected: string): boolean {
-  try { return new URL(candidate).origin === new URL(expected).origin } catch { return false }
-}
 
 function projectRoot(): string {
   return resolve(process.env.TECHSPAR_PROJECT_ROOT || join(app.getAppPath(), '..', '..'))
@@ -89,8 +86,9 @@ function runtimeInfo(): DesktopRuntimeInfo {
 
 function registerIpc(): void {
   const assertTrusted = (event: Electron.IpcMainInvokeEvent) => {
-    if (!event.senderFrame?.url || !sameOrigin(event.senderFrame.url, rendererOrigin)) throw new Error('Untrusted IPC sender')
+    if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow?.webContents.mainFrame || !event.senderFrame?.url || !sameOrigin(event.senderFrame.url, rendererOrigin)) throw new Error('Untrusted IPC sender')
   }
+  ipcMain.handle(DESKTOP_AUDIO_SETTINGS_CHANNEL, async (event, kind: unknown) => { assertTrusted(event); await openAudioSettings(kind) })
   ipcMain.handle(DESKTOP_RUNTIME_CHANNEL, (event) => {
     assertTrusted(event)
     return runtimeInfo()
@@ -107,14 +105,6 @@ function registerIpc(): void {
     if (!response.ok) throw new Error(`Desktop session bootstrap failed with HTTP ${response.status}`)
     return response.json() as Promise<DesktopBootstrapSession>
   })
-}
-
-function configurePermissions(window: BrowserWindow): void {
-  const allowed = (webContents: Electron.WebContents | null, permission: string, requestingOrigin?: string) => {
-    return webContents === window.webContents && permission === 'media' && Boolean(requestingOrigin && sameOrigin(requestingOrigin, rendererOrigin))
-  }
-  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin) => allowed(webContents, permission, requestingOrigin))
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => callback(allowed(webContents, permission, details.requestingUrl)))
 }
 
 async function createWindow(): Promise<void> {
@@ -136,7 +126,7 @@ async function createWindow(): Promise<void> {
     },
   })
   mainWindow = window
-  configurePermissions(window)
+  configureAudioPermissions(window, rendererOrigin)
   window.once('ready-to-show', () => window.show())
   window.on('closed', () => { if (mainWindow === window) mainWindow = undefined })
   window.webContents.setWindowOpenHandler(({ url }) => {

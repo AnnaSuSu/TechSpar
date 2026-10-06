@@ -1,7 +1,7 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi'
 import type { UpgradeWebSocket, WSContext, WSMessageReceive } from 'hono/ws'
 import { z } from 'zod'
-import { CopilotClientMessageSchema, CopilotPrepCreateSchema, CopilotPrepCreatedSchema, CopilotPrepListSchema, CopilotPrepObjectSchema, OkSchema } from '@techspar/contracts'
+import { decodeCopilotAudio, CopilotClientMessageSchema, CopilotPrepCreateSchema, CopilotPrepCreatedSchema, CopilotPrepListSchema, CopilotPrepObjectSchema, OkSchema } from '@techspar/contracts'
 import type { CopilotPrepUseCases, CopilotRealtimeConnection, CopilotRealtimeUseCases, RequestContext, TokenService } from '@techspar/core'
 import { copilotSender } from '../http/events.ts'
 import { authenticatedContext } from '../http/context.ts'
@@ -32,6 +32,7 @@ export function registerCopilotWebSocket(app: OpenAPIHono, deps: { realtime: Cop
     const userId = await deps.tokens.decode(c.req.query('token') || '')
     let socket: WSContext | undefined
     let connection: CopilotRealtimeConnection | undefined
+    let dualAudio = false
     const controller = new AbortController()
     const requestId = c.get('requestId') as string
     let cleanupPromise: Promise<void> | undefined
@@ -61,9 +62,17 @@ export function registerCopilotWebSocket(app: OpenAPIHono, deps: { realtime: Cop
       async onMessage(event) {
         if (!connection || controller.signal.aborted) return
         try {
-          if (typeof event.data !== 'string') { const value = bytes(event.data); if (value) connection.audio(value); return }
+          if (typeof event.data !== 'string') {
+            const value = bytes(event.data)
+            if (value) {
+              if (dualAudio) { const { source, pcm } = decodeCopilotAudio(value); connection.audio(pcm, source) }
+              else connection.audio(value)
+            }
+            return
+          }
           const parsed = CopilotClientMessageSchema.safeParse((() => { try { return JSON.parse(event.data) } catch { return undefined } })())
           if (!parsed.success) { await emit({ type: 'error', message: 'Invalid message' }); return }
+          if (parsed.data.type === 'start') dualAudio = parsed.data.audio_mode === 'dual'
           await connection.handle(parsed.data)
         } catch (error) { await emit({ type: 'error', message: error instanceof Error ? error.message : String(error) }) }
       },

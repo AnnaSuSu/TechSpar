@@ -11,7 +11,7 @@ import type {
   ProviderSource,
 } from './model.ts'
 
-export type ChatReasoningEffort = 'low' | 'high' | 'max'
+export type ChatReasoningEffort = 'none' | 'low' | 'high' | 'max'
 export type ChatCompleteOptions = {
   maxTokens?: number
   temperature?: number
@@ -23,6 +23,8 @@ export type ChatUsage = { promptTokens: number; completionTokens: number; cached
 
 export type ChatStreamOptions = {
   temperature?: number
+  maxTokens?: number
+  reasoningEffort?: ChatReasoningEffort
   /**
    * 流式结束时回调用量。
    *

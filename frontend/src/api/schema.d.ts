@@ -337,6 +337,7 @@ export interface paths {
                             services: {
                                 /** @default  */
                                 dashscope_api_key: string;
+                                dashscope_workspace_id?: string;
                                 /** @default  */
                                 tavily_api_key: string;
                                 /** @default  */
@@ -467,6 +468,7 @@ export interface paths {
                         services?: {
                             /** @default  */
                             dashscope_api_key?: string;
+                            dashscope_workspace_id?: string;
                             /** @default  */
                             tavily_api_key?: string;
                             /** @default  */
@@ -4199,6 +4201,7 @@ export interface components {
             /** @constant */
             type: "started";
             session_id: string;
+            audio_ready?: boolean;
         } | {
             /** @constant */
             type: "stopped";
@@ -4214,6 +4217,8 @@ export interface components {
             /** @constant */
             type: "asr_interim";
             text: string;
+            /** @enum {string} */
+            role?: "hr" | "candidate";
         } | {
             /** @constant */
             type: "asr_final";

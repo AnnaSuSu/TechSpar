@@ -26,6 +26,7 @@ import {
 } from '@techspar/core'
 
 export { normalizeEmbeddingApiBase } from '@techspar/core'
+export { QwenStreamingAsrFactory } from './qwen-streaming-asr.ts'
 
 const DEFAULT_EMPTY_COMPLETION_RETRY_DELAYS_MS = [250, 750] as const
 
@@ -98,6 +99,8 @@ export class OpenAiChatDriverFactory implements ChatDriverFactory {
             messages: [...messages],
             temperature: options?.temperature ?? config.temperature,
             stream: true,
+            ...(options?.maxTokens ? { max_tokens: options.maxTokens } : {}),
+            ...(config.compatibility === 'deepseek' && options?.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
             // usage 只随最后一个分片下发,不显式索取就完全拿不到,
             // 流式调用会被记成 0 token
             stream_options: { include_usage: true },

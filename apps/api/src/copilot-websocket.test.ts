@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CopilotRealtimeService, type CopilotDependencies, type CopilotRealtimeUseCases, type CopilotServerEvent, type RequestContext } from '@techspar/core'
+import { encodeCopilotAudio } from '@techspar/contracts'
 import { CopilotServerEventSchema } from '@techspar/contracts/events'
 import { BunCopilotRepository } from '@techspar/db'
 import { DashScopeRealtimeAsrFactory } from '@techspar/providers'
@@ -97,6 +98,23 @@ describe('Copilot contracts over real Bun WebSockets', () => {
     expect<unknown>(h.events).toEqual([{ type: 'error', message: '合成音频错误' }, ...[1, 2, 3].map(() => ({ type: 'error', message: 'Invalid message' })), { type: 'error', message: '合成业务错误' }, { type: 'stopped' }])
   })
 
+  test('negotiates dual audio, rejects invalid frames, and preserves PCM source over a real socket', async () => {
+    const received: Array<{ source?: string; pcm: number[] }> = []
+    const h = await socketHarness({ connect(_context, _id, emit) { return {
+      audio(pcm, source) { received.push({ source, pcm: [...pcm] }); void emit({ type: 'progress', message: 'audio' }) },
+      async handle() { await emit({ type: 'started', session_id: 'dual', audio_ready: true }) },
+      async close() {},
+    } } })
+    h.send({ type: 'start', prep_id: 'dual', audio_mode: 'dual' })
+    await h.until(() => h.events.length === 1)
+    h.ws.send(encodeCopilotAudio('microphone', Uint8Array.from([2, 0])))
+    h.ws.send(encodeCopilotAudio('system', Uint8Array.from([1, 0])))
+    h.ws.send(Uint8Array.from([1, 0]))
+    await h.until(() => h.events.length === 4)
+    expect(received).toEqual([{ source: 'microphone', pcm: [2, 0] }, { source: 'system', pcm: [1, 0] }])
+    expect(h.events).toContainEqual({ type: 'error', message: 'Invalid dual-channel audio frame' })
+  })
+
   test('blocks bad primary output, sanitizes logs and closes/aborts exactly once', async () => {
     let closed = 0
     let context: RequestContext | undefined
@@ -180,7 +198,7 @@ describe('Copilot contracts over real Bun WebSockets', () => {
     let context: RequestContext | undefined
     let modelStreams = 0
     const deps = dependencyStub<CopilotDependencies>({
-      repository, voiceprint: undefined,
+      repository,
       embeddings: dependencyStub<CopilotDependencies['embeddings']>({ async embed(_context: RequestContext, texts: readonly string[]) { return texts.map(() => Float32Array.from([1, 0])) } }),
       settings: dependencyStub<CopilotDependencies['settings']>({ async loadProvider() { return { services: { dashscope_api_key: 'synthetic', tavily_api_key: '', oss_access_key_id: '', oss_access_key_secret: '', oss_bucket: '', oss_endpoint: '' } } } }),
       asr: new DashScopeRealtimeAsrFactory({
@@ -210,11 +228,11 @@ describe('Copilot contracts over real Bun WebSockets', () => {
       expect(modelStreams).toBe(0)
       expect(h.events).toEqual([{ type: 'progress', message: '正在预计算策略树 embedding...' }])
     } else {
-      await h.until(() => h.events.some((event) => (event as { type: string }).type === 'answer_done'))
+      await h.until(() => h.events.some((event) => (event as { type: string }).type === 'started'))
       expect(h.events).toContainEqual({ type: 'progress', message: '语音识别不可用，请使用手动输入' })
       expect(h.events).toContainEqual({ type: 'started', session_id: 'live-1' })
       h.send({ type: 'manual', text: '手动输入的问题' })
-      await h.until(() => h.events.filter((event) => (event as { type: string }).type === 'answer_done').length === 2)
+      await h.until(() => h.events.filter((event) => (event as { type: string }).type === 'answer_done').length === 1)
       expect(h.events).toContainEqual({ type: 'answer_chunk', text: '合成回答' })
       expect((await repository.loadSession('live-1', 'user-a'))?.conversation).toMatchObject([{ role: 'hr', text: '手动输入的问题' }])
       for (const event of h.events) expect(CopilotServerEventSchema.safeParse(event).success).toBeTrue()
@@ -243,7 +261,7 @@ describe('Copilot contracts over real Bun WebSockets', () => {
     let asr: Parameters<CopilotDependencies['asr']['create']>[0] | undefined
     let stops = 0
     const deps = dependencyStub<CopilotDependencies>({
-      repository, voiceprint: undefined,
+      repository,
       embeddings: dependencyStub<CopilotDependencies['embeddings']>({ async embed(_context: RequestContext, texts: readonly string[]) { return texts.map(() => Float32Array.from([1, 0])) } }),
       settings: dependencyStub<CopilotDependencies['settings']>({ async loadProvider() { return { services: { dashscope_api_key: 'synthetic', tavily_api_key: '', oss_access_key_id: '', oss_access_key_secret: '', oss_bucket: '', oss_endpoint: '' } } } }),
       asr: { create(input) { asr = input; return { async start() {}, sendAudio() { return true }, async stop() { stops += 1 } } } },
@@ -261,8 +279,8 @@ describe('Copilot contracts over real Bun WebSockets', () => {
     const h = await socketHarness(service)
     h.send({ type: 'start', prep_id: 'ready' })
     const has = (type: string) => h.events.some((event) => (event as { type: string }).type === type)
-    await h.until(() => has('started') && has('answer_done'))
-    // Warmup meta/done legitimately have no answer_chunk or copilot_update.
+    await h.until(() => has('started'))
+    // Opening the session must not generate an unsolicited model answer.
     expect<unknown>(has('answer_chunk')).toBeFalse()
     await asr!.onInterim('请介绍')
     await asr!.onFinal('请介绍一下项目', 'hr')
@@ -290,7 +308,6 @@ describe('Copilot contracts over real Bun WebSockets', () => {
     const stored = await repository.loadSession('live-1', 'user-a')
     expect<unknown>(stored?.turn_count).toBe(3)
     expect<unknown>(stored?.conversation.map((turn) => turn.role)).toEqual(['hr', 'candidate', 'hr', 'hr'])
-    await resumed.until(() => resumed.events.some((event) => (event as { type: string }).type === 'answer_done'))
     deps.ai.stream = async function* () { yield '部分回答'; throw new Error('ASR 触发的模型流错误') }
     await asr!.onFinal('新的问题', 'hr')
     await resumed.until(() => resumed.events.some((event) => (event as { message?: string }).message === 'ASR 触发的模型流错误'))

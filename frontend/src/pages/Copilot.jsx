@@ -6,6 +6,8 @@ import "./copilot/styles.css";
 import DetailView from "./copilot/DetailView";
 import ListView from "./copilot/ListView";
 import RealtimePhase from "./copilot/RealtimePhase";
+import DesktopRequired from "./copilot/DesktopRequired";
+import { isDesktopApp } from "@/lib/desktop";
 
 export default function Copilot() {
   const navigate = useNavigate();
@@ -40,6 +42,8 @@ export default function Copilot() {
   const goNew = useCallback(() => go("new", null), [go]);
   const goDetail = useCallback((prepId) => go("detail", prepId), [go]);
   const goRealtime = useCallback((prepId) => go("realtime", prepId), [go]);
+
+  if (!isDesktopApp()) return <DesktopRequired />;
 
   switch (state.view) {
     case "list":

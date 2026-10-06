@@ -12,7 +12,7 @@
 | Copilot 实时字幕 | DashScope API Key | 仍可手动输入 HR 问题 |
 | Copilot 公司搜索 | Tavily API Key | 跳过联网公司情报，其余准备流程继续 |
 | 长录音自动转写 | DashScope + 阿里云 OSS | 可以先粘贴人工逐字稿做复盘 |
-| 自动区分 HR/候选人 | DashScope + 腾讯云 VPR + 已注册声纹 | 使用手动角色切换 |
+| 自动区分对方/自己 | 桌面端系统音频 + 麦克风，分别实时转写 | 使用手动角色切换 |
 
 ## LLM
 
@@ -44,10 +44,12 @@
 用户服务配置中的 DashScope API Key 同时用于：
 
 - 答题时的短音频转写；
-- Copilot 的 `qwen3-asr-flash-realtime` 实时字幕；
+- Copilot 的 `qwen-audio-3.1-asr-flash-streaming` 双路实时字幕；
 - 录音复盘的长音频异步转写。
 
 配置后先用短音频或 Copilot 实时字幕验证。缺少 key 时，文本输入和人工逐字稿路径仍然可用。
+
+Copilot 使用北京地域。可填写百炼业务空间 ID（如 `llm-...`）以使用专属域名；不填则使用北京公共入口。这里填写 ID，不是完整 URL。ASR 使用 WebSocket `run-task` / 二进制 PCM / `finish-task` 协议；已收到 `task-started` 才开始采集传输。其他短音频和录音复盘接口保持原有配置。
 
 ## Tavily
 
@@ -64,11 +66,9 @@ Tavily API Key 只用于 Copilot Prep 的公司联网搜索。配置后，用真
 
 Bucket 可以保持私有。适配器上传文件后生成短期签名 URL，并在任务结束后清理临时对象。短音频和 Copilot 实时字幕不需要 OSS。
 
-## 腾讯云 VPR 声纹
+## 旧声纹数据
 
-在“设置 → 声纹识别”填写腾讯云 SecretId/SecretKey，可选 AppId，先测试凭据，再录制 6–15 秒候选人语音注册声纹。凭据加密后按用户保存。
-
-实时识别同时依赖 DashScope ASR 切段。建议注册和面试使用相近的麦克风与环境；信道变化、多人重叠或强噪声都会降低判断质量。声纹只能辅助角色标注，不应作为身份认证手段。
+桌面 Copilot 已按音频来源区分角色，不需要腾讯云 VPR。旧声纹数据和兼容接口暂时保留供历史数据迁移，设置页不再提供注册入口。
 
 ## 平台共享兜底
 

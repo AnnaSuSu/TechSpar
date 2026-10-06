@@ -16,5 +16,6 @@ interface Window {
   techsparDesktop?: {
     getRuntimeInfo(): Promise<TechSparDesktopRuntimeInfo>
     bootstrapSession(): Promise<TechSparDesktopBootstrapSession>
+    openAudioSettings?(kind: 'microphone' | 'system'): Promise<void>
   }
 }

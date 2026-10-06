@@ -4,6 +4,7 @@ export * from './interview-shared.ts'
 export * from './interview-responses.ts'
 export * from './task-responses.ts'
 export * from './profile-responses.ts'
+export * from './copilot-audio.ts'
 
 const UploadedFileSchema = z.instanceof(File).meta({ type: 'string', format: 'binary' })
 
@@ -72,6 +73,7 @@ export const EmbeddingSettingsSchema = z.object({
 
 export const ServiceSettingsSchema = z.object({
   dashscope_api_key: z.string().default(''),
+  dashscope_workspace_id: z.string().trim().max(100).regex(/^[a-zA-Z0-9-]*$/).optional(),
   tavily_api_key: z.string().default(''),
   oss_access_key_id: z.string().default(''),
   oss_access_key_secret: z.string().default(''),
@@ -204,7 +206,7 @@ export const VoiceprintUploadSchema = z.object({ file: UploadedFileSchema })
 export const VoiceprintEnrolledSchema = OkSchema.extend({ enrolled_at: z.string() })
 
 export const CopilotClientMessageSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('start'), prep_id: z.string().optional() }),
+  z.object({ type: z.literal('start'), prep_id: z.string().optional(), audio_mode: z.literal('dual').optional() }),
   z.object({ type: z.literal('manual'), text: z.string().optional() }),
   z.object({ type: z.literal('candidate_response'), text: z.string() }),
   z.object({ type: z.literal('stop') }),

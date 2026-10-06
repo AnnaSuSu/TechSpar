@@ -32,6 +32,8 @@ export type EmbeddingSettings = {
 
 export type ServiceSettings = {
   dashscope_api_key: string
+  /** Beijing Model Studio workspace; blank uses the shared Beijing endpoint. */
+  dashscope_workspace_id?: string
   tavily_api_key: string
   oss_access_key_id: string
   oss_access_key_secret: string

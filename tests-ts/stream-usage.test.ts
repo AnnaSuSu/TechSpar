@@ -10,6 +10,7 @@ import {
   type ProviderSource,
   type QuotaStatus,
   type QuotaUseCases,
+  type ResolvedLlmConfig,
 } from '@techspar/core'
 
 const platform: PlatformProviderConfig = {
@@ -49,6 +50,23 @@ class RecordingQuota implements QuotaUseCases {
 }
 
 describe('流式调用的用量计量', () => {
+  test('Copilot override applies to complete and stream without changing the general model or billing', async () => {
+    const configs: ResolvedLlmConfig[] = []
+    const quota = new RecordingQuota()
+    const factory: ChatDriverFactory = { create(config) { configs.push(config); return new StreamingDriver() } }
+    const general = new AiService(settings, platform, quota, factory)
+    const copilotConfig: ResolvedLlmConfig = { api_base: 'https://api.deepseek.com', api_key: 'copilot-only', model: 'deepseek-flash', compatibility: 'deepseek', temperature: 0.7, use_platform: true, source: 'platform' }
+    const copilot = new AiService(settings, platform, quota, factory, copilotConfig)
+    const context = { requestId: 'routing', userId: 'u1', signal: new AbortController().signal }
+    await general.complete(context, [])
+    await copilot.complete(context, [])
+    for await (const _chunk of copilot.stream(context, [])) { /* consume usage */ }
+    await general.complete(context, [])
+    expect(configs.map((c) => c.model)).toEqual(['m', 'deepseek-flash', 'deepseek-flash', 'm'])
+    expect(configs[1]).toEqual(copilotConfig)
+    expect(quota.recorded).toHaveLength(4)
+    expect(quota.recorded[2]).toMatchObject({ source: 'platform', model: 'deepseek-flash', completionTokens: 340 })
+  })
   test('把流式报出的 token 记进用量,而不是记 0', async () => {
     // 曾经的漏洞:stream 路径不取 usage,一律记 0 token。按 token 计费时
     // 等于流式免费无限量,而流式恰恰是面试作答、Copilot 这些最贵的场景。

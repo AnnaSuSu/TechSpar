@@ -3,6 +3,16 @@ import { loadConfig } from './index.ts'
 
 const baseEnv = { TECHSPAR_BASE_DIR: '/tmp/techspar-test', JWT_SECRET: 'test-secret' }
 
+test('Copilot credentials are isolated from general LLM and transcription settings', () => {
+  const config = loadConfig({ ...baseEnv, PLATFORM_LLM_MODEL: 'general-model', PLATFORM_LLM_API_KEY: 'general-key', COPILOT_LLM_API_KEY: 'copilot-key', COPILOT_DASHSCOPE_API_KEY: 'asr-key', COPILOT_DASHSCOPE_WORKSPACE_ID: 'workspace' })
+  expect(config.platformLlmModel).toBe('general-model')
+  expect(config.platformLlmApiKey).toBe('general-key')
+  expect(config.copilotLlm).toMatchObject({ model: 'deepseek-flash', api_key: 'copilot-key', api_base: 'https://api.deepseek.com', compatibility: 'deepseek', source: 'platform' })
+  expect(config.copilotAsr).toEqual({ apiKey: 'asr-key', workspaceId: 'workspace' })
+  expect(loadConfig(baseEnv).copilotLlm).toBeUndefined()
+  expect(loadConfig(baseEnv).copilotAsr).toBeUndefined()
+})
+
 test('数字型环境变量缺省时回退到默认值', () => {
   const config = loadConfig({ ...baseEnv })
   expect(config.port).toBe(8000)

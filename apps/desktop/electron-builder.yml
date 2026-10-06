@@ -11,6 +11,8 @@ files:
   - package.json
   - "!node_modules/**/*"
 extraResources:
+  - from: ../../docs/third-party/meetily.md
+    to: licenses/meetily.md
   - from: resources/backend
     to: backend
     filter:
@@ -20,6 +22,10 @@ extraResources:
     filter:
       - "**/*"
 mac:
+  extendInfo:
+    NSMicrophoneUsageDescription: TechSpar 使用麦克风转写你的回答。
+    NSAudioCaptureUsageDescription: TechSpar 使用系统音频转写会议中对方的发言。
+    NSScreenCaptureUsageDescription: TechSpar 通过系统共享接口获取会议音频，不上传屏幕画面。
   category: public.app-category.education
   icon: build/icon.png
   target:

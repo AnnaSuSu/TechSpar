@@ -18,6 +18,21 @@ describe('chat provider compatibility', () => {
   const config = { api_base: 'https://example.test/v1', api_key: 'key', model: 'test-model', temperature: 0.7, compatibility: 'generic' as const, use_platform: false, source: USER_PROVIDER }
   const valid = completion([{ index: 0, message: { role: 'assistant', content: '[{"id":1,"question":"题目"}]' }, finish_reason: 'stop' }], { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 })
 
+  test('disables thinking for DeepSeek live advice without changing generic providers', async () => {
+    const requests: Array<Record<string, unknown>> = []
+    const factory = new OpenAiChatDriverFactory({ fetch: (async (_input, init) => {
+      requests.push(JSON.parse(String(init?.body)))
+      return new Response('data: {"choices":[{"delta":{"content":"回答"}}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":20,"completion_tokens":2}}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
+    }) as typeof fetch })
+    for (const compatibility of ['deepseek', 'generic'] as const) {
+      const chunks: string[] = []
+      for await (const chunk of factory.create({ ...config, compatibility }).stream([{ role: 'user', content: '问题' }], new AbortController().signal, { reasoningEffort: 'none', maxTokens: 600 })) chunks.push(chunk)
+      expect(chunks.join('')).toBe('回答')
+    }
+    expect(requests[0]).toMatchObject({ reasoning_effort: 'none', max_tokens: 600, stream: true })
+    expect(requests[1]).not.toHaveProperty('reasoning_effort')
+  })
+
   test('retries null choices with backoff and preserves the output limit', async () => {
     const requests: Array<Record<string, unknown>> = []
     const delays: number[] = []

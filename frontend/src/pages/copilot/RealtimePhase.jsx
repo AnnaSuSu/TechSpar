@@ -6,12 +6,10 @@ import {
   Mic,
   MicOff,
   Minimize2,
-  Radio,
   Send,
   Sparkles,
 } from "lucide-react";
 
-import { getVoiceprintStatus } from "../../api/voiceprint";
 import useCopilotStream from "../../hooks/useCopilotStream";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,14 +34,9 @@ export default function RealtimePhase({ prepId, onBack }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [progressMsg, setProgressMsg] = useState("连接中...");
   const [started, setStarted] = useState(false);
-  const [voiceprintAuto, setVoiceprintAuto] = useState(false);
+  const [microphoneId, setMicrophoneId] = useState("");
+  const [microphones, setMicrophones] = useState([]);
   const chatEndRef = useRef(null);
-
-  useEffect(() => {
-    getVoiceprintStatus()
-      .then((status) => setVoiceprintAuto(Boolean(status?.configured && status?.enrolled)))
-      .catch(() => {});
-  }, []);
 
   const handleUpdate = useCallback((msg) => {
     switch (msg.type) {
@@ -82,7 +75,7 @@ export default function RealtimePhase({ prepId, onBack }) {
       case "started":
         setStarted(true);
         setProgressMsg("");
-        setPerfMetrics({ warming: true });
+        setPerfMetrics(null);
         break;
       case "asr_final":
         if (msg.text) {
@@ -101,6 +94,10 @@ export default function RealtimePhase({ prepId, onBack }) {
   const {
     connected,
     listening,
+    starting,
+    audioReady,
+    audioError,
+    levels,
     asrText,
     connect,
     startListening,
@@ -109,6 +106,19 @@ export default function RealtimePhase({ prepId, onBack }) {
     sendCandidateResponse,
     disconnect,
   } = useCopilotStream({ prepId, onUpdate: handleUpdate });
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        if (!cancelled) setMicrophones(devices.filter((device) => device.kind === "audioinput"));
+      } catch { /* The default microphone remains selectable before permission. */ }
+    };
+    void refresh();
+    navigator.mediaDevices.addEventListener("devicechange", refresh);
+    return () => { cancelled = true; navigator.mediaDevices.removeEventListener("devicechange", refresh); };
+  }, [listening]);
 
   useEffect(() => {
     connect(sessionId);
@@ -196,11 +206,11 @@ export default function RealtimePhase({ prepId, onBack }) {
             size="sm"
             variant={listening ? "destructive" : "outline"}
             className="rounded-2xl"
-            onClick={listening ? stopListening : startListening}
-            disabled={!connected || !started}
+            onClick={listening || starting ? stopListening : () => startListening(microphoneId)}
+            disabled={!connected || !started || !audioReady}
           >
             {listening ? <MicOff size={14} className="mr-1.5" /> : <Mic size={14} className="mr-1.5" />}
-            {listening ? "停止录音" : "开始录音"}
+            {starting ? "取消授权" : listening ? "停止采集" : "开始双路采集"}
           </Button>
           <Button size="icon" variant="ghost" className="rounded-2xl h-9 w-9" onClick={toggleFullscreen}>
             {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
@@ -211,6 +221,28 @@ export default function RealtimePhase({ prepId, onBack }) {
         </div>
       </div>
 
+      <div className="px-5 py-3 border-b border-border space-y-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <label htmlFor="copilot-microphone">你的麦克风</label>
+          <select id="copilot-microphone" className="rounded-xl border border-border bg-background px-3 py-2" value={microphoneId} disabled={listening || starting} onChange={(event) => setMicrophoneId(event.target.value)}>
+            <option value="">系统默认麦克风</option>
+            {microphones.filter((device) => device.deviceId && device.deviceId !== "default").map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `麦克风 ${index + 1}`}</option>)}
+          </select>
+          <span className="text-xs text-dim">对方声音来自电脑播放的会议音频。建议戴耳机，并关闭音乐和通知声音。</span>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          {[['microphone', '自己 · 麦克风'], ['system', '对方 · 系统音频']].map(([source, label]) => (
+            <div key={source} className="rounded-xl border border-border px-3 py-2 text-xs">
+              <div className="flex justify-between gap-2"><span>{label}</span><span className="text-dim">{!listening ? '未采集' : levels[source].active ? '收到声音' : levels[source].heard ? '当前安静' : '尚未检测到声音'}</span></div>
+              <meter className="mt-2 h-2 w-full" min="0" max="1" value={Math.min(1, levels[source].rms * 5)} aria-label={`${label}音量`} />
+            </div>
+          ))}
+        </div>
+        {listening && (!levels.system.heard || !levels.microphone.heard) && <p className="text-xs text-dim">请说一句话，并让会议播放声音，确认两路都有音量。若对方一路始终无声，请检查系统音频授权。</p>}
+        {audioError && <div role="alert" className="text-sm text-red">{audioError}</div>}
+        {audioError && <div className="flex gap-3 text-xs"><button onClick={() => window.techsparDesktop?.openAudioSettings?.('microphone')}>打开麦克风设置</button><button onClick={() => window.techsparDesktop?.openAudioSettings?.('system')}>打开系统音频设置</button></div>}
+      </div>
+
       {progressMsg && (
         <div className="px-5 py-2.5 bg-gradient-to-r from-primary/8 to-primary/3 border-b border-primary/10 text-sm text-primary flex items-center gap-2 shrink-0">
           <Loader2 size={14} className="animate-spin" /> {progressMsg}
@@ -219,10 +251,10 @@ export default function RealtimePhase({ prepId, onBack }) {
 
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col border-r border-border min-w-0">
-          {asrText && (
+          {(asrText.hr || asrText.candidate) && (
             <div className="px-5 py-2.5 bg-card/50 border-b border-border/50 text-sm text-dim shrink-0">
-              <span className="inline-block w-2 h-2 rounded-full bg-red animate-pulse mr-2 align-middle" />
-              HR: {asrText}
+              {asrText.hr && <p>对方：{asrText.hr}</p>}
+              {asrText.candidate && <p>自己：{asrText.candidate}</p>}
             </div>
           )}
 
@@ -289,15 +321,6 @@ export default function RealtimePhase({ prepId, onBack }) {
           </div>
 
           <div className="px-5 py-4 border-t border-border shrink-0 flex gap-3 bg-card/20 md:px-6">
-            {voiceprintAuto ? (
-              <div
-                className="rounded-xl h-[46px] px-3 shrink-0 text-[11px] font-semibold min-w-[56px] shadow-sm flex items-center justify-center bg-primary/10 text-primary border border-primary/25"
-                title="已启用声纹自动识别 HR/You"
-              >
-                <Radio size={14} className="mr-1" />
-                Auto
-              </div>
-            ) : (
               <Button
                 size="sm"
                 variant={inputRole === "hr" ? "outline" : "secondary"}
@@ -307,7 +330,6 @@ export default function RealtimePhase({ prepId, onBack }) {
               >
                 {inputRole === "hr" ? "HR" : "You"}
               </Button>
-            )}
             <Input
               className="h-[46px] rounded-xl border-border/80 bg-background shadow-sm px-4 focus-visible:bg-card/50"
               placeholder={inputRole === "hr" ? "手动输入 HR 的问题..." : "记录你的回答..."}

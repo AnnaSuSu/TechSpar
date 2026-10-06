@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TechSpar",
-    "version": "0.4.0"
+    "version": "0.4.1"
   },
   "components": {
     "schemas": {
@@ -2010,6 +2010,9 @@
               },
               "session_id": {
                 "type": "string"
+              },
+              "audio_ready": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -2074,6 +2077,13 @@
               },
               "text": {
                 "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "hr",
+                  "candidate"
+                ]
               }
             },
             "required": [
@@ -2995,6 +3005,11 @@
                           "type": "string",
                           "default": ""
                         },
+                        "dashscope_workspace_id": {
+                          "type": "string",
+                          "maxLength": 100,
+                          "pattern": "^[a-zA-Z0-9-]*$"
+                        },
                         "tavily_api_key": {
                           "type": "string",
                           "default": ""
@@ -3221,6 +3236,11 @@
                       "dashscope_api_key": {
                         "type": "string",
                         "default": ""
+                      },
+                      "dashscope_workspace_id": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "pattern": "^[a-zA-Z0-9-]*$"
                       },
                       "tavily_api_key": {
                         "type": "string",

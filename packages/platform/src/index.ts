@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import bcrypt from 'bcryptjs'
 import { jwtVerify, SignJWT } from 'jose'
-import type { IdGenerator, PasswordHasher, TokenService } from '@techspar/core'
+import type { IdGenerator, PasswordHasher, ResolvedLlmConfig, TokenService } from '@techspar/core'
 
 export type AppConfig = {
   baseDir: string
@@ -15,6 +15,8 @@ export type AppConfig = {
   platformLlmApiBase: string
   platformLlmApiKey: string
   platformLlmModel: string
+  copilotLlm?: ResolvedLlmConfig
+  copilotAsr?: { apiKey: string; workspaceId: string }
   platformEmbeddingApiBase: string
   platformEmbeddingApiKey: string
   platformEmbeddingModel: string
@@ -61,6 +63,16 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     platformLlmApiBase: env.PLATFORM_LLM_API_BASE || '',
     platformLlmApiKey: env.PLATFORM_LLM_API_KEY || '',
     platformLlmModel: env.PLATFORM_LLM_MODEL || '',
+    ...(env.COPILOT_LLM_API_KEY ? { copilotLlm: {
+      api_base: env.COPILOT_LLM_API_BASE || 'https://api.deepseek.com',
+      api_key: env.COPILOT_LLM_API_KEY,
+      model: env.COPILOT_LLM_MODEL || 'deepseek-flash',
+      compatibility: 'deepseek' as const, temperature: 0.7, use_platform: true, source: 'platform' as const,
+    } } : {}),
+    ...(env.COPILOT_DASHSCOPE_API_KEY ? { copilotAsr: {
+      apiKey: env.COPILOT_DASHSCOPE_API_KEY,
+      workspaceId: env.COPILOT_DASHSCOPE_WORKSPACE_ID || '',
+    } } : {}),
     platformEmbeddingApiBase: env.PLATFORM_EMBEDDING_API_BASE || '',
     platformEmbeddingApiKey: env.PLATFORM_EMBEDDING_API_KEY || '',
     platformEmbeddingModel: env.PLATFORM_EMBEDDING_MODEL || '',

@@ -41,8 +41,8 @@ import {
   EncryptedFileVoiceprintRepository,
   TarGzipArchiveCodec,
 } from '@techspar/platform'
-import { DashScopeLongAsrDriver, DashScopeRealtimeAsrFactory, DashScopeShortAsrDriver, OpenAiChatDriverFactory, OpenAiEmbeddingDriverFactory, TavilyWebSearchDriver, TencentVoiceprintDriverFactory } from '@techspar/providers'
-import { createBunWebSocket } from 'hono/bun'
+import { DashScopeLongAsrDriver, QwenStreamingAsrFactory, DashScopeShortAsrDriver, OpenAiChatDriverFactory, OpenAiEmbeddingDriverFactory, TavilyWebSearchDriver, TencentVoiceprintDriverFactory } from '@techspar/providers'
+import { createBunWebSocket, type BunWebSocketData } from 'hono/bun'
 import { createApp } from './app.ts'
 import { loadExtensions } from './extensions.ts'
 import { withLongRequestTimeout } from './server-options.ts'
@@ -128,7 +128,8 @@ const recording = new RecordingService({ sessions, tasks: taskQueue, ids: new Sh
 const copilotRepository = new BunCopilotRepository(config.dbPath)
 copilotRepository.initialize()
 const voiceprint = new VoiceprintService(new EncryptedFileVoiceprintRepository(config.dataDir, config.voiceprintEncryptionKey), new TencentVoiceprintDriverFactory())
-const copilotDependencies = { repository: copilotRepository, tasks: taskQueue, ids: new ShortUuidGenerator(), ai, embeddings, profile, resume, settings: settingsRepository, search: new TavilyWebSearchDriver(), asr: new DashScopeRealtimeAsrFactory(), voiceprint }
+const copilotAi = new AiService(settingsRepository, platform, quota, chatDrivers, config.copilotLlm)
+const copilotDependencies = { repository: copilotRepository, tasks: taskQueue, ids: new ShortUuidGenerator(), ai: copilotAi, embeddings, profile, resume, settings: settingsRepository, search: new TavilyWebSearchDriver(), asr: new QwenStreamingAsrFactory(), asrConfig: config.copilotAsr }
 const copilotPrep = new CopilotPrepService(copilotDependencies)
 const copilotRealtime = new CopilotRealtimeService(copilotDependencies)
 const migration = new DataMigrationService({ codec: new TarGzipArchiveCodec(), database: new BunDataMigrationRepository(config.dbPath), files: new FileMigrationStore(config.dataDir, config.voiceprintEncryptionKey), profiles: profileRepository, users })
@@ -142,6 +143,6 @@ await taskQueue.start()
 const { upgradeWebSocket, websocket } = createBunWebSocket()
 const app = createApp({ auth, registration, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, recording, copilotPrep, copilotRealtime, websocketUpgrade: upgradeWebSocket, voiceprint, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir })
 
-const server = Bun.serve(withLongRequestTimeout({ hostname: config.host, port: config.port, fetch: app.fetch, websocket }))
+const server = Bun.serve<BunWebSocketData>(withLongRequestTimeout({ hostname: config.host, port: config.port, fetch: (request, server) => app.fetch(request, server), websocket }))
 console.log(JSON.stringify({ event: 'techspar:ready', host: config.host, port: server.port }))
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => { void server.stop(true).finally(() => process.exit(0)) })

@@ -244,7 +244,36 @@ describe('Copilot realtime', () => {
       const answer = events.slice(update).filter((event) => ['answer_chunk', 'answer_done'].includes(String(event.type)))
       expect(answer[0]).toEqual({ type: 'answer_chunk', text: '部分回答' })
       expect(answer.at(-1)).toMatchObject({ type: 'answer_done', chunk_count: 1 })
-      expect(events).toContainEqual(expect.objectContaining({ type: 'answer_done', chunk_count: 0 }))
+      expect(events.filter((event) => event.type === 'answer_done')).toHaveLength(1)
+    } finally { await connection.close(); repository.close() }
+  })
+
+  test('a new question cancels a pending answer while preserving both turns', async () => {
+    const repository = new BunCopilotRepository(await databasePath()); repository.initialize()
+    await repository.createPrep({ prepId: 'ready', userId: 'user-a', company: '', position: '', jdText: 'JD' })
+    await repository.completePrep('ready', 'user-a', { question_strategy_tree: { nodes: {} } })
+    const deps = dependencies(repository, { async enqueue(input) { return queued(input) }, async get() { return undefined } })
+    const entered = Promise.withResolvers<void>()
+    let aborted = false
+    deps.ai.stream = async function* (ctx, messages, options) {
+      expect(options).toMatchObject({ reasoningEffort: 'none', maxTokens: 600 })
+      if (messages.some(message => message.content.includes('HR 最新发言：第一题'))) {
+        entered.resolve()
+        await new Promise<void>(resolve => ctx.signal.addEventListener('abort', () => { aborted = true; resolve() }, { once: true }))
+        yield '过期回答'
+      } else yield '新回答'
+    }
+    const events: Array<Record<string, unknown>> = []
+    const connection = new CopilotRealtimeService(deps).connect(context, 'cancel', async event => { events.push(event) })
+    try {
+      await connection.handle({ type: 'start', prep_id: 'ready' })
+      const first = connection.handle({ type: 'manual', text: '第一题' })
+      await within(entered.promise)
+      const second = connection.handle({ type: 'manual', text: '第二题' })
+      await within(Promise.all([first, second]))
+      expect(aborted).toBeTrue()
+      expect(events.filter(event => event.type === 'answer_chunk').map(event => event.text)).toEqual(['新回答'])
+      expect((await repository.loadSession('cancel', 'user-a'))?.conversation.map(turn => turn.text)).toEqual(['第一题', '第二题'])
     } finally { await connection.close(); repository.close() }
   })
 
@@ -288,7 +317,7 @@ describe('Copilot realtime', () => {
     deps.settings.loadProvider = async () => ({ ...config, services: { ...config.services!, dashscope_api_key: 'synthetic' } })
     const entered = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
-    deps.voiceprint = { async detector() { entered.resolve(); await release.promise; return undefined } }
+    deps.settings.loadProvider = async () => { entered.resolve(); await release.promise; return { ...config, services: { ...config.services!, dashscope_api_key: 'synthetic' } } }
     let created = 0
     deps.asr = { create() { created += 1; throw new Error('must not create ASR after close') } }
     const events: unknown[] = []
@@ -303,5 +332,77 @@ describe('Copilot realtime', () => {
       expect(created).toBe(0)
       expect(events).toHaveLength(count)
     } finally { release.resolve(); await connection.close(); repository.close() }
+  })
+})
+
+
+describe('Copilot independent desktop channels', () => {
+  async function fixture(failMicrophone = false) {
+    const repository = new BunCopilotRepository(await databasePath()); repository.initialize()
+    await repository.createPrep({ prepId: 'dual', userId: 'user-a', company: '', position: '', jdText: 'JD' })
+    await repository.completePrep('dual', 'user-a', { question_strategy_tree: { nodes: {} } })
+    const deps = dependencies(repository, { async enqueue(input) { return queued(input) }, async get() { return undefined } })
+    const config = await deps.settings.loadProvider('user-a')
+    deps.settings.loadProvider = async () => ({ ...config, services: { ...config.services!, dashscope_api_key: 'synthetic' } })
+    const inputs: Array<Parameters<CopilotDependencies['asr']['create']>[0]> = []
+    const audio: Uint8Array[][] = [[], []]
+    const stopped = [0, 0]
+    deps.asr = { create(input) {
+      const index = inputs.length; inputs.push(input)
+      return { async start() { if (failMicrophone && index === 1) throw new Error('microphone ASR offline') }, sendAudio(bytes) { audio[index]!.push(bytes); return true }, async stop() { stopped[index]! += 1 } }
+    } }
+    const events: unknown[] = []
+    const connection = new CopilotRealtimeService(deps).connect(context, 'dual-session', async (event) => { events.push(event) })
+    await connection.handle({ type: 'start', prep_id: 'dual', audio_mode: 'dual' })
+    return { repository, inputs, audio, stopped, events, connection }
+  }
+
+  test('routes independent PCM and binds roles to source even if the recognizer says otherwise', async () => {
+    const f = await fixture()
+    try {
+      expect(f.inputs).toHaveLength(2)
+      expect(f.inputs.every((input) => !input.roleDetector)).toBeTrue()
+      expect(f.events).toContainEqual({ type: 'started', session_id: 'dual-session', audio_ready: true })
+      f.connection.audio(Uint8Array.from([1, 0]), 'system')
+      f.connection.audio(Uint8Array.from([2, 0]), 'microphone')
+      expect(f.audio).toEqual([[Uint8Array.from([1, 0])], [Uint8Array.from([2, 0])]])
+      await f.inputs[1]!.onInterim('我的回答')
+      await f.inputs[1]!.onFinal('我的回答', 'hr')
+      expect(f.events).toContainEqual({ type: 'asr_interim', text: '我的回答', role: 'candidate' })
+      expect(f.events).not.toContainEqual(expect.objectContaining({ type: 'copilot_update' }))
+      await f.inputs[0]!.onFinal('对方的问题', 'candidate')
+      const stored = await f.repository.loadSession('dual-session', 'user-a')
+      expect(stored?.conversation.map(({ role, text }) => ({ role, text }))).toEqual([{ role: 'candidate', text: '我的回答' }, { role: 'hr', text: '对方的问题' }])
+      expect(stored?.turn_count).toBe(1)
+      await f.connection.close()
+      expect(f.stopped).toEqual([1, 1])
+      const count = f.events.length
+      await f.inputs[0]!.onFinal('late')
+      await f.inputs[1]!.onInterim('late')
+      f.connection.audio(Uint8Array.from([3, 0]), 'system')
+      expect(f.events).toHaveLength(count)
+      expect(f.audio[0]).toHaveLength(1)
+    } finally { await f.connection.close(); f.repository.close() }
+  })
+
+  test('releases both sessions if the second ASR cannot start', async () => {
+    const f = await fixture(true)
+    try {
+      expect(f.stopped).toEqual([1, 1])
+      expect(f.events).toContainEqual({ type: 'started', session_id: 'dual-session', audio_ready: false })
+      f.connection.audio(Uint8Array.from([1, 0]), 'system')
+      expect(f.audio).toEqual([[], []])
+    } finally { await f.connection.close(); f.repository.close() }
+  })
+
+  test('a live channel error stops both sessions and rejects late transcripts', async () => {
+    const f = await fixture()
+    try {
+      await f.inputs[1]!.onError('connection lost')
+      expect(f.stopped).toEqual([1, 1])
+      const count = f.events.length
+      await f.inputs[0]!.onFinal('late')
+      expect(f.events).toHaveLength(count)
+    } finally { await f.connection.close(); f.repository.close() }
   })
 })
