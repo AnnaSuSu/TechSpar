@@ -100,33 +100,6 @@ When self-hosting or building the desktop application from source, configure LLM
 - DashScope powers voice input, recording transcription, and Copilot realtime ASR.
 - Tavily adds company research, OSS supports long-audio jobs, and Tencent VPR optionally distinguishes interviewer and candidate voices.
 
-## Architecture
-
-| Layer | Technology |
-| --- | --- |
-| API host | Bun 1.3, Hono 4, `@hono/zod-openapi` |
-| Desktop | Electron 43, sandboxed renderer, constrained preload, compiled Bun sidecar |
-| Core | Pure TypeScript use cases, state machines, and owned ports |
-| Storage | SQLite and atomic JSON/file storage |
-| Providers | OpenAI-compatible APIs, Transformers.js, DashScope, OSS, Tavily, Tencent VPR |
-| Web | React 19, React Router 7, Vite 8, Tailwind CSS 4 |
-| Contracts | Zod, OpenAPI 3.1, generated frontend types |
-| Validation | Bun Test, OpenAPI parity, Node compatibility, boundary checks |
-
-TechSpar is a modular monolith with hexagonal boundaries. Hono maps HTTP, SSE, and WebSocket transports; business rules live in `packages/core`; storage, files, and providers stay in outer adapters. See [TypeScript backend architecture](docs/typescript-backend-architecture.md).
-
-```text
-apps/api/             Bun + Hono composition root and routes
-apps/desktop/         Electron main/preload, sidecar supervision, packaging
-packages/contracts/   OpenAPI and transport protocols
-packages/core/        Use cases, state machines, and ports
-packages/db/          SQLite repositories
-packages/platform/    Files, auth, configuration, and archives
-packages/providers/   LLM, embedding, ASR, OSS, search, and voiceprint adapters
-frontend/             React Web client
-tests-ts/             TypeScript tests and the legacy OpenAPI baseline
-```
-
 ## Validation
 
 ```bash

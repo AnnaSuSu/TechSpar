@@ -126,39 +126,6 @@ docker compose up --build
 - **阿里云 OSS**：长录音异步转写的临时对象存储。
 - **腾讯云 VPR**：可选的 HR/候选人声纹区分。
 
-## 技术架构
-
-[![Bun](https://img.shields.io/badge/Bun-1.3+-000000.svg)](https://bun.sh/)
-[![Hono](https://img.shields.io/badge/Hono-4-E36002.svg)](https://hono.dev/)
-[![Electron](https://img.shields.io/badge/Electron-43-47848F.svg)](https://www.electronjs.org/)
-[![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
-
-| 层 | 技术 |
-| --- | --- |
-| API Host | Bun 1.3、Hono 4、`@hono/zod-openapi` |
-| Desktop | Electron 43、沙箱 Renderer、受限 Preload、编译后的 Bun sidecar |
-| Core | 纯 TypeScript 用例、状态机和端口 |
-| Storage | SQLite、原子 JSON/文件存储 |
-| Providers | OpenAI-compatible、Transformers.js、DashScope、OSS、Tavily、腾讯云 VPR |
-| Web | React 19、React Router 7、Vite 8、Tailwind CSS 4 |
-| Contracts | Zod、OpenAPI 3.1、生成的前端类型 |
-| Test | Bun Test、OpenAPI 契约对照、Node 兼容性检查 |
-
-项目采用模块化单体和六边形边界：Hono 只负责 HTTP/SSE/WebSocket 映射，业务规则在 `packages/core`，数据库、文件和供应商实现位于外层适配器。详见 [TypeScript 后端架构](docs/typescript-backend-architecture.md)。
-
-```text
-apps/api/             Bun + Hono 组合入口与路由
-apps/desktop/         Electron 主进程、Preload、sidecar 监督与打包配置
-packages/contracts/   OpenAPI 与传输协议
-packages/core/        业务用例、状态机、端口
-packages/db/          SQLite repositories
-packages/platform/    文件、认证、配置与归档适配器
-packages/providers/   LLM、Embedding、ASR、OSS、搜索与声纹适配器
-frontend/             React Web 客户端
-tests-ts/             TypeScript 测试与旧版 OpenAPI 基线
-```
-
 ## 质量检查
 
 ```bash
