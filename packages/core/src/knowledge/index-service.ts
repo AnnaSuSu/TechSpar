@@ -7,6 +7,7 @@ import type { QuestionGraph } from './model.ts'
 const TOPIC_CHUNK = 'topic_chunk'
 const CHUNK_SIZE = 1000
 const CHUNK_OVERLAP = 150
+const RRF_RANK_CONSTANT = 60
 
 export function chunkText(value: string): string[] {
   const text = value.trim()
@@ -97,33 +98,42 @@ export class KnowledgeIndexService implements KnowledgeIndex, KnowledgeQuery, Ve
     })
   }
 
-  private async retrieve(context: RequestContext, topic: string, query: string, topK: number): Promise<string[]> {
+  private async retrieve(context: RequestContext, topic: string, queries: readonly string[], topK: number): Promise<string[]> {
+    const intents = [...new Set(queries.map(query => query.trim()).filter(Boolean))]
+    if (!intents.length || topK <= 0) return []
     let chunks = await this.vectors.listChunks(context.userId!, TOPIC_CHUNK, topic)
     if (!chunks.length && (await this.documents(context.userId!, topic)).length) {
       await this.ingest(context, topic)
       chunks = await this.vectors.listChunks(context.userId!, TOPIC_CHUNK, topic)
     }
     if (!chunks.length) return []
-    const [queryVector] = await this.embeddings.embed(context, [query])
-    return chunks
-      .map((chunk) => ({ content: chunk.content, similarity: cosine(queryVector!, chunk.embedding) }))
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, topK)
-      .map((item) => item.content)
+    const queryVectors = await this.embeddings.embed(context, intents)
+    const fused = new Map<string, number>()
+    for (const queryVector of queryVectors) {
+      const ranked = chunks
+        .map(chunk => ({ content: chunk.content, similarity: cosine(queryVector, chunk.embedding) }))
+        .sort((a, b) => b.similarity - a.similarity)
+      const seen = new Set<string>()
+      let rank = 0
+      for (const chunk of ranked) {
+        // The same evidence gets at most one vote per query, even across files.
+        if (seen.has(chunk.content)) continue
+        seen.add(chunk.content)
+        rank += 1
+        fused.set(chunk.content, (fused.get(chunk.content) ?? 0) + 1 / (RRF_RANK_CONSTANT + rank))
+        if (rank >= topK) break
+      }
+    }
+    return [...fused.entries()]
+      .sort(([left, leftScore], [right, rightScore]) => rightScore - leftScore || (left < right ? -1 : left > right ? 1 : 0))
+      .map(([content]) => content)
   }
 
   async context(context: RequestContext, topic: string, queries: readonly string[], options?: { topK?: number; charBudget?: number }): Promise<string> {
     const charBudget = options?.charBudget ?? 8000
     const full = (await this.documents(context.userId!, topic)).map((item) => item.content).join('\n\n---\n\n')
     if (full.length <= charBudget) return full
-    const seen = new Set<string>()
-    const chunks: string[] = []
-    for (const query of queries) {
-      for (const chunk of await this.retrieve(context, topic, query, options?.topK ?? 5)) {
-        const key = chunk.slice(0, 100)
-        if (!seen.has(key)) { seen.add(key); chunks.push(chunk) }
-      }
-    }
+    const chunks = await this.retrieve(context, topic, queries, options?.topK ?? 5)
     return chunks.join('\n\n---\n\n').slice(0, charBudget)
   }
 
