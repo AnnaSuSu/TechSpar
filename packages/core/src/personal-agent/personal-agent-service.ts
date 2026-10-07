@@ -89,8 +89,9 @@ export class PersonalAgentService implements PersonalAgentUseCases {
     const sources = hits.map((hit) => ({ document_id: hit.document_id, filename: hit.source }))
     const userMessage: AgentMessage = { role: 'user', content: input, created_at: now }
     const assistantMessage: AgentMessage = { role: 'assistant', content: answer, created_at: now, sources }
-    const messages = [...conversation.messages, userMessage, assistantMessage]
-    await this.deps.repository.saveConversation(conversation.conversation_id, id, messages)
+    if (!(await this.deps.repository.appendConversationMessages(conversation.conversation_id, id, [userMessage, assistantMessage]))) {
+      throw new AppError('对话不存在', 404)
+    }
     return { conversation_id: conversation.conversation_id, title: conversation.title, message: assistantMessage }
   }
 
