@@ -48,13 +48,11 @@ function cosine(left: Float32Array, right: Float32Array): number {
   return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm) + 1e-12)
 }
 
-function questionKey(value: string): string {
-  let hash = 2166136261
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index)
-    hash = Math.imul(hash, 16777619)
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0')
+async function questionKey(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  const hash = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+  // Version the key so legacy 32-bit entries are rebuilt instead of trusted.
+  return `sha256:${hash}`
 }
 
 export class KnowledgeIndexService implements KnowledgeIndex, KnowledgeQuery, VectorIndexControl {
@@ -168,7 +166,7 @@ export class KnowledgeIndexService implements KnowledgeIndex, KnowledgeQuery, Ve
     const nodes = questions.map(({ score_sum: _, ...question }, id) => ({ id, ...question }))
     if (questions.length < 2) return { nodes, links: [] }
     const context: RequestContext = { requestId: 'question-graph', userId, signal: new AbortController().signal }
-    const keys = questions.map((question) => questionKey(String(question.question)))
+    const keys = await Promise.all(questions.map((question) => questionKey(String(question.question))))
     const cached = await this.vectors.questionEmbeddings(userId, keys)
     const missing = questions.map((question, index) => ({ question: String(question.question), key: keys[index]! })).filter((item) => !cached.has(item.key))
     if (missing.length) {
