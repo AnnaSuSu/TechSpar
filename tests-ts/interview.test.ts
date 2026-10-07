@@ -190,11 +190,11 @@ describe('resume interview state machine', () => {
 })
 
 describe('interview application service', () => {
-  test('validates structured JD preview and derives resume usage from actual context', async () => {
+  test.each(['', '🧑‍💻📝 分析结果：\n'])('validates structured JD preview with prefix %s and derives resume usage from actual context', async (prefix) => {
     const path = await databasePath()
     const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
     const states = new BunResumeInterviewStateRepository(path); states.initialize()
-    const ai = new FakeAi([JSON.stringify({
+    const ai = new FakeAi([prefix + JSON.stringify({
       company: '跨越速运',
       position: '高级 Java 工程师',
       role_summary: '负责物流核心系统开发',

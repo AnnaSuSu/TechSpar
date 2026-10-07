@@ -3,6 +3,7 @@ import { createBunWebSocket } from 'hono/bun'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createConnection } from 'node:net'
 import { CopilotRealtimeService, type CopilotDependencies, type CopilotRealtimeUseCases, type CopilotServerEvent, type RequestContext } from '@techspar/core'
 import { encodeCopilotAudio } from '@techspar/contracts'
 import { CopilotServerEventSchema } from '@techspar/contracts/events'
@@ -21,14 +22,19 @@ async function socketHarness(realtime: CopilotRealtimeUseCases, token = 'test-to
   const { upgradeWebSocket, websocket } = createBunWebSocket()
   const app = boundaryApp({ copilotRealtime: realtime, websocketUpgrade: upgradeWebSocket })
   const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: app.fetch, websocket })
-  const origin = `http://127.0.0.1:${server.port}`
+  const port = server.port!
   disposers.push(async () => {
     // Bun 1.3.14 leaves stop()'s promise/pendingWebSockets counter unsettled
     // after server-initiated close (also reproducible without Hono). Verify the
     // actual shutdown instead: clients close first, then the listener refuses TCP.
     void server.stop(true)
     server.unref()
-    await expect(fetch(origin)).rejects.toThrow()
+    await expect(new Promise<void>((resolve, reject) => {
+      const socket = createConnection({ host: '127.0.0.1', port })
+      socket.setTimeout(2000, () => socket.destroy(new Error('Timed out probing stopped test server')))
+      socket.once('connect', () => { socket.destroy(); resolve() })
+      socket.once('error', reject)
+    })).rejects.toMatchObject({ code: 'ECONNREFUSED' })
   })
   const ws = new WebSocket(`ws://127.0.0.1:${server.port}/ws/copilot/live-1?token=${token}`)
   const events: unknown[] = []

@@ -5,7 +5,7 @@ export function parseJsonResponse(content: string): Record<string, unknown> | un
   const attempts = [value]
   const fenced = value.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
   if (fenced?.[1]) attempts.push(fenced[1].trim())
-  const firstJson = [...value].findIndex((character) => character === '[' || character === '{')
+  const firstJson = value.search(/[\[{]/)
   if (firstJson > 0) attempts.push(value.slice(firstJson))
   for (const attempt of attempts) {
     try {
