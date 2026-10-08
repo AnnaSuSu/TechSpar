@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useResumeStore } from "@/resume/store/useResumeStore";
+import { getResumeAccount } from "@/resume/store/resumeAccount";
 import { DEFAULT_TEMPLATES } from "@/resume/config";
 import ResumeTemplateComponent from "@/resume/templates";
 import ThemeModal from "@/resume/shared/ThemeModal";
@@ -146,8 +147,10 @@ export default function ResumeManager() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    const account = getResumeAccount();
     try {
       const data = JSON.parse(await file.text());
+      if (!account || account !== getResumeAccount()) return;
       if (!data || typeof data !== "object" || !data.menuSections || !data.basic) {
         throw new Error("不是有效的简历 JSON");
       }

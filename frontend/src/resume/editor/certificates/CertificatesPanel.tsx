@@ -1,5 +1,6 @@
 import { cn } from "@/resume/lib/utils";
 import { useResumeStore } from "@/resume/store/useResumeStore";
+import { getResumeAccount } from "@/resume/store/resumeAccount";
 import { Reorder } from "framer-motion";
 import { ImagePlus } from "lucide-react";
 import { useTranslations } from "@/resume/i18n/compat/client";
@@ -27,6 +28,7 @@ const CertificatesPanel = () => {
     };
 
     const handleFile = async (file: File) => {
+        const account = getResumeAccount();
         if (!file.type.startsWith("image/")) {
             toast.error("Format error"); // Or use i18n
             return;
@@ -46,6 +48,7 @@ const CertificatesPanel = () => {
             } else {
                 imageData = await compressImage(file, 1200, 1200, 0.8);
             }
+            if (!account || account !== getResumeAccount()) return;
             handleCreateCertificate(imageData);
         } catch {
             toast.error("Upload error");

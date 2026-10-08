@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from "react";
 import AuthContext, { type AuthUser } from "./AuthContextBase";
+import { setResumeAccount } from "../resume/store/resumeAccount";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -11,20 +12,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
   // 用户尚未配齐自己的 LLM/Embedding → 进首登引导。由 /api/settings 的 configured 决定。
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [sessionVersion, setSessionVersion] = useState(0);
 
   function login(tokenStr: string, userData: AuthUser) {
+    setResumeAccount(null);
     localStorage.setItem("token", tokenStr);
     localStorage.setItem("user", JSON.stringify(userData));
     setLoading(true); // re-validate + load provider status before routing
     setToken(tokenStr);
     setUser(userData);
+    setSessionVersion((version) => version + 1);
   }
 
   function logout() {
+    setResumeAccount(null);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setToken(null);
     setUser(null);
+    setLoading(false);
     setNeedsOnboarding(false);
   }
 
@@ -43,7 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         const stored = localStorage.getItem("user");
-        if (stored) setUser(JSON.parse(stored));
+        const validatedUser = stored ? JSON.parse(stored) as AuthUser : null;
+        if (typeof validatedUser?.id !== "string" || !validatedUser.id.trim()) {
+          logout();
+          return;
+        }
         if (settingsRes.ok) {
           const data = (await settingsRes.json()) as {
             configured?: { llm?: boolean; embedding?: boolean };
@@ -51,6 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const c = data.configured || {};
           setNeedsOnboarding(!(c.llm && c.embedding));
         }
+        if (cancelled || localStorage.getItem("token") !== token) return;
+        setResumeAccount(validatedUser.id);
+        setUser(validatedUser);
       })
       .catch(() => {
         if (!cancelled) logout();
@@ -61,7 +74,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, sessionVersion]);
+
+  useEffect(() => {
+    const syncSession = (event: StorageEvent) => {
+      if (event.storageArea !== localStorage || (event.key !== "token" && event.key !== null)) return;
+      setResumeAccount(null);
+      const nextToken = localStorage.getItem("token");
+      setLoading(Boolean(nextToken));
+      setToken(nextToken);
+      setUser(null);
+      setNeedsOnboarding(false);
+      setSessionVersion((version) => version + 1);
+    };
+    window.addEventListener("storage", syncSession);
+    return () => window.removeEventListener("storage", syncSession);
+  }, []);
 
   return (
     <AuthContext.Provider
