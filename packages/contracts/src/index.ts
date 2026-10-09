@@ -42,6 +42,8 @@ export const AuthResponseSchema = z.object({
   user: AuthUserSchema,
 })
 
+export const AuthIdentitySchema = z.strictObject({ id: z.string().min(1) })
+
 export const AuthConfigSchema = z.object({
   allow_registration: z.boolean(),
 })

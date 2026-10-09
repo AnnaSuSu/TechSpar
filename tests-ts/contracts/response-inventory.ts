@@ -20,6 +20,7 @@ export type ResponseInventoryEntry = {
  * slots remain explicit in notes even when the root is no longer dynamic.
  */
 export const responseInventory: readonly ResponseInventoryEntry[] = [
+  { operation: 'GET /api/auth/me', routeFile: 'apps/api/src/routes/auth.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'auth-identity.json', dynamic: false, requiredKeys: ['id'] },
   { operation: 'GET /api/', routeFile: 'apps/api/src/routes/auth.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'service-info.json', dynamic: false, requiredKeys: ['service', 'version'] },
   { operation: 'POST /api/auth/password', routeFile: 'apps/api/src/routes/auth.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'change-password.json', dynamic: false, requiredKeys: ['status'] },
   { operation: 'GET /api/auth/config', routeFile: 'apps/api/src/routes/auth.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'auth-config.json', dynamic: false, requiredKeys: ['allow_registration'] },

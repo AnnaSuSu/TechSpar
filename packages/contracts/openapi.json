@@ -2619,6 +2619,37 @@
     }
   },
   "paths": {
+    "/api/auth/me": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Verified token identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/": {
       "get": {
         "responses": {

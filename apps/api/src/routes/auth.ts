@@ -1,6 +1,7 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi'
 import {
   AuthConfigSchema,
+  AuthIdentitySchema,
   AuthResponseSchema,
   ChangePasswordRequestSchema,
   ChangePasswordResponseSchema,
@@ -16,6 +17,18 @@ export function registerAuthRoutes(
   app: OpenAPIHono,
   deps: { auth: AuthUseCases; registration: AuthPolicy; tokens: TokenService },
 ): void {
+  app.openapi(
+    createRoute({
+      method: 'get',
+      path: '/api/auth/me',
+      responses: { 200: { content: { 'application/json': { schema: AuthIdentitySchema } }, description: 'Verified token identity' } },
+    }),
+    async (c) => {
+      const context = await authenticatedContext(c, deps.tokens)
+      return c.json(AuthIdentitySchema.parse({ id: context.userId }))
+    },
+  )
+
   app.openapi(
     createRoute({
       method: 'get',

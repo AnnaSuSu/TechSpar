@@ -12,6 +12,7 @@ import ResumeTemplateComponent from "@/resume/templates";
 import ThemeModal from "@/resume/shared/ThemeModal";
 import { generateUUID } from "@/resume/utils/uuid";
 import PdfResumeSection from "./resumeManager/PdfResumeSection";
+import LegacyResumeRecovery from "./resumeManager/LegacyResumeRecovery";
 import "@/resume/styles/resume.css";
 import "@/resume/styles/fonts";
 
@@ -179,6 +180,7 @@ export default function ResumeManager() {
       </div>
 
       <PdfResumeSection />
+      <LegacyResumeRecovery />
 
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div className="flex items-center gap-2">
