@@ -392,3 +392,128 @@ describe('interview application service', () => {
     sessions.close(); states.close(); vectors.close()
   })
 })
+
+
+describe('job preparation saved lifecycle', () => {
+  const input = { jd_text: '合成岗位要求 TypeScript、数据库、分布式系统设计、缓存、异步执行和清晰的技术表达能力。'.repeat(2), company: '示例公司', position: '后端工程师', use_resume: false, request_id: 'b9c47adb-1fd3-4376-b366-b3b777208be8' }
+  const preview = JSON.stringify({ company: '示例公司', position: '后端工程师', role_summary: '后端工程师', focus_areas: [], likely_question_groups: [], resume_alignment: { resume_used: false, fit_assessment: '未启用简历', matching_evidence: [], risk_gaps: [], recommended_stories: [] }, prep_priorities: [], question_blueprint: [] })
+  const questions = JSON.stringify({ questions: Array.from({ length: 4 }, (_, i) => ({ id: i + 1, question: `合成问题 ${i + 1}` })) })
+  async function setup(replies: string[] = []) {
+    const path = await databasePath()
+    const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
+    const states = new BunResumeInterviewStateRepository(path); states.initialize()
+    const ai = new FakeAi(replies)
+    const deps = interviewDependencies({ sessions, states, ai })
+    let serial = 0
+    deps.ids = { next: () => `job-${++serial}` }
+    return { path, sessions, states, ai, deps, service: new InterviewService(deps) }
+  }
+
+  test('persists analysis before practice; restores after reopen and retries without model calls', async () => {
+    const h = await setup([preview, questions])
+    const first = await h.service.previewJob(context, input)
+    expect((await h.service.history(context, {})).items).toMatchObject([{ session_id: first.session_id, status: 'prepared' }])
+    expect((await h.service.resume(context, first.session_id)).meta).toMatchObject({ jd_text: input.jd_text, use_resume: false, preview: first.preview })
+    expect(await h.service.previewJob(context, input)).toEqual(first)
+    expect(h.ai.calls).toHaveLength(1)
+    await expect(h.service.end(context, first.session_id, [])).rejects.toThrow('请先开始训练')
+    h.sessions.close()
+    const reopened = new BunInterviewSessionRepository(h.path); reopened.initialize()
+    const service = new InterviewService({ ...h.deps, sessions: reopened })
+    expect(await service.previewJob(context, input)).toEqual(first)
+    const started = await service.startJob(context, { ...input, session_id: first.session_id, jd_text: 'tampered', preview_data: { role_summary: 'tampered' } })
+    expect(started.session_id).toBe(first.session_id)
+    expect(started.meta.jd_text).toBe(input.jd_text)
+    expect(started.preview).toEqual(first.preview)
+    expect((await service.history(context, {})).items).toMatchObject([{ session_id: first.session_id, status: 'ongoing' }])
+    expect(await service.startJob(context, { ...input, session_id: first.session_id })).toEqual(started)
+    expect(h.ai.calls).toHaveLength(2)
+    await reopened.updateMeta(first.session_id, 'user-a', { profile_extract_failed: false })
+    expect(await service.startJob(context, { ...input, session_id: first.session_id })).toEqual(started)
+    await service.draft(context, first.session_id, [{ question_id: 1, answer: '已保存的回答' }])
+    expect((await service.resume(context, first.session_id)).transcript.slice(0, 2)).toMatchObject([{ role: 'assistant' }, { role: 'user', content: '已保存的回答' }])
+    expect(await service.history({ ...context, userId: 'user-b' }, {})).toEqual({ items: [], total: 0 })
+    await expect(service.startJob({ ...context, userId: 'user-b' }, { ...input, session_id: first.session_id })).rejects.toThrow('备面记录不存在')
+    await service.delete(context, first.session_id)
+    await expect(service.previewJob(context, input)).rejects.toThrow('已删除')
+    expect(h.ai.calls).toHaveLength(2)
+    reopened.close(); h.states.close()
+  })
+
+  test('retains the saved plan when question generation fails and preserves previous plans on reanalysis', async () => {
+    const h = await setup([preview, '{"questions":[]}', questions, preview])
+    const first = await h.service.previewJob(context, input)
+    await expect(h.service.startJob(context, { ...input, session_id: first.session_id })).rejects.toThrow('数量不足')
+    expect((await h.service.resume(context, first.session_id)).status).toBe('prepared')
+    await h.service.startJob(context, { ...input, session_id: first.session_id })
+    await expect(h.service.previewJob(context, { ...input, position: '不同岗位' })).rejects.toThrow('已改变')
+    const next = await h.service.previewJob(context, { ...input, request_id: crypto.randomUUID(), position: '不同岗位' })
+    expect(next.session_id).not.toBe(first.session_id)
+    expect((await h.service.history(context, {})).total).toBe(2)
+    h.sessions.close(); h.states.close()
+  })
+
+  test('serializes concurrent submissions across repository instances and completes after caller disconnects', async () => {
+    const h = await setup()
+    let release!: (value: string) => void
+    let called!: () => void
+    const entered = new Promise<void>((resolve) => { called = resolve })
+    const pending = new Promise<string>((resolve) => { release = resolve })
+    let signal: AbortSignal | undefined
+    h.deps.ai = { async complete(ctx) { signal = ctx.signal; called(); return pending }, async *stream() {} }
+    const service = new InterviewService(h.deps)
+    const abort = new AbortController()
+    const first = service.previewJob({ ...context, signal: abort.signal }, input)
+    await entered
+    const otherRepo = new BunInterviewSessionRepository(h.path); otherRepo.initialize()
+    const otherService = new InterviewService({ ...h.deps, sessions: otherRepo })
+    await expect(otherService.previewJob(context, input)).rejects.toThrow('正在生成')
+    abort.abort()
+    expect(signal?.aborted).toBe(false)
+    release(preview)
+    const result = await first
+    expect(await otherService.previewJob(context, input)).toEqual(result)
+    expect((await otherService.history(context, {})).total).toBe(1)
+    otherRepo.close(); h.sessions.close(); h.states.close()
+  })
+
+  test('does not recreate a plan deleted while questions are being generated', async () => {
+    const h = await setup([preview])
+    const plan = await h.service.previewJob(context, input)
+    let release!: (value: string) => void
+    let entered!: () => void
+    const started = new Promise<void>((resolve) => { entered = resolve })
+    h.deps.ai = { async complete() { entered(); return new Promise<string>((resolve) => { release = resolve }) }, async *stream() {} }
+    const service = new InterviewService(h.deps)
+    const pending = service.startJob(context, { ...input, session_id: plan.session_id })
+    await started
+    await service.delete(context, plan.session_id)
+    release(questions)
+    await expect(pending).rejects.toThrow('变更或删除')
+    expect(await service.history(context, {})).toEqual({ items: [], total: 0 })
+    h.sessions.close(); h.states.close()
+  })
+
+  test('recovers an expired generation lease and fences its previous owner', async () => {
+    const h = await setup()
+    const { Database } = await import('bun:sqlite')
+    const claim = { userId: 'user-a', key: 'preview:lease', fingerprint: 'same-input', owner: 'old-worker' }
+    expect(await h.sessions.claimJobPrep(claim)).toEqual({ state: 'claimed' })
+    const db = new Database(h.path)
+    db.query('UPDATE job_prep_operations SET updated_at = 0').run()
+    expect(await h.sessions.claimJobPrep({ ...claim, owner: 'new-worker' })).toEqual({ state: 'claimed' })
+    const result = { userId: 'user-a', key: claim.key, sessionId: 'recovered', meta: {}, questions: [], existing: false }
+    expect(await h.sessions.completeJobPrep({ ...result, owner: 'old-worker' })).toBeFalse()
+    await h.sessions.releaseJobPrep('user-a', claim.key, 'old-worker')
+    expect(await h.sessions.completeJobPrep({ ...result, owner: 'new-worker' })).toBeTrue()
+    db.close(); h.sessions.close(); h.states.close()
+  })
+
+  test('includes legacy JD sessions with questions and no answers, but still hides empty stubs', async () => {
+    const h = await setup()
+    await h.sessions.create({ sessionId: 'legacy', userId: 'user-a', mode: 'jd_prep', questions: [{ id: 1, question: '已生成题目' }] })
+    await h.sessions.create({ sessionId: 'empty', userId: 'user-a', mode: 'jd_prep' })
+    expect((await h.service.history(context, {})).items.map((item) => item.session_id)).toEqual(['legacy'])
+    h.sessions.close(); h.states.close()
+  })
+})

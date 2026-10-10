@@ -192,7 +192,7 @@ export class InterviewService implements InterviewUseCases {
     this.resumeEngine = new ResumeInterviewEngine(deps.ai, deps.states, deps.profile, deps.maxQuestionsPerPhase)
   }
 
-  async previewJob(context: RequestContext, input: JobPrepInput): Promise<{ preview: JobPrepPreview }> {
+  private async generateJobPreview(context: RequestContext, input: JobPrepInput): Promise<JobPrepPreview> {
     const id = userId(context)
     const jd = input.jd_text.trim()
     if (jd.length < 50) throw new AppError('JD 内容太短，无法分析。', 400)
@@ -202,24 +202,82 @@ export class InterviewService implements InterviewUseCases {
       { role: 'system', content: '你是 JD 备面分析引擎。只返回 JSON。' },
       { role: 'user', content: fill(JOB_PREVIEW_PROMPT, { company: input.company || '未提供', position: input.position || '未提供', jd_text: jd.slice(0, 6000), resume_context: resumeContext || '未启用简历联动', user_profile: await this.deps.profile.summary(id) }) },
     ], STRUCTURED_CHAT_OPTIONS)))
-    return { preview: jobPreview(parsed, input, Boolean(useResume && resumeContext)) }
+    return jobPreview(parsed, input, Boolean(useResume && resumeContext))
+  }
+
+  // The operation and its session are committed together. A lost HTTP response
+  // can be retried without another model call, including after a server restart.
+  private async jobOperation(context: RequestContext, key: string, input: unknown, generate: (context: RequestContext) => Promise<{ sessionId: string; meta: Record<string, unknown>; questions: InterviewQuestion[]; existing: boolean }>): Promise<InterviewSession> {
+    const id = userId(context)
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(input)))
+    const fingerprint = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('')
+    const owner = crypto.randomUUID()
+    const operation = await this.deps.sessions.claimJobPrep({ userId: id, key, fingerprint, owner })
+    if (operation.state === 'conflict') throw new AppError('本次请求的岗位资料已改变，请重新分析。', 409)
+    if (operation.state === 'busy') throw new AppError('正在生成，请稍后重试或在历史记录中查看。', 409)
+    if (operation.state === 'done') {
+      const session = await this.deps.sessions.get(operation.sessionId!, id)
+      if (!session) throw new AppError('备面记录已删除，请重新分析。', 404)
+      return session
+    }
+    const heartbeat = setInterval(() => void this.deps.sessions.renewJobPrep(id, key, owner).catch(() => undefined), 30_000)
+    try {
+      // Closing a browser must not cancel an already accepted generation.
+      const result = await generate({ ...context, signal: AbortSignal.timeout(600_000) })
+      if (!await this.deps.sessions.completeJobPrep({ ...result, userId: id, key, owner })) {
+        throw new AppError('备面记录已变更或删除，请刷新历史记录。', 409)
+      }
+      return (await this.deps.sessions.get(result.sessionId, id))!
+    } catch (error) {
+      await this.deps.sessions.releaseJobPrep(id, key, owner)
+      throw error
+    } finally {
+      clearInterval(heartbeat)
+    }
+  }
+
+  private jobMeta(input: JobPrepInput, preview: Record<string, unknown>) {
+    return { company: String(preview.company || input.company || '').trim(), position: String(preview.position || input.position || '').trim() || 'JD 备面', jd_text: input.jd_text.trim(), use_resume: input.use_resume ?? true, preview }
+  }
+
+  async previewJob(context: RequestContext, input: JobPrepInput): Promise<{ session_id: string; preview: JobPrepPreview }> {
+    userId(context)
+    if (input.jd_text.trim().length < 50) throw new AppError('JD 内容太短，无法分析。', 400)
+    const normalized = { jd_text: input.jd_text.trim(), company: input.company?.trim() || '', position: input.position?.trim() || '', use_resume: input.use_resume ?? true }
+    const session = await this.jobOperation(context, `preview:${input.request_id || crypto.randomUUID()}`, normalized, async (generationContext) => {
+      const preview = await this.generateJobPreview(generationContext, normalized)
+      return { sessionId: this.deps.ids.next(), meta: this.jobMeta(normalized, preview), questions: [], existing: false }
+    })
+    return { session_id: session.session_id, preview: session.meta.preview as JobPrepPreview }
   }
 
   async startJob(context: RequestContext, input: JobPrepInput): Promise<JobPrepStartResult> {
     const id = userId(context)
-    const jd = input.jd_text.trim()
+    const saved = input.session_id ? await this.deps.sessions.get(input.session_id, id) : undefined
+    if (input.session_id && (!saved || saved.mode !== 'jd_prep')) throw new AppError('备面记录不存在。', 404)
+    if (saved && saved.status !== 'prepared' && !saved.questions.length) throw new AppError('该记录不能开始训练。', 409)
+    const fromSession = (session: InterviewSession): JobPrepStartResult => {
+      const stored = session.meta
+      const meta = { company: String(stored.company || ''), position: String(stored.position || 'JD 备面'), jd_text: String(stored.jd_text || ''), use_resume: stored.use_resume !== false, preview: object(stored.preview) }
+      return { session_id: session.session_id, mode: 'jd_prep', questions: session.questions, preview: meta.preview, company: meta.company, position: meta.position, meta }
+    }
+    if (saved?.questions.length) return fromSession(saved)
+    // A saved plan is authoritative: client fields cannot rewrite it on start.
+    const effective = saved ? { ...saved.meta, jd_text: String(saved.meta.jd_text), preview_data: saved.meta.preview } as JobPrepInput : input
+    const jd = effective.jd_text.trim()
     if (jd.length < 50) throw new AppError('JD 内容太短，无法生成训练。', 400)
-    const preview = input.preview_data || (await this.previewJob(context, input)).preview
-    const resumeContext = (input.use_resume ?? true) ? (await this.deps.resume.text(context)).slice(0, 5000) : ''
-    const generated = questions(parseJsonResponse(await this.deps.ai.complete(context, [
-      { role: 'system', content: '你是 JD 备面出题引擎。只返回 JSON 对象，题目放在 questions 数组中。' },
-      { role: 'user', content: fill(JOB_QUESTION_PROMPT, { preview: JSON.stringify(preview, null, 2).slice(0, 5000), jd_text: jd.slice(0, 5000), resume_context: resumeContext || '未启用简历联动', user_profile: await this.deps.profile.summary(id) }) },
-    ], STRUCTURED_CHAT_OPTIONS)), 8)
-    if (generated.length < 4) throw new AppError('JD 备面出题失败，生成的问题数量不足。请重试。', 500)
-    const sessionId = this.deps.ids.next()
-    const meta = { company: String(preview.company || input.company || '').trim(), position: String(preview.position || input.position || '').trim() || 'JD 备面', jd_text: jd, use_resume: input.use_resume ?? true, preview }
-    await this.deps.sessions.create({ sessionId, userId: id, mode: 'jd_prep', questions: generated, meta })
-    return { session_id: sessionId, mode: 'jd_prep', questions: generated, preview, company: meta.company, position: meta.position, meta }
+    const key = saved ? `start:${saved.session_id}` : `start-request:${input.request_id || crypto.randomUUID()}`
+    const session = await this.jobOperation(context, key, saved ? { session_id: saved.session_id } : effective, async (generationContext) => {
+      const preview = effective.preview_data || await this.generateJobPreview(generationContext, effective)
+      const resumeContext = (effective.use_resume ?? true) ? (await this.deps.resume.text(generationContext)).slice(0, 5000) : ''
+      const generated = questions(parseJsonResponse(await this.deps.ai.complete(generationContext, [
+        { role: 'system', content: '你是 JD 备面出题引擎。只返回 JSON 对象，题目放在 questions 数组中。' },
+        { role: 'user', content: fill(JOB_QUESTION_PROMPT, { preview: JSON.stringify(preview, null, 2).slice(0, 5000), jd_text: jd.slice(0, 5000), resume_context: resumeContext || '未启用简历联动', user_profile: await this.deps.profile.summary(id) }) },
+      ], STRUCTURED_CHAT_OPTIONS)), 8)
+      if (generated.length < 4) throw new AppError('JD 备面出题失败，生成的问题数量不足。请重试。', 500)
+      return { sessionId: saved?.session_id || this.deps.ids.next(), meta: this.jobMeta(effective, preview), questions: generated, existing: Boolean(saved) }
+    })
+    return fromSession(session)
   }
 
   async start(context: RequestContext, input: StartInterviewInput): Promise<InterviewStartResult> {
@@ -316,6 +374,7 @@ export class InterviewService implements InterviewUseCases {
     const id = userId(context)
     const session = await this.deps.sessions.get(sessionId, id)
     if (!session) throw new AppError('Session not found.', 404)
+    if (session.status === 'prepared') throw new AppError('请先开始训练。', 409)
     if (session.status === 'reviewed') return { session_id: sessionId, mode: session.mode, status: 'done' }
     if (session.status === 'reviewing') return { session_id: sessionId, mode: session.mode, status: 'pending' }
     const batchMode = session.mode === 'topic_drill' || session.mode === 'jd_prep'

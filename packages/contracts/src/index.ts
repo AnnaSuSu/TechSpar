@@ -164,8 +164,8 @@ export const StartInterviewSchema = z.object({
   target_role: z.string().optional(),
   job_description: z.string().max(12000).optional(),
 })
-export const JobPrepPreviewSchema = z.object({ jd_text: z.string(), company: z.string().nullable().optional(), position: z.string().nullable().optional(), use_resume: z.boolean().default(true) })
-export const JobPrepStartSchema = JobPrepPreviewSchema.extend({ preview_data: z.record(z.string(), z.unknown()).optional() })
+export const JobPrepPreviewSchema = z.object({ request_id: z.uuid().optional(), jd_text: z.string(), company: z.string().nullable().optional(), position: z.string().nullable().optional(), use_resume: z.boolean().default(true) })
+export const JobPrepStartSchema = JobPrepPreviewSchema.extend({ session_id: z.string().min(1).max(200).optional(), preview_data: z.record(z.string(), z.unknown()).optional() })
 export const InterviewChatSchema = z.object({ session_id: z.string(), message: z.string() })
 export const EndInterviewSchema = z.object({ answers: z.array(InterviewAnswerSchema).default([]) })
 export const ReferenceAnswerRequestSchema = z.object({ session_id: z.string(), question_id: z.union([z.string(), z.number()]) })

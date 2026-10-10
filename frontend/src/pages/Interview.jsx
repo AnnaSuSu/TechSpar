@@ -72,6 +72,10 @@ export default function Interview() {
       try {
         const data = await getResumableSession(sessionId);
         if (cancelled) return;
+        if (data.status === "prepared") {
+          navigate(`/mock-interview?mode=targeted&session=${encodeURIComponent(sessionId)}`, { replace: true });
+          return;
+        }
         setInitData({
           mode: data.mode,
           topic: data.topic,
@@ -124,7 +128,7 @@ export default function Interview() {
       }
     })();
     return () => { cancelled = true; };
-  }, [location.state, sessionId, startTask]);
+  }, [location.state, sessionId, startTask, navigate]);
 
   useEffect(() => {
     if (!isBatchMode) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -381,6 +385,7 @@ export default function Interview() {
               )
               : initData?.topic && <span className="text-sm text-dim">{initData.topic}</span>}
             <span className="text-[13px] text-dim">{answeredCount}/{totalQ} 已答</span>
+            {isJobPrep && <Button variant="ghost" size="sm" onClick={() => navigate(`/mock-interview?mode=targeted&session=${encodeURIComponent(sessionId)}`)}>查看岗位方案</Button>}
           </div>
           {(() => {
             const task = tasks.find((t) => t.id === sessionId);

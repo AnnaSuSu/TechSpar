@@ -33,3 +33,16 @@ describe('job prep draft compatibility', () => {
     })).toMatchObject({ preview: null, previewSignature: '' })
   })
 })
+
+
+describe('job prep account namespace', () => {
+  test('uses the authenticated token subject, never shared or legacy user storage', async () => {
+    const { jobPrepDraftKey } = await import('../frontend/src/lib/jobPrepAccount.ts')
+    const token = (sub: string) => `header.${btoa(JSON.stringify({ sub }))}.signature`
+    expect(jobPrepDraftKey(token('user-a'))).toBe('jobprep-draft:user-a')
+    expect(jobPrepDraftKey(token('user-b'))).not.toBe(jobPrepDraftKey(token('user-a')))
+    expect(jobPrepDraftKey(null)).toBeNull()
+    expect(jobPrepDraftKey('broken')).toBeNull()
+    expect(jobPrepDraftKey('h.e30.s')).toBeNull()
+  })
+})

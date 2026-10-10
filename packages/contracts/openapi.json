@@ -9,6 +9,9 @@
       "JobPrepPreviewResponse": {
         "type": "object",
         "properties": {
+          "session_id": {
+            "type": "string"
+          },
           "preview": {
             "type": "object",
             "properties": {
@@ -455,6 +458,7 @@
               "status": {
                 "type": "string",
                 "enum": [
+                  "prepared",
                   "ended",
                   "reviewing",
                   "reviewed",
@@ -499,6 +503,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "prepared",
               "ongoing",
               "ended",
               "reviewing",
@@ -746,6 +751,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "prepared",
               "ongoing",
               "ended",
               "reviewing",
@@ -1017,6 +1023,7 @@
                 "status": {
                   "type": "string",
                   "enum": [
+                    "prepared",
                     "ongoing",
                     "ended",
                     "reviewing",
@@ -1959,6 +1966,7 @@
             "status": {
               "type": "string",
               "enum": [
+                "prepared",
                 "ongoing",
                 "ended",
                 "reviewing",
@@ -4689,6 +4697,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
                   "jd_text": {
                     "type": "string"
                   },
@@ -4750,6 +4762,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
                   "jd_text": {
                     "type": "string"
                   },
@@ -4764,6 +4780,11 @@
                   "use_resume": {
                     "type": "boolean",
                     "default": true
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
                   },
                   "preview_data": {
                     "type": "object",

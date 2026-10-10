@@ -1,6 +1,6 @@
 import type { ApiResponse } from "../api/client";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   BriefcaseBusiness,
   CheckCircle2,
@@ -10,7 +10,7 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
-import { getResumeStatus, previewJobPrep, startJobPrep } from "../api/interview";
+import { getHistory, getResumableSession, getResumeStatus, previewJobPrep, startJobPrep } from "../api/interview";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { sanitizeJobPrepDraft } from "@/lib/jobPrepDraft";
+import { jobPrepDraftKey } from "@/lib/jobPrepAccount";
+import useAuth from "@/hooks/useAuth";
 
 interface JobPrepProps {
   embedded?: boolean;
@@ -37,6 +39,10 @@ interface JobPrepDraft {
   jdText: string;
   preview: JobPrepPreview | null;
   previewSignature: string;
+  useResume: boolean;
+  requestId: string;
+  requestSignature: string;
+  sourceSession: string | null;
 }
 
 interface JobPrepPayload {
@@ -48,17 +54,12 @@ interface JobPrepPayload {
 
 type StatusTone = "blue" | "amber" | "green" | "neutral";
 
-// Survive leaving the page without starting practice — a JD analysis costs an LLM
-// call, so persist inputs + result locally and restore them on return.
-const DRAFT_KEY = "jobprep-draft";
-
-function loadDraft(): Partial<JobPrepDraft> {
+function loadDraft(key: string | null): Partial<JobPrepDraft> {
+  if (!key) return {};
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? sanitizeJobPrepDraft(JSON.parse(raw)) as Partial<JobPrepDraft> : {};
-  } catch {
-    return {};
-  }
+  } catch { return {}; }
 }
 
 function priorityVariant(priority?: string): "destructive" | "blue" | "secondary" {
@@ -104,57 +105,90 @@ function errorMessage(error: unknown) {
 }
 
 export default function JobPrep({ embedded = false }: JobPrepProps) {
+  const { token } = useAuth();
+  const [params] = useSearchParams();
+  const draftKey = jobPrepDraftKey(token);
+  const savedSessionId = params.get("session");
+  return <JobPrepWorkspace key={`${draftKey}:${savedSessionId || "new"}`} embedded={embedded} draftKey={draftKey} savedSessionId={savedSessionId} />;
+}
+
+function JobPrepWorkspace({ embedded, draftKey, savedSessionId }: JobPrepProps & { draftKey: string | null; savedSessionId: string | null }) {
   const navigate = useNavigate();
-  const initialDraft = useMemo(() => loadDraft(), []);
+  const initialDraft = useMemo(() => {
+    const draft = loadDraft(draftKey);
+    return (draft.sourceSession || null) === savedSessionId ? draft : {};
+  }, [draftKey, savedSessionId]);
   const [company, setCompany] = useState(initialDraft.company || "");
   const [position, setPosition] = useState(initialDraft.position || "");
   const [jdText, setJdText] = useState(initialDraft.jdText || "");
   const [resumeFile, setResumeFile] = useState<ResumeFile | null>(null);
-  const [useResume, setUseResume] = useState(true);
+  const [useResume, setUseResume] = useState(initialDraft.useResume ?? true);
   const [preview, setPreview] = useState<JobPrepPreview | null>(initialDraft.preview || null);
   const [previewSignature, setPreviewSignature] = useState(initialDraft.previewSignature || "");
   const [loadingResume, setLoadingResume] = useState(true);
   const [previewing, setPreviewing] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
+  const [savedStatus, setSavedStatus] = useState("prepared");
+  const [restoring, setRestoring] = useState(Boolean(savedSessionId));
+  const [restored, setRestored] = useState(!savedSessionId);
+  const [recent, setRecent] = useState<ApiResponse<"/api/interview/history", "get">["items"]>([]);
+  const operation = useRef({ requestId: initialDraft.requestId || "", signature: initialDraft.requestSignature || "" });
+  const busy = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   useEffect(() => {
-    getResumeStatus()
-      .then((data) => {
-        const status = data as unknown as { has_resume: boolean; filename?: string; size?: number };
-        if (status.has_resume) {
-          setResumeFile({ filename: status.filename || "resume.pdf", size: status.size });
-          setUseResume(true);
-        } else {
-          setUseResume(false);
-        }
-      })
-      .catch(() => setUseResume(false))
-      .finally(() => setLoadingResume(false));
+    let cancelled = false;
+    Promise.all([
+      getResumeStatus().catch(() => ({ has_resume: false })),
+      savedSessionId ? getResumableSession(savedSessionId) : Promise.resolve(null),
+    ]).then(([resume, session]) => {
+      if (cancelled) return;
+      const status = resume as { has_resume: boolean; filename?: string; size?: number };
+      setResumeFile(status.has_resume ? { filename: status.filename || "resume.pdf", size: status.size } : null);
+      if (session) {
+        if (session.mode !== "jd_prep") throw new Error("这不是岗位备面记录");
+        setSavedStatus(session.status);
+        const meta = session.meta;
+        const restoredPayload = { company: String(meta.company || "") || null, position: String(meta.position || "") || null, jd_text: String(meta.jd_text || ""), use_resume: Boolean(meta.use_resume) };
+        setCompany(initialDraft.company ?? restoredPayload.company ?? "");
+        setPosition(initialDraft.position ?? restoredPayload.position ?? "");
+        setJdText(initialDraft.jdText ?? restoredPayload.jd_text);
+        setUseResume(initialDraft.useResume ?? restoredPayload.use_resume);
+        setPreview(meta.preview as JobPrepPreview);
+        setPreviewSignature(JSON.stringify(restoredPayload));
+        setRestored(true);
+      } else if (!status.has_resume) setUseResume(false);
+    }).catch((err) => { if (!cancelled) setError("恢复失败: " + errorMessage(err)); })
+      .finally(() => { if (!cancelled) { setLoadingResume(false); setRestoring(false); } });
+    return () => { cancelled = true; };
+  }, [savedSessionId, navigate, initialDraft]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getHistory(5, 0, "jd_prep").then((data) => { if (!cancelled) setRecent(data.items); }).catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
-  // Best-effort: keep the workspace mirrored to localStorage so a refresh or
-  // navigation never discards a token-costing analysis. Cleared once practice starts.
+  // Only unsubmitted inputs live in browser storage. Saved results live on the server.
   useEffect(() => {
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ company, position, jdText, preview, previewSignature }));
-    } catch {
-      // storage full / unavailable — ignore
-    }
-  }, [company, position, jdText, preview, previewSignature]);
+    if (!draftKey || restoring || !restored) return;
+    try { localStorage.setItem(draftKey, JSON.stringify({ company, position, jdText, useResume, sourceSession: savedSessionId, requestId: operation.current.requestId, requestSignature: operation.current.signature })); } catch { /* best effort */ }
+  }, [draftKey, savedSessionId, company, position, jdText, useResume, restoring, restored]);
 
   const payload = useMemo<JobPrepPayload>(() => ({
     company: company.trim() || null,
     position: position.trim() || null,
     jd_text: jdText.trim(),
-    use_resume: !!(useResume && resumeFile),
-  }), [company, position, jdText, useResume, resumeFile]);
+    use_resume: useResume,
+  }), [company, position, jdText, useResume]);
 
   const signature = JSON.stringify(payload);
   const charCount = payload.jd_text.length;
   const previewStale = !!preview && previewSignature !== signature;
-  const canPreview = charCount >= 50 && !previewing && !starting;
-  const canStart = !!preview && !previewStale && !previewing && !starting;
+  const canPreview = charCount >= 50 && !previewing && !starting && !loadingResume && !restoring && restored;
+  const canStart = !!savedSessionId && !!preview && !previewStale && !previewing && !starting && !loadingResume && !restoring && restored;
   const status = buildStatus({ preview, previewStale, previewing, starting });
   const resumeReady = !!resumeFile;
   const resumeEnabled = !!(useResume && resumeFile);
@@ -163,33 +197,48 @@ export default function JobPrep({ embedded = false }: JobPrepProps) {
   const priorityCount = preview?.prep_priorities?.length || 0;
 
   const handlePreview = async () => {
+    if (busy.current || !canPreview) return;
+    busy.current = true;
     setPreviewing(true);
     setError("");
+    if (operation.current.signature !== signature || !operation.current.requestId) {
+      operation.current = { requestId: crypto.randomUUID(), signature };
+    }
     try {
-      const data = await previewJobPrep({ ...payload });
-      setPreview(data.preview);
-      setPreviewSignature(signature);
+      // Persist the operation key before sending, so retries after a reload reuse it.
+      if (draftKey) localStorage.setItem(draftKey, JSON.stringify({ company, position, jdText, useResume, sourceSession: savedSessionId, requestId: operation.current.requestId, requestSignature: signature }));
+    } catch { /* server-side history still retains completed results */ }
+    try {
+      const data = await previewJobPrep({ ...payload, request_id: operation.current.requestId });
+      if (!mounted.current) return;
+      if (!data.session_id) throw new Error("服务未返回已保存的记录，请稍后重试");
+      try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* ignore */ }
+      navigate(`/mock-interview?mode=targeted&session=${encodeURIComponent(data.session_id)}`, { replace: true });
     } catch (err) {
-      setError("JD 分析失败: " + errorMessage(err));
+      if (mounted.current) setError("JD 分析失败: " + errorMessage(err));
     } finally {
-      setPreviewing(false);
+      busy.current = false;
+      if (mounted.current) setPreviewing(false);
     }
   };
 
   const handleStart = async () => {
-    if (!preview) return;
+    if (busy.current || !canStart || !savedSessionId) return;
+    if (savedStatus !== "prepared") {
+      navigate(savedStatus === "reviewed" ? `/review/${savedSessionId}` : `/interview/${savedSessionId}`);
+      return;
+    }
+    busy.current = true;
     setStarting(true);
     setError("");
     try {
-      const data = await startJobPrep({
-        ...payload,
-        preview_data: { ...preview },
-      });
-      try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
-      navigate(`/interview/${data.session_id}`, { state: data });
+      const data = await startJobPrep({ ...payload, session_id: savedSessionId });
+      if (mounted.current) navigate(`/interview/${data.session_id}`);
     } catch (err) {
-      setError("启动失败: " + errorMessage(err));
-      setStarting(false);
+      if (mounted.current) setError("启动失败: " + errorMessage(err));
+    } finally {
+      busy.current = false;
+      if (mounted.current) setStarting(false);
     }
   };
 
@@ -205,6 +254,21 @@ export default function JobPrep({ embedded = false }: JobPrepProps) {
         </header>
       )}
 
+      <div className="mb-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <span className="text-dim">{restoring ? "正在恢复备面记录…" : savedSessionId && restored ? "方案已保存，可随时从历史记录继续。" : "分析成功后自动保存到历史记录。"}</span>
+          <div className="flex gap-4">
+            {savedSessionId && <Link className="text-primary" to="/mock-interview?mode=targeted">新建备面</Link>}
+            <Link className="text-primary" to="/history">查看历史记录</Link>
+          </div>
+        </div>
+        {!savedSessionId && recent.length > 0 && <div className="flex flex-wrap gap-2" aria-label="最近的岗位备面">
+          {recent.map((session) => <Link key={session.session_id} className="rounded-xl border border-border px-3 py-2 text-sm hover:bg-hover" to={session.status === "prepared" ? `/mock-interview?mode=targeted&session=${encodeURIComponent(session.session_id)}` : session.status === "reviewed" ? `/review/${session.session_id}` : `/interview/${session.session_id}`}>
+            {String(session.meta.position || "JD 备面")} · {session.status === "prepared" ? "待开始训练" : session.status === "reviewed" ? "查看复盘" : "继续训练"}
+          </Link>)}
+        </div>}
+      </div>
+      <fieldset disabled={restoring || !restored || previewing || starting} className="contents">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
           <Card className="overflow-hidden border-border/80 bg-card/70 shadow-sm">
@@ -379,7 +443,7 @@ export default function JobPrep({ embedded = false }: JobPrepProps) {
                   ) : (
                     <>
                       <Sparkles size={18} />
-                      先分析这个岗位
+                      {preview ? "重新分析并保存新方案" : "分析并保存方案"}
                     </>
                   )}
                 </Button>
@@ -397,7 +461,7 @@ export default function JobPrep({ embedded = false }: JobPrepProps) {
                       初始化中...
                     </>
                   ) : (
-                    "开始定向训练"
+                    savedStatus === "prepared" ? "开始定向训练" : savedStatus === "reviewed" ? "查看复盘" : "继续训练"
                   )}
                 </Button>
 
@@ -546,6 +610,7 @@ export default function JobPrep({ embedded = false }: JobPrepProps) {
           </CardContent>
         </Card>
       )}
+      </fieldset>
     </div>
   );
 }
