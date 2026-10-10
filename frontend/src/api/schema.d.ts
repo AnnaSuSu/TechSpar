@@ -1620,6 +1620,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        /** Format: uuid */
+                        request_id?: string;
                         jd_text: string;
                         company?: string | null;
                         position?: string | null;
@@ -1674,11 +1676,26 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        /** Format: uuid */
+                        request_id?: string;
                         jd_text: string;
                         company?: string | null;
                         position?: string | null;
                         /** @default true */
                         use_resume?: boolean;
+                        session_id: string;
+                        preview_data?: {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        /** Format: uuid */
+                        request_id: string;
+                        jd_text: string;
+                        company?: string | null;
+                        position?: string | null;
+                        /** @default true */
+                        use_resume?: boolean;
+                        session_id?: string;
                         preview_data?: {
                             [key: string]: unknown;
                         };
@@ -3633,6 +3650,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         JobPrepPreviewResponse: {
+            session_id: string;
             preview: {
                 company: string;
                 position: string;
@@ -3739,7 +3757,7 @@ export interface components {
         } | {
             session_id: string;
             /** @enum {string} */
-            status: "ended" | "reviewing" | "reviewed" | "review_failed";
+            status: "prepared" | "ended" | "reviewing" | "reviewed" | "review_failed";
             /** @enum {boolean} */
             saved: false;
         };
@@ -3749,7 +3767,7 @@ export interface components {
             mode: "resume" | "topic_drill" | "jd_prep" | "recording";
             topic?: string | null;
             /** @enum {string} */
-            status: "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
+            status: "prepared" | "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
             review_error?: string | null;
             transcript: ({
                 /** @enum {string} */
@@ -3819,7 +3837,7 @@ export interface components {
             };
             review?: string | null;
             /** @enum {string} */
-            status: "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
+            status: "prepared" | "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
             review_error?: string | null;
             user_id: string;
             created_at: string;
@@ -3887,7 +3905,7 @@ export interface components {
                 created_at: string;
                 avg_score: number | null;
                 /** @enum {string} */
-                status: "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
+                status: "prepared" | "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
                 review_error?: string | null;
             }[];
             total: number;
@@ -4191,7 +4209,7 @@ export interface components {
             };
             review?: string | null;
             /** @enum {string} */
-            status: "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
+            status: "prepared" | "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
             review_error?: string | null;
             user_id: string;
             created_at: string;

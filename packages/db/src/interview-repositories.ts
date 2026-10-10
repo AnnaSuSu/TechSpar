@@ -71,6 +71,11 @@ export class BunInterviewSessionRepository implements InterviewSessionRepository
 
   initialize(): void {
     this.sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS job_prep_operations (
+        user_id TEXT NOT NULL, operation_key TEXT NOT NULL, fingerprint TEXT NOT NULL,
+        owner TEXT NOT NULL, session_id TEXT, updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, operation_key)
+      );
       CREATE TABLE IF NOT EXISTS sessions (
         session_id TEXT PRIMARY KEY,
         mode TEXT NOT NULL,
@@ -111,6 +116,49 @@ export class BunInterviewSessionRepository implements InterviewSessionRepository
         if (name === 'status') this.sqlite.exec("UPDATE sessions SET status = CASE WHEN review IS NOT NULL AND review != '' THEN 'reviewed' ELSE 'ended' END")
       }
     }
+  }
+
+  async claimJobPrep(input: { userId: string; key: string; fingerprint: string; owner: string }) {
+    return this.sqlite.transaction(() => {
+      const row = this.sqlite.query<{ fingerprint: string; session_id: string | null; updated_at: number }, [string, string]>(
+        'SELECT fingerprint, session_id, updated_at FROM job_prep_operations WHERE user_id = ? AND operation_key = ?',
+      ).get(input.userId, input.key)
+      if (row?.fingerprint !== undefined && row.fingerprint !== input.fingerprint) return { state: 'conflict' as const }
+      if (row?.session_id) return { state: 'done' as const, sessionId: row.session_id }
+      if (row && row.updated_at > Date.now() - 120_000) return { state: 'busy' as const }
+      this.sqlite.query(`INSERT INTO job_prep_operations (user_id, operation_key, fingerprint, owner, updated_at)
+        VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, operation_key) DO UPDATE SET owner = excluded.owner, updated_at = excluded.updated_at`)
+        .run(input.userId, input.key, input.fingerprint, input.owner, Date.now())
+      return { state: 'claimed' as const }
+    }).immediate()
+  }
+
+  async renewJobPrep(userId: string, key: string, owner: string): Promise<void> {
+    this.sqlite.query('UPDATE job_prep_operations SET updated_at = ? WHERE user_id = ? AND operation_key = ? AND owner = ? AND session_id IS NULL').run(Date.now(), userId, key, owner)
+  }
+
+  async releaseJobPrep(userId: string, key: string, owner: string): Promise<void> {
+    this.sqlite.query('DELETE FROM job_prep_operations WHERE user_id = ? AND operation_key = ? AND owner = ? AND session_id IS NULL').run(userId, key, owner)
+  }
+
+  async completeJobPrep(input: { userId: string; key: string; owner: string; sessionId: string; meta: Record<string, unknown>; questions: InterviewQuestion[]; existing: boolean }): Promise<boolean> {
+    return this.sqlite.transaction(() => {
+      const owned = this.sqlite.query('SELECT 1 FROM job_prep_operations WHERE user_id = ? AND operation_key = ? AND owner = ? AND session_id IS NULL').get(input.userId, input.key, input.owner)
+      if (!owned) return false
+      const status = input.questions.length ? 'ongoing' : 'prepared'
+      if (input.existing) {
+        const changed = this.sqlite.query(`UPDATE sessions SET questions = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE session_id = ? AND user_id = ? AND mode = 'jd_prep' AND status = 'prepared'`)
+          .run(JSON.stringify(input.questions), status, input.sessionId, input.userId).changes
+        if (!changed) return false
+      } else {
+        this.sqlite.query(`INSERT INTO sessions (session_id, user_id, mode, meta, questions, status) VALUES (?, ?, 'jd_prep', ?, ?, ?)`)
+          .run(input.sessionId, input.userId, JSON.stringify(input.meta), JSON.stringify(input.questions), status)
+      }
+      this.sqlite.query('UPDATE job_prep_operations SET session_id = ?, updated_at = ? WHERE user_id = ? AND operation_key = ? AND owner = ?')
+        .run(input.sessionId, Date.now(), input.userId, input.key, input.owner)
+      return true
+    }).immediate()
   }
 
   async create(input: { sessionId: string; userId: string; mode: InterviewMode; topic?: string; questions?: InterviewQuestion[]; meta?: Record<string, unknown> }): Promise<void> {
@@ -197,7 +245,7 @@ export class BunInterviewSessionRepository implements InterviewSessionRepository
   }
 
   async list(input: { userId: string; limit: number; offset: number; mode?: InterviewMode; topic?: string }): Promise<{ items: SessionSummary[]; total: number }> {
-    const conditions = ["user_id = $userId", "(status != 'ongoing' OR transcript != '[]')"]
+    const conditions = ["user_id = $userId", "(status != 'ongoing' OR transcript != '[]' OR (mode = 'jd_prep' AND questions != '[]'))"]
     if (input.mode) conditions.push('mode = $mode')
     if (input.topic) conditions.push('topic = $topic')
     const where = conditions.join(' AND ')

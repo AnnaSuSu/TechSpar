@@ -46,7 +46,7 @@ describe('legacy nullable HTTP request contracts', () => {
     const payload = { jd_text: '负责后端系统设计与 TypeScript 服务开发', company: null, position: null, use_resume: true }
 
     const preview = await app.request('/api/job-prep/preview', { method: 'POST', headers, body: JSON.stringify(payload) })
-    const start = await app.request('/api/job-prep/start', { method: 'POST', headers, body: JSON.stringify({ ...payload, preview_data: { role_summary: '后端岗位' } }) })
+    const start = await app.request('/api/job-prep/start', { method: 'POST', headers, body: JSON.stringify({ ...payload, request_id: crypto.randomUUID(), preview_data: { role_summary: '后端岗位' } }) })
 
     expect(preview.status).toBe(200)
     expect(start.status).toBe(200)

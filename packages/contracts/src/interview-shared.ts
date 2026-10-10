@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const InterviewModeSchema = z.enum(['resume', 'topic_drill', 'jd_prep', 'recording'])
-export const SessionStatusSchema = z.enum(['ongoing', 'ended', 'reviewing', 'reviewed', 'review_failed'])
+export const SessionStatusSchema = z.enum(['prepared', 'ongoing', 'ended', 'reviewing', 'reviewed', 'review_failed'])
 export const InterviewQuestionSchema = z.object({
   id: z.union([z.string(), z.number()]),
   question: z.string(),
