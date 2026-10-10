@@ -227,7 +227,9 @@ export class InterviewService implements InterviewUseCases {
       if (!await this.deps.sessions.completeJobPrep({ ...result, userId: id, key, owner })) {
         throw new AppError('备面记录已变更或删除，请刷新历史记录。', 409)
       }
-      return (await this.deps.sessions.get(result.sessionId, id))!
+      const session = await this.deps.sessions.get(result.sessionId, id)
+      if (!session) throw new AppError('备面记录已删除，请重新分析。', 404)
+      return session
     } catch (error) {
       await this.deps.sessions.releaseJobPrep(id, key, owner)
       throw error
@@ -253,6 +255,7 @@ export class InterviewService implements InterviewUseCases {
 
   async startJob(context: RequestContext, input: JobPrepInput): Promise<JobPrepStartResult> {
     const id = userId(context)
+    if (!input.session_id && !input.request_id) throw new AppError('直接开始训练需要 request_id，请刷新页面后重试。', 400)
     const saved = input.session_id ? await this.deps.sessions.get(input.session_id, id) : undefined
     if (input.session_id && (!saved || saved.mode !== 'jd_prep')) throw new AppError('备面记录不存在。', 404)
     if (saved && saved.status !== 'prepared' && !saved.questions.length) throw new AppError('该记录不能开始训练。', 409)
@@ -266,7 +269,7 @@ export class InterviewService implements InterviewUseCases {
     const effective = saved ? { ...saved.meta, jd_text: String(saved.meta.jd_text), preview_data: saved.meta.preview } as JobPrepInput : input
     const jd = effective.jd_text.trim()
     if (jd.length < 50) throw new AppError('JD 内容太短，无法生成训练。', 400)
-    const key = saved ? `start:${saved.session_id}` : `start-request:${input.request_id || crypto.randomUUID()}`
+    const key = saved ? `start:${saved.session_id}` : `start-request:${input.request_id}`
     const session = await this.jobOperation(context, key, saved ? { session_id: saved.session_id } : effective, async (generationContext) => {
       const preview = effective.preview_data || await this.generateJobPreview(generationContext, effective)
       const resumeContext = (effective.use_resume ?? true) ? (await this.deps.resume.text(generationContext)).slice(0, 5000) : ''

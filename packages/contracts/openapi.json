@@ -155,6 +155,7 @@
           }
         },
         "required": [
+          "session_id",
           "preview"
         ],
         "additionalProperties": false
@@ -4760,41 +4761,85 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "request_id": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "jd_text": {
-                    "type": "string"
-                  },
-                  "company": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "position": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "use_resume": {
-                    "type": "boolean",
-                    "default": true
-                  },
-                  "session_id": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200
-                  },
-                  "preview_data": {
+                "anyOf": [
+                  {
                     "type": "object",
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "properties": {
+                      "request_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "jd_text": {
+                        "type": "string"
+                      },
+                      "company": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "position": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "use_resume": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "session_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "preview_data": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "required": [
+                      "jd_text",
+                      "session_id"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "request_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "jd_text": {
+                        "type": "string"
+                      },
+                      "company": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "position": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "use_resume": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "session_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "preview_data": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "required": [
+                      "request_id",
+                      "jd_text"
+                    ]
                   }
-                },
-                "required": [
-                  "jd_text"
                 ]
               }
             }

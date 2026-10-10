@@ -11,8 +11,8 @@ export type ResponseCase = {
 }
 
 export const phaseTwoCases: ResponseCase[] = [
-  { operation: 'POST /api/job-prep/preview', service: 'interview', useCase: 'previewJob', schema: contracts.JobPrepPreviewResponseSchema, body: { jd_text: '合成测试岗位描述。'.repeat(10) } },
-  { operation: 'POST /api/job-prep/start', service: 'interview', useCase: 'startJob', schema: contracts.JobPrepStartResponseSchema, body: { jd_text: '合成测试岗位描述。'.repeat(10) } },
+  { operation: 'POST /api/job-prep/preview', service: 'interview', useCase: 'previewJob', schema: contracts.JobPrepPreviewResponseSchema, body: { jd_text: '合成测试岗位描述。'.repeat(10), request_id: 'eae3be97-42b6-4a30-a1fb-312d1eac67ee' } },
+  { operation: 'POST /api/job-prep/start', service: 'interview', useCase: 'startJob', schema: contracts.JobPrepStartResponseSchema, body: { jd_text: '合成测试岗位描述。'.repeat(10), request_id: 'eae3be97-42b6-4a30-a1fb-312d1eac67ee' } },
   { operation: 'POST /api/interview/start', service: 'interview', useCase: 'start', schema: contracts.InterviewStartResponseSchema, body: { mode: 'topic_drill', topic: 'typescript' } },
   { operation: 'POST /api/interview/chat', service: 'interview', useCase: 'chat', schema: contracts.InterviewChatResponseSchema, body: { session_id: 'topic-session-1', message: '合成回答' } },
   { operation: 'POST /api/interview/end/{session_id}', service: 'interview', useCase: 'end', schema: contracts.InterviewReviewSubmissionResponseSchema },

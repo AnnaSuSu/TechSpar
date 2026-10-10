@@ -60,11 +60,11 @@ describe('real services through HTTP and SQLite', () => {
     const preview = await json(await h.request('/api/job-prep/preview', 'POST', { jd_text: jdText, company: '示例公司', position: '后端工程师' }))
     expect<unknown>(preview).toEqual({ ...expected, session_id: 'generated-session-1' })
     const supplied = { legacy_preview: true, company: '客户端公司' }
-    const suppliedStart = await json(await h.request('/api/job-prep/start', 'POST', { jd_text: jdText, preview_data: supplied }))
+    const suppliedStart = await json(await h.request('/api/job-prep/start', 'POST', { jd_text: jdText, request_id: crypto.randomUUID(), preview_data: supplied }))
     expect<unknown>(suppliedStart).toMatchObject({ mode: 'jd_prep', company: '客户端公司', position: 'JD 备面', preview: supplied, meta: { preview: supplied } })
     expect<unknown>(suppliedStart.preview).toEqual(supplied)
     expect<unknown>(suppliedStart.questions).toHaveLength(4)
-    const generatedStart = await json(await h.request('/api/job-prep/start', 'POST', { jd_text: jdText, company: '示例公司', position: '后端工程师' }))
+    const generatedStart = await json(await h.request('/api/job-prep/start', 'POST', { request_id: crypto.randomUUID(), jd_text: jdText, company: '示例公司', position: '后端工程师' }))
     expect<unknown>(generatedStart.preview).toEqual(expected.preview)
     expect<unknown>(h.remaining).toEqual([])
   })
@@ -84,6 +84,14 @@ describe('real services through HTTP and SQLite', () => {
     expect(started).toMatchObject({ session_id: saved.session_id, questions })
     expect(await json(await h.request('/api/job-prep/start', 'POST', { jd_text: '', session_id: saved.session_id }))).toEqual(started)
     expect((await json(await h.request('/api/interview/history?mode=jd_prep'))).items[0]).toMatchObject({ session_id: saved.session_id, status: 'ongoing' })
+    expect(h.remaining).toEqual([])
+  })
+
+  test('rejects direct starts without an operation ID and previews without a saved session ID', async () => {
+    const h = await setup()
+    await json(await h.request('/api/job-prep/start', 'POST', { jd_text: jdText }), 422)
+    const fixture = await loadResponseFixture('interview-job-preview.json') as { preview: unknown }
+    expect(JobPrepPreviewResponseSchema.safeParse({ preview: fixture.preview }).success).toBeFalse()
     expect(h.remaining).toEqual([])
   })
 

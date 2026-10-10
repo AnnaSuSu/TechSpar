@@ -77,7 +77,7 @@ export interface CandidateProfilePort {
 }
 
 export interface InterviewUseCases {
-  previewJob(context: RequestContext, input: JobPrepInput): Promise<{ session_id?: string; preview: JobPrepPreview }>
+  previewJob(context: RequestContext, input: JobPrepInput): Promise<{ session_id: string; preview: JobPrepPreview }>
   startJob(context: RequestContext, input: JobPrepInput): Promise<JobPrepStartResult>
   start(context: RequestContext, input: StartInterviewInput): Promise<InterviewStartResult>
   chat(context: RequestContext, sessionId: string, message: string): Promise<{ session_id: string; message: string; is_finished: boolean }>

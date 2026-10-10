@@ -165,7 +165,11 @@ export const StartInterviewSchema = z.object({
   job_description: z.string().max(12000).optional(),
 })
 export const JobPrepPreviewSchema = z.object({ request_id: z.uuid().optional(), jd_text: z.string(), company: z.string().nullable().optional(), position: z.string().nullable().optional(), use_resume: z.boolean().default(true) })
-export const JobPrepStartSchema = JobPrepPreviewSchema.extend({ session_id: z.string().min(1).max(200).optional(), preview_data: z.record(z.string(), z.unknown()).optional() })
+const JobPrepStartFieldsSchema = JobPrepPreviewSchema.extend({ session_id: z.string().min(1).max(200).optional(), preview_data: z.record(z.string(), z.unknown()).optional() })
+export const JobPrepStartSchema = z.union([
+  JobPrepStartFieldsSchema.extend({ session_id: z.string().min(1).max(200) }),
+  JobPrepStartFieldsSchema.extend({ request_id: z.uuid() }),
+])
 export const InterviewChatSchema = z.object({ session_id: z.string(), message: z.string() })
 export const EndInterviewSchema = z.object({ answers: z.array(InterviewAnswerSchema).default([]) })
 export const ReferenceAnswerRequestSchema = z.object({ session_id: z.string(), question_id: z.union([z.string(), z.number()]) })

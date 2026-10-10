@@ -1683,6 +1683,18 @@ export interface paths {
                         position?: string | null;
                         /** @default true */
                         use_resume?: boolean;
+                        session_id: string;
+                        preview_data?: {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        /** Format: uuid */
+                        request_id: string;
+                        jd_text: string;
+                        company?: string | null;
+                        position?: string | null;
+                        /** @default true */
+                        use_resume?: boolean;
                         session_id?: string;
                         preview_data?: {
                             [key: string]: unknown;
@@ -3638,7 +3650,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         JobPrepPreviewResponse: {
-            session_id?: string;
+            session_id: string;
             preview: {
                 company: string;
                 position: string;

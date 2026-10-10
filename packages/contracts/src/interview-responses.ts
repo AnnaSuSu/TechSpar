@@ -24,7 +24,7 @@ export const JobPrepPreviewResultSchema = z.strictObject({
   question_blueprint: z.array(z.unknown()).describe('New model-produced blueprint items are validated in core; persisted and caller-supplied legacy items remain compatible.'),
   jd_excerpt: z.string(),
 })
-export const JobPrepPreviewResponseSchema = z.strictObject({ session_id: z.string().optional(), preview: JobPrepPreviewResultSchema })
+export const JobPrepPreviewResponseSchema = z.strictObject({ session_id: z.string(), preview: JobPrepPreviewResultSchema })
 export const JobPrepStartResponseSchema = z.strictObject({
   session_id: z.string(), mode: z.literal('jd_prep'), questions: z.array(InterviewQuestionSchema),
   preview: JobPrepPreviewCompatibilitySchema, company: z.string(), position: z.string(),

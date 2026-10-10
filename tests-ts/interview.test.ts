@@ -494,6 +494,39 @@ describe('job preparation saved lifecycle', () => {
     h.sessions.close(); h.states.close()
   })
 
+  for (const operation of ['preview', 'start'] as const) test(`reports deletion after ${operation} commits as 404, not a TypeError`, async () => {
+    const h = await setup([preview, questions])
+    const plan = operation === 'start' ? await h.service.previewJob(context, input) : undefined
+    const complete = h.sessions.completeJobPrep.bind(h.sessions)
+    h.sessions.completeJobPrep = async (value) => {
+      const saved = await complete(value)
+      if (saved) await h.sessions.delete(value.sessionId, value.userId)
+      return saved
+    }
+    const run = () => operation === 'preview'
+      ? h.service.previewJob(context, input)
+      : h.service.startJob(context, { ...input, session_id: plan!.session_id })
+    await expect(run()).rejects.toMatchObject({ status: 404 })
+    await expect(run()).rejects.toMatchObject({ status: 404 })
+    expect(h.ai.calls).toHaveLength(operation === 'preview' ? 1 : 2)
+    h.sessions.close(); h.states.close()
+  })
+
+  test('requires a stable direct-start request and replays its result after repository reopen', async () => {
+    const h = await setup([questions])
+    const direct = { ...input, preview_data: JSON.parse(preview) }
+    await expect(h.service.startJob(context, { ...direct, request_id: undefined })).rejects.toMatchObject({ status: 400 })
+    expect(h.ai.calls).toHaveLength(0)
+    const first = await h.service.startJob(context, direct)
+    h.sessions.close()
+    const reopened = new BunInterviewSessionRepository(h.path); reopened.initialize()
+    const service = new InterviewService({ ...h.deps, sessions: reopened })
+    expect(await service.startJob(context, direct)).toEqual(first)
+    expect((await service.history(context, {})).total).toBe(1)
+    expect(h.ai.calls).toHaveLength(1)
+    reopened.close(); h.states.close()
+  })
+
   test('recovers an expired generation lease and fences its previous owner', async () => {
     const h = await setup()
     const { Database } = await import('bun:sqlite')

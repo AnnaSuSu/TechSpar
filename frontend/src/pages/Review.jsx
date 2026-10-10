@@ -1,8 +1,11 @@
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { BookOpen, BriefcaseBusiness, Sparkles, RotateCcw } from "lucide-react";
 import { getReview, getReferenceAnswer, startInterview, startJobPrep } from "../api/interview";
+import useAuth from "../hooks/useAuth";
+import { jobPrepDraftKey } from "../lib/jobPrepAccount";
+import { jobPrepRestartRequest, clearJobPrepRestart } from "../lib/jobPrepRestart";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -517,16 +520,27 @@ export default function Review() {
   const [showTranscript, setShowTranscript] = useState(false);
   const [loading, setLoading] = useState(!review && !scores);
   const [restarting, setRestarting] = useState(false);
+  const { token } = useAuth();
+  const restartOperation = useRef(null);
+  const restartBusy = useRef(false);
+  const restartKey = `${jobPrepDraftKey(token)}:restart:${sessionId}`;
 
   const handleRestart = async () => {
     const currentMode = mode || stateData.mode;
-    if (!currentMode || currentMode === "recording") return;
+    if (!currentMode || currentMode === "recording" || restartBusy.current) return;
+    restartBusy.current = true;
     setRestarting(true);
     try {
       let data;
       if (currentMode === "jd_prep") {
         const m = meta || stateData.meta || {};
+        if (restartOperation.current?.key !== restartKey) {
+          restartOperation.current = { key: restartKey, id: crypto.randomUUID() };
+        }
+        const requestId = jobPrepRestartRequest(window.sessionStorage, restartKey, restartOperation.current.id);
+        restartOperation.current.id = requestId;
         data = await startJobPrep({
+          request_id: requestId,
           jd_text: m.jd_text || m.jd_excerpt,  // jd_excerpt: 兼容修复前创建的旧会话
           company: m.company,
           position: m.position,
@@ -536,10 +550,15 @@ export default function Review() {
       } else {
         data = await startInterview(currentMode, topic || stateData.topic);
       }
+      if (currentMode === "jd_prep") {
+        clearJobPrepRestart(window.sessionStorage, restartKey);
+        restartOperation.current = null;
+      }
       navigate(`/interview/${data.session_id}`, { state: { ...data, mode: currentMode, topic: topic || stateData.topic, meta: data.meta || meta || stateData.meta } });
     } catch (err) {
       alert("启动失败: " + err.message);
     } finally {
+      restartBusy.current = false;
       setRestarting(false);
     }
   };
