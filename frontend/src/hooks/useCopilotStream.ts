@@ -3,6 +3,7 @@ import { encodeCopilotAudio } from '@techspar/contracts';
 import { decodeCopilotEvent, type CopilotServerEvent } from '../api/events';
 import { CopilotAudioCapture, emptyAudioLevel } from '../lib/copilot-audio';
 import { isDesktopApp } from '../lib/desktop';
+import { getAuthToken } from '../lib/authSession';
 
 export type CopilotMessage = CopilotServerEvent;
 interface CopilotStreamOptions { prepId?: string; onUpdate?: (msg: CopilotMessage) => void }
@@ -41,7 +42,7 @@ export default function useCopilotStream({ prepId, onUpdate }: CopilotStreamOpti
     readyRef.current = false;
     setAudioReady(false);
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const token = localStorage.getItem('token') || '';
+    const token = getAuthToken() || '';
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws/copilot/${sessionId}?token=${encodeURIComponent(token)}`);
     wsRef.current = ws;
     ws.onopen = () => {

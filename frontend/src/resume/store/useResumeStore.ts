@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { StateStorage } from "zustand/middleware";
+import { accountResumeStorage, subscribeResumeAccount } from "./resumeAccount";
 import {
   BasicInfo,
   Education,
@@ -101,32 +101,6 @@ const createDefaultCustomItem = (): CustomItem => ({
   dateRange: "",
   description: "",
   visible: true,
-});
-
-const warnedPersistFailures = new Set<string>();
-
-const warnPersistFailure = (name: string, error: unknown) => {
-  if (warnedPersistFailures.has(name)) {
-    return;
-  }
-
-  warnedPersistFailures.add(name);
-  console.warn(
-    `[resume-store] Failed to persist "${name}" to localStorage. Changes remain available in memory for this session.`,
-    error
-  );
-};
-
-const createSafeLocalStorage = (): StateStorage => ({
-  getItem: (name) => localStorage.getItem(name),
-  setItem: (name, value) => {
-    try {
-      localStorage.setItem(name, value);
-    } catch (error) {
-      warnPersistFailure(name, error);
-    }
-  },
-  removeItem: (name) => localStorage.removeItem(name),
 });
 
 const parseTimestamp = (value?: string): number | null => {
@@ -848,18 +822,19 @@ export const useResumeStore = create(
     }),
     {
       name: "resume-storage",
+      skipHydration: true,
       storage: createJSONStorage<PersistedResumeStore>(() =>
-        createSafeLocalStorage()
+        accountResumeStorage
       ),
       partialize: (state): PersistedResumeStore => ({
         resumes: state.resumes,
         activeResumeId: state.activeResumeId,
       }),
       merge: (persistedState, currentState) => {
-        const persisted = persistedState as Partial<PersistedResumeStore>;
-        const resumes = persisted.resumes ?? currentState.resumes;
+        const persisted = persistedState as Partial<PersistedResumeStore> | undefined;
+        const resumes = persisted?.resumes ?? currentState.resumes;
         const activeResumeId =
-          persisted.activeResumeId ?? currentState.activeResumeId;
+          persisted?.activeResumeId ?? currentState.activeResumeId;
 
         return {
           ...currentState,
@@ -872,3 +847,14 @@ export const useResumeStore = create(
     }
   )
 );
+
+subscribeResumeAccount((userId) => {
+  if (userId) {
+    void useResumeStore.persist.rehydrate();
+    return;
+  }
+  Object.keys(useResumeStore.getState().resumes).forEach(clearHistoryGroup);
+  useResumeStore.setState({
+    resumes: {}, activeResumeId: null, activeResume: null, history: {}, future: {},
+  });
+});

@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { isDesktopApp } from "@/lib/desktop";
+import { getAuthToken } from "@/lib/authSession";
 
 const DIVERGENCE_OPTIONS = [
   { value: 1, label: "聚焦薄弱", description: "100% 针对存在弱点的知识域，适合考前专项突击" },
@@ -257,7 +258,7 @@ export default function Settings() {
     try {
       const response = await fetch("/api/auth/password", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAuthToken() || ""}` },
         body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
       });
       if (!response.ok) {

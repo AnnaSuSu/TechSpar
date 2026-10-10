@@ -62,6 +62,20 @@ function testApp(allowRegistration = false) {
 }
 
 describe('auth compatibility', () => {
+  test('returns only the verified token subject and rejects absent or forged tokens', async () => {
+    const { app, users, passwords } = testApp();
+    users.rows.set('user-b', { id: 'user-b', email: 'b@example.com', name: 'B', is_admin: false, password: await passwords.hash('secret') });
+    const login = await app.request('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'b@example.com', password: 'secret' }) });
+    const { token } = await login.json() as { token: string };
+    const response = await app.request('/api/auth/me', { headers: { authorization: `Bearer ${token}` } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ id: 'user-b' });
+    expect((await app.request('/api/auth/me')).status).toBe(401);
+    const [header, payload] = token.split('.');
+    const forged = `${header}.${Buffer.from(JSON.stringify({ sub: 'user-a' })).toString('base64url')}.${payload}`;
+    expect((await app.request('/api/auth/me', { headers: { authorization: `Bearer ${forged}` } })).status).toBe(401);
+  });
+
   test('reports registration flag and service version', async () => {
     const { app } = testApp()
     expect(await (await app.request('/api/auth/config')).json()).toEqual({ allow_registration: false })

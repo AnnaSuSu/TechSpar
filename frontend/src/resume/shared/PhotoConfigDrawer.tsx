@@ -23,6 +23,7 @@ import {
 } from "@/resume/types/resume";
 import { Textarea } from "@/resume/ui/textarea";
 import { useResumeStore } from "@/resume/store/useResumeStore";
+import { getResumeAccount } from "@/resume/store/resumeAccount";
 import { cn } from "@/resume/lib/utils";
 
 const DEFAULT_AVATAR = "/avatar.png";
@@ -90,6 +91,7 @@ const PhotoConfigDrawer: React.FC<Props> = ({
 
 
   const handleFile = async (file: File) => {
+    const account = getResumeAccount();
     if (!file.type.startsWith("image/")) {
       toast.error(t("upload.typeLimit"));
       return;
@@ -125,6 +127,7 @@ const PhotoConfigDrawer: React.FC<Props> = ({
         imageData = await compressImage(file, 1200, 1200, 0.8);
       }
 
+      if (!account || account !== getResumeAccount()) return;
       setPreviewUrl(imageData);
       setImageUrl(imageData);
       updateBasicInfo({
@@ -143,6 +146,7 @@ const PhotoConfigDrawer: React.FC<Props> = ({
   };
 
   const handleUrlChange = async (e: string) => {
+    const account = getResumeAccount();
     const url = e.trim();
     setImageUrl(url);
     if (!url) {
@@ -196,12 +200,14 @@ const PhotoConfigDrawer: React.FC<Props> = ({
         img.src = proxyUrl;
       });
 
+      if (!account || account !== getResumeAccount()) return;
       setPreviewUrl(proxyUrl);
       updateBasicInfo({
         photo: url,
       });
       onPhotoChange(url, config);
     } catch {
+      if (!account || account !== getResumeAccount()) return;
       toast.error(
         t("upload.invalidUrl", {
           defaultMessage: "图片链接无效或无法访问，请尝试使用其他图片链接",

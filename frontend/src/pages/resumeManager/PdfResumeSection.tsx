@@ -21,6 +21,7 @@ import {
 } from "@/resume/ui/dialog";
 import ThemeModal from "@/resume/shared/ThemeModal";
 import { useResumeStore } from "@/resume/store/useResumeStore";
+import { getResumeAccount } from "@/resume/store/resumeAccount";
 import {
   deleteUploadedResume,
   getResumePdfBlob,
@@ -127,12 +128,17 @@ export default function PdfResumeSection() {
   };
 
   const handleParse = async () => {
+    const account = getResumeAccount();
     setParsing(true);
     const toastId = toast.loading("正在用你的 LLM 解析简历,可能需要一分钟…");
     try {
       const result = (await parseUploadedResume()) as {
         parsed?: ParsedResumePayload;
       };
+      if (!account || account !== getResumeAccount()) {
+        toast.dismiss(toastId);
+        return;
+      }
       if (!result.parsed) throw new Error("解析结果为空");
       const fallbackTitle = (status?.filename || "导入的简历").replace(
         /\.pdf$/i,
