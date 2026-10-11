@@ -3,8 +3,13 @@ import type { AuthUser } from './model.ts'
 export interface UserRepository {
   findByEmail(email: string): Promise<(AuthUser & { password: string }) | undefined>
   findById(id: string): Promise<AuthUser | undefined>
+  tokenVersion(id: string): Promise<number | undefined>
   create(input: { id: string; email: string; password: string; name: string }): Promise<AuthUser>
   updatePassword(id: string, password: string): Promise<void>
+}
+
+export interface TokenVersionStore {
+  tokenVersion(userId: string): Promise<number | undefined>
 }
 
 export interface PasswordHasher {

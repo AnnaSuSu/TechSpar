@@ -112,6 +112,7 @@ describe('settings persistence', () => {
     const users: UserRepository = {
       async findByEmail() { return undefined },
       async findById() { return { id: 'admin', email: 'admin@example.com', name: 'Admin', is_admin: true } },
+      async tokenVersion() { return 0 },
       async create() { throw new Error('not used') },
       async updatePassword() {},
     }

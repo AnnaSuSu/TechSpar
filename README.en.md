@@ -50,6 +50,8 @@ cp .env.example .env
 
 Download macOS and Windows installers from [GitHub Releases](https://github.com/AnnaSuSu/TechSpar/releases) and sign in online to use them. The commands below build a desktop application with a local backend from source.
 
+Before starting the API, copy `.env.example` to `.env` and replace the sample values for `JWT_SECRET`, `VOICEPRINT_ENCRYPTION_KEY`, and `DEFAULT_PASSWORD`. The server refuses to start while JWT or password placeholders remain.
+
 Run Vite, Hono, and Electron together in development:
 
 ```bash
@@ -81,7 +83,7 @@ bun run dev:api
 bun run dev:web
 ```
 
-Open <http://localhost:5173>. The development login is `admin@techspar.local` / `admin123`. Change `JWT_SECRET` and the default password before deployment.
+Open <http://localhost:5173>. The server no longer has a fixed default password. The Electron desktop app creates random local credentials and signs in automatically.
 
 Docker is also supported:
 

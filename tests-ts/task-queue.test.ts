@@ -155,6 +155,35 @@ describe('persistent task queue leases', () => {
     repository.close()
   })
 
+  test('aborts the old handler when its lease expires and a replacement completes', async () => {
+    const path = await databasePath()
+    let now = Date.UTC(2026, 7, 20, 0, 0, 0)
+    const clock = () => new Date(now)
+    const firstRepo = new BunTaskRepository(path, clock)
+    const secondRepo = new BunTaskRepository(path, clock)
+    firstRepo.initialize(); secondRepo.initialize()
+    await firstRepo.upsert({ taskId: 'lost-lease', userId: 'user-a', type: 'review', payload: {} })
+
+    const gate = deferred()
+    let oldSignal: AbortSignal | undefined
+    const first = new PersistentTaskQueue(firstRepo, { owner: 'old-worker', leaseDurationMs: 100, heartbeatIntervalMs: 10 })
+    const second = new PersistentTaskQueue(secondRepo, { owner: 'replacement', leaseDurationMs: 100, heartbeatIntervalMs: 10 })
+    first.register('review', async (task) => { oldSignal = task.signal; await gate.promise; return { stale: true } })
+    second.register('review', async () => ({ fresh: true }))
+    await first.start()
+    await waitFor(() => oldSignal !== undefined)
+
+    now += 101
+    await second.start()
+    await waitFor(async () => (await secondRepo.get('lost-lease', 'user-a'))?.status === 'done')
+    await waitFor(() => oldSignal!.aborted)
+    gate.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(await firstRepo.get('lost-lease', 'user-a')).toMatchObject({ status: 'done', attempts: 2, result: { fresh: true } })
+
+    first.stop(); second.stop(); firstRepo.close(); secondRepo.close()
+  })
+
   test('renews the lease while a handler is still running', async () => {
     const path = await databasePath()
     const repository = new BunTaskRepository(path)

@@ -107,7 +107,7 @@ export class RecordingService implements RecordingUseCases {
     }
     const transcript = String(session.meta.source_transcript || session.transcript[0]?.content || '').trim()
     if (!transcript) throw new Error('Transcript must not be blank.')
-    const request: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: new AbortController().signal }
+    const request: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: task.signal || new AbortController().signal }
     try {
       let scores: Array<Record<string, unknown>> = []
       let overall: Record<string, unknown> = {}
@@ -117,6 +117,7 @@ export class RecordingService implements RecordingUseCases {
           { role: 'system', content: '你是面试记录分析引擎。只返回 JSON，不要其他内容。' },
           { role: 'user', content: fill(RECORDING_STRUCTURE_PROMPT, { transcript }) },
         ], STRUCTURED_CHAT_OPTIONS))
+        if (request.signal.aborted) throw request.signal.reason || new Error('Task lease was lost')
         const pairs = validateRecordingStructure(structured)
         const questions: InterviewQuestion[] = pairs.map((pair) => ({ id: pair.id as string | number, question: String(pair.question), difficulty: 3, focus_area: typeof pair.focus_area === 'string' ? pair.focus_area : '' }))
         const answers: InterviewAnswer[] = pairs.map((pair) => ({ question_id: pair.id as string | number, answer: pair.answer as string }))
@@ -144,12 +145,14 @@ export class RecordingService implements RecordingUseCases {
         scores = topics.map((topic, index) => ({ question_id: topic.id ?? index + 1, score: topic.score, difficulty: 3 }))
         review = formatSoloReview(topics, overall)
       }
+      if (request.signal.aborted) throw request.signal.reason || new Error('Task lease was lost')
       await this.deps.sessions.saveReview({ sessionId: session.session_id, userId: session.user_id, review, scores, weakPoints: Array.isArray(overall.new_weak_points) ? overall.new_weak_points : [], overall })
       const reviewed = await this.deps.sessions.get(session.session_id, session.user_id)
+      if (request.signal.aborted) throw request.signal.reason || new Error('Task lease was lost')
       if (reviewed) await this.updateProfile(reviewed)
       return { session_id: session.session_id, status: 'done' }
     } catch (error) {
-      await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })
+      if (!request.signal.aborted) await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })
       throw error
     }
   }

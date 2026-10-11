@@ -33,6 +33,14 @@ export class BunUserRepository implements UserRepository {
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       )
     `)
+    const columns = new Set(this.sqlite.query<{ name: string }, []>('PRAGMA table_info(users)').all().map((row) => row.name))
+    if (!columns.has('token_version')) {
+      try { this.sqlite.exec('ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0') }
+      catch (error) {
+        const addedByAnotherInstance = this.sqlite.query<{ name: string }, []>('PRAGMA table_info(users)').all().some((row) => row.name === 'token_version')
+        if (!addedByAnotherInstance) throw error
+      }
+    }
   }
 
   async findByEmail(email: string): Promise<(AuthUser & { password: string }) | undefined> {
@@ -45,6 +53,11 @@ export class BunUserRepository implements UserRepository {
     return row ? authUser(row, this.defaultEmail) : undefined
   }
 
+  async tokenVersion(id: string): Promise<number | undefined> {
+    const row = this.sqlite.query<{ token_version: number }, { $id: string }>('SELECT token_version FROM users WHERE id = $id').get({ $id: id })
+    return row?.token_version
+  }
+
   async create(input: { id: string; email: string; password: string; name: string }): Promise<AuthUser> {
     const normalized = input.email.toLowerCase().trim()
     await this.db.insert(users).values({ ...input, email: normalized })
@@ -52,7 +65,7 @@ export class BunUserRepository implements UserRepository {
   }
 
   async updatePassword(id: string, password: string): Promise<void> {
-    await this.db.update(users).set({ password }).where(eq(users.id, id))
+    this.sqlite.query('UPDATE users SET password = $password, token_version = token_version + 1 WHERE id = $id').run({ $password: password, $id: id })
   }
 
   close(): void {

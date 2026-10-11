@@ -16,7 +16,7 @@ async function root(): Promise<string> { const value = await mkdtemp(join(tmpdir
 afterEach(async () => { while (roots.length) await rm(roots.pop()!, { recursive: true, force: true }) })
 const context = (userId: string): RequestContext => ({ requestId: 'test', userId, signal: new AbortController().signal })
 const users: UserRepository = {
-  async findByEmail() { return undefined }, async findById(id) { return { id, email: 'user@example.com', name: '', is_admin: id === 'admin' } }, async create() { throw new Error() }, async updatePassword() {},
+  async findByEmail() { return undefined }, async findById(id) { return { id, email: 'user@example.com', name: '', is_admin: id === 'admin' } }, async tokenVersion() { return 0 }, async create() { throw new Error() }, async updatePassword() {},
 }
 function service(base: string) {
   const data = join(base, 'data'); mkdirSync(data, { recursive: true }); const db = join(data, 'interviews.db'); const profiles = new FileCandidateProfileRepository(data)
@@ -199,5 +199,23 @@ describe('personal archive migration', () => {
     const targetRoot = await root(); const target = service(targetRoot)
     const bytes = await new TarGzipArchiveCodec().pack({ manifest: { schema_version: 2, exported_at: '', user_id: null, backup_kind: 'system', includes_sensitive_credentials: true }, files: new Map() })
     await expect(target.value.importPersonal(context('target-user'), 'full.tar.gz', bytes, { dbStrategy: 'skip', overwriteFiles: false })).rejects.toThrow('单账户备份')
+  })
+
+  test('validates profile files before importing any database rows', async () => {
+    const sourceRoot = await root(); const source = service(sourceRoot)
+    const sourceSessions = new BunInterviewSessionRepository(source.db); sourceSessions.initialize()
+    await sourceSessions.create({ sessionId: 'must-not-import', userId: 'source-user', mode: 'resume' })
+    const database = await new BunDataMigrationRepository(source.db).exportPersonal('source-user')
+    const codec = new TarGzipArchiveCodec()
+    const bytes = await codec.pack({
+      manifest: { schema_version: 2, exported_at: '', user_id: 'source-user', backup_kind: 'personal', includes_sensitive_credentials: false },
+      database,
+      files: new Map([['data/users/source-user/profile/profile.json', encoder.encode('[]')]]),
+    })
+    const targetRoot = await root(); const target = service(targetRoot)
+    const targetSessions = new BunInterviewSessionRepository(target.db); targetSessions.initialize()
+    await expect(target.value.importPersonal(context('target-user'), 'invalid-profile.tar.gz', bytes, { dbStrategy: 'skip', overwriteFiles: false })).rejects.toThrow('画像文件必须是 JSON 对象')
+    expect(await targetSessions.get('must-not-import', 'target-user')).toBeUndefined()
+    sourceSessions.close(); targetSessions.close()
   })
 })

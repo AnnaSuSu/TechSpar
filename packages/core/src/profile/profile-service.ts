@@ -603,8 +603,9 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     const topicName = topics[topic]?.name || topic
     const history = sessions.map((session) => `### ${session.created_at.slice(0, 10)}\n${session.review || ''}\n评分：${JSON.stringify(session.scores)}`).join('\n\n')
     const mastery = profile.topic_mastery[topic] || {}
-    const context: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: new AbortController().signal }
+    const context: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: task.signal || new AbortController().signal }
     const retrospective = (await this.deps.ai.complete(context, [{ role: 'system', content: '你是面试教练。用 Markdown 生成回顾报告。' }, { role: 'user', content: fill(RETROSPECTIVE_PROMPT, { topic_name: topicName, mastery: `${mastery.score ?? Number(mastery.level || 0) * 20}/100 — ${mastery.notes || ''}`, history }) }])).trim()
+    if (context.signal.aborted) throw context.signal.reason || new Error('Task lease was lost')
     const at = new Date().toISOString()
     await this.deps.repository.update(task.user_id, (value) => { (value.topic_mastery[topic] ||= {}).retrospective = retrospective; value.topic_mastery[topic]!.retrospective_at = at })
     return { topic, topic_name: topicName, retrospective, retrospective_at: at, session_count: sessions.length }

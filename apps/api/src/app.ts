@@ -36,6 +36,9 @@ import { registerVoiceprintRoutes } from './routes/voiceprint.ts'
 import { registerStaticFrontend } from './http/static-frontend.ts'
 import { createOpenApiDocument } from './http/openapi.ts'
 import { fastApiValidationBody } from './http/validation.ts'
+import { LoginRateLimiter } from './http/login-rate-limiter.ts'
+import type { LoginRateLimiter as LoginRateLimiterType } from './http/login-rate-limiter.ts'
+import { requestBodyLimit } from './http/request-body-limit.ts'
 
 export type AppDependencies = {
   auth: AuthUseCases
@@ -58,6 +61,8 @@ export type AppDependencies = {
   /** 追加路由。必须在静态前端兜底之前注册,否则会被 app.get('*') 吃掉。 */
   extendRoutes?: (app: OpenAPIHono) => void
   webDir?: string
+  loginLimiter?: LoginRateLimiterType
+  trustProxy?: boolean
 }
 
 export function createApp(deps: AppDependencies): OpenAPIHono {
@@ -69,6 +74,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono {
 
   app.use('*', requestId())
   app.use('/api/*', logger())
+  app.use('/api/*', (c, next) => requestBodyLimit(c.req.path)(c, next))
 
   app.onError((error, c) => {
     if (error instanceof HTTPException) {
@@ -83,7 +89,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono {
     return c.json({ detail: 'Internal Server Error' }, 500)
   })
 
-  registerAuthRoutes(app, deps)
+  registerAuthRoutes(app, { ...deps, loginLimiter: deps.loginLimiter || new LoginRateLimiter(), trustProxy: deps.trustProxy })
   registerSettingsRoutes(app, deps)
   registerKnowledgeRoutes(app, deps)
   registerResumeRoutes(app, deps)

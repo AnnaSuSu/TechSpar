@@ -32,10 +32,10 @@ const child = Bun.spawn([executable], {
     TECHSPAR_DATA_DIR: join(root, 'data'),
     DB_PATH: join(root, 'data', 'interviews.db'),
     TECHSPAR_MODEL_CACHE_DIR: join(root, 'models'),
-    JWT_SECRET: 'local-embedding-smoke-secret',
-    VOICEPRINT_ENCRYPTION_KEY: 'local-embedding-smoke-voiceprint',
+    JWT_SECRET: 'local-embedding-smoke-jwt-secret-with-at-least-32-chars',
+    VOICEPRINT_ENCRYPTION_KEY: 'local-embedding-smoke-voiceprint-key-with-32-chars',
     DEFAULT_EMAIL: 'admin@techspar.local',
-    DEFAULT_PASSWORD: 'admin123',
+    DEFAULT_PASSWORD: 'local-embedding-smoke-password',
     DEFAULT_NAME: 'Admin',
   },
 })

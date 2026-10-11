@@ -420,7 +420,7 @@ export class InterviewService implements InterviewUseCases {
   async runReviewTask(task: TaskRecord): Promise<Record<string, unknown> | undefined> {
     const session = await this.deps.sessions.get(task.task_id, task.user_id)
     if (!session) throw new Error('Session not found.')
-    const context: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: new AbortController().signal }
+    const context: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: task.signal || new AbortController().signal }
     try {
       if (task.payload.profile_only === true) {
         if (session.review == null) throw new Error('No saved review to synchronize')
@@ -434,6 +434,7 @@ export class InterviewService implements InterviewUseCases {
         const transcript = state.messages.map((message) => `${message.role === 'user' ? '**候选人**' : '**面试官**'}: ${message.content}`).join('\n\n')
         const evaluations = state.eval_history.map((evaluation) => `- [${evaluation.phase || ''}] ${evaluation.score ?? '?'}/10 — ${evaluation.brief || ''}${evaluation.evidence ? `（原话：${evaluation.evidence}）` : ''}`).join('\n')
         const review = await this.deps.ai.complete(context, [{ role: 'system', content: fill(REVIEW_PROMPT, { mode: session.mode, topic: session.topic || '', transcript, evaluations, resume_context: state.resume_context }) }, { role: 'user', content: '请生成复盘报告。' }])
+        if (context.signal.aborted) throw context.signal.reason || new Error('Task lease was lost')
         await this.deps.sessions.saveReview({ sessionId: session.session_id, userId: session.user_id, review })
       } else if (session.mode === 'topic_drill' || session.mode === 'jd_prep') {
         const answers = answerOverride(task.payload.answers_override) ?? answersFromTranscript(session)
@@ -449,15 +450,17 @@ export class InterviewService implements InterviewUseCases {
         const { scores, overall } = reviewResult(parsed, session)
         const difficulty = new Map(session.questions.map((question) => [String(question.id), question.difficulty || 3]))
         for (const score of scores) if (score.difficulty === undefined) score.difficulty = difficulty.get(String(score.question_id)) || 3
+        if (context.signal.aborted) throw context.signal.reason || new Error('Task lease was lost')
         await this.deps.sessions.saveReview({ sessionId: session.session_id, userId: session.user_id, review: markdownReview(session.mode === 'topic_drill' ? '专项训练复盘' : 'JD 定向备面复盘', session, parsed), scores, weakPoints: Array.isArray(overall.new_weak_points) ? overall.new_weak_points : [], overall })
       } else {
         throw new Error(`Unsupported review mode: ${session.mode}`)
       }
       const reviewed = await this.deps.sessions.get(session.session_id, session.user_id)
+      if (context.signal.aborted) throw context.signal.reason || new Error('Task lease was lost')
       if (reviewed) await this.updateProfile(reviewed)
       return { session_id: session.session_id, status: 'done' }
     } catch (error) {
-      await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })
+      if (!context.signal.aborted) await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })
       throw error
     }
   }

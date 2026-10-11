@@ -48,6 +48,7 @@ v0.3.2 提供 macOS arm64 和 Windows x64 发行包。当前公开包没有商�
 ```bash
 bun install --frozen-lockfile
 cp .env.example .env
+# Replace the Auth sample values with unique credentials before starting the API.
 bun run dev:api
 ```
 
@@ -75,22 +76,28 @@ TECHSPAR_WEB_DIR=frontend/dist HOST=127.0.0.1 PORT=8000 bun apps/api/src/entry.b
 
 ```bash
 cp .env.example .env
+# Edit .env and replace all sample values in the Auth section before startup.
 docker compose up --build
 ```
 
 启动后访问 <http://localhost>。`./data` 会挂载到 API 容器；升级或切换镜像前先备份该目录。
+
+Compose 中 API 只通过容器网络暴露给前端 Nginx；Nginx 会覆盖 `X-Real-IP`，因此 Compose 为登录限流启用了 `TRUST_PROXY=true`。自定义部署默认不信任转发头。只有在 API 无法被客户端绕过代理直接访问，且代理会覆盖 `X-Real-IP` 时，才设置 `TRUST_PROXY=true`；否则攻击者可以伪造来源地址绕过登录限流。
 
 ## 启动配置
 
 必须检查的项目：
 
 ```env
-JWT_SECRET=replace-with-a-long-random-value
-VOICEPRINT_ENCRYPTION_KEY=replace-with-another-long-random-value
+# Replace all samples; the two encryption keys must be different.
+JWT_SECRET=replace-with-a-unique-random-value-at-least-32-characters
+VOICEPRINT_ENCRYPTION_KEY=replace-with-a-different-random-value-at-least-32-characters
 DEFAULT_EMAIL=admin@techspar.local
-DEFAULT_PASSWORD=replace-this-password
+DEFAULT_PASSWORD=replace-with-a-unique-password-at-least-12-characters
 DEFAULT_NAME=Admin
 ALLOW_REGISTRATION=false
+# 仅当 API 只能经由会覆盖 X-Real-IP 的可信代理访问时启用；Compose 已由内部 Nginx 满足此条件。
+TRUST_PROXY=false
 HOST=0.0.0.0
 PORT=8000
 ```
@@ -106,7 +113,7 @@ TECHSPAR_MODEL_CACHE_DIR=
 
 LLM、Embedding、DashScope、Tavily、OSS 和腾讯 VPR 凭据默认由每个用户登录后在“设置”中填写，不写入 `.env`。部署方若要提供共享兜底，只能使用 `.env.example` 中的 `PLATFORM_LLM_*`、`PLATFORM_EMBEDDING_*` 和调用额度配置。
 
-首次启动会在用户表中创建 `DEFAULT_EMAIL`；以后修改 `DEFAULT_PASSWORD` 不会重置已经存在的账号密码。生产环境应在首次启动前改好默认值。
+首次启动会在用户表中创建 `DEFAULT_EMAIL`；以后修改 `DEFAULT_PASSWORD` 不会重置已经存在的账号密码。服务端启动会拒绝缺失、过短或仍为示例值的 JWT 密钥和默认密码。可用 `openssl rand -hex 32` 生成密钥；建议使用至少 32 个字符的独立 `VOICEPRINT_ENCRYPTION_KEY`。未配置声纹密钥时会沿用 JWT 密钥，以兼容已有加密数据。
 
 ## 本地 Embedding
 
