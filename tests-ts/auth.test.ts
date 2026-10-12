@@ -26,7 +26,10 @@ import rootPackage from '../package.json' with { type: 'json' }
 class MemoryUsers implements UserRepository {
   rows = new Map<string, AuthUser & { password: string }>()
   tokenVersions = new Map<string, number>()
-  async findByEmail(email: string) { return [...this.rows.values()].find((row) => row.email === email.toLowerCase().trim()) }
+  async findByEmail(email: string) {
+    const row = [...this.rows.values()].find((row) => row.email === email.toLowerCase().trim())
+    return row ? { ...row, tokenVersion: this.tokenVersions.get(row.id) ?? 0 } : undefined
+  }
   async findById(id: string) { return this.rows.get(id) }
   async tokenVersion(id: string) { return this.rows.has(id) ? this.tokenVersions.get(id) ?? 0 : undefined }
   async create(input: { id: string; email: string; password: string; name: string }) {
@@ -207,4 +210,59 @@ test('upgrades existing users with token versions and invalidates JWTs after a p
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+test('a successful own-account login cannot reset failures against another account', async () => {
+  const { app, users, passwords } = testApp()
+  for (const id of ['victim', 'attacker']) await users.create({ id, email: `${id}@example.com`, password: await passwords.hash('correct-password'), name: id })
+  const attempt = (email: string, password: string) => app.request('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json', 'x-real-ip': '192.0.2.1' }, body: JSON.stringify({ email, password }) })
+  expect((await attempt('victim@example.com', 'wrong')).status).toBe(401)
+  expect((await attempt('attacker@example.com', 'correct-password')).status).toBe(200)
+  expect((await attempt('victim@example.com', 'wrong')).status).toBe(401)
+  expect((await attempt('attacker@example.com', 'correct-password')).status).toBe(429)
+  expect((await attempt('victim@example.com', 'wrong')).status).toBe(429)
+})
+
+test('rejects an old-password login when the password changes during verification', async () => {
+  const users = new BunUserRepository(':memory:', 'admin@example.com'); users.initialize()
+  let start!: () => void; let release!: () => void
+  const started = new Promise<void>(resolve => { start = resolve })
+  const gate = new Promise<void>(resolve => { release = resolve })
+  try {
+    await users.create({ id: 'user-a', email: 'a@example.com', password: 'old-hash', name: 'A' })
+    const tokens = new JoseTokenService('test-jwt-secret-with-at-least-32-chars', Date.now, users)
+    const auth = new AuthService(users, {
+      async hash(value) { return value },
+      async verify(password, hash) { start(); await gate; return password === 'old-password' && hash === 'old-hash' },
+    }, tokens, new ShortUuidGenerator(), { allowRegistration: false })
+    const pending = auth.login('a@example.com', 'old-password').then(
+      value => ({ value, error: undefined }), error => ({ value: undefined, error }),
+    )
+    await started
+    await users.updatePassword('user-a', 'new-hash')
+    release()
+    const outcome = await pending
+    expect(outcome.value).toBeUndefined()
+    expect(outcome.error).toMatchObject({ status: 401 })
+    expect(await users.findByEmail('a@example.com')).toMatchObject({ password: 'new-hash', tokenVersion: 1 })
+  } finally { release?.(); users.close() }
+})
+
+test('tokens retain the verified version if the password changes just before signing', async () => {
+  const users = new BunUserRepository(':memory:', 'admin@example.com'); users.initialize()
+  try {
+    await users.create({ id: 'user-a', email: 'a@example.com', password: 'old-hash', name: 'A' })
+    const tokens = new JoseTokenService('test-jwt-secret-with-at-least-32-chars', Date.now, users)
+    const auth = new AuthService(users, { async hash(value) { return value }, async verify() { return true } }, {
+      async create(id, verifiedVersion) {
+        await users.updatePassword(id, 'new-hash')
+        return tokens.create(id, verifiedVersion)
+      }, decode: tokens.decode.bind(tokens),
+    }, new ShortUuidGenerator(), { allowRegistration: false })
+    const result = await auth.login('a@example.com', 'old-password')
+    expect(await tokens.decode(result.token)).toBeUndefined()
+    expect(result.user).not.toHaveProperty('tokenVersion')
+    expect(result.user).not.toHaveProperty('password')
+    expect(await tokens.decode(await tokens.create('user-a'))).toBe('user-a')
+  } finally { users.close() }
 })

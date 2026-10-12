@@ -79,7 +79,7 @@ export class PersistentTaskQueue implements PersistentTaskDispatcher {
     let claimed = false
     let heartbeat: ReturnType<typeof setInterval> | undefined
     const controller = new AbortController()
-    let renewing = false
+    let renewing: Promise<void> | undefined
     const stopHeartbeat = (): void => {
       if (heartbeat) clearInterval(heartbeat)
       heartbeat = undefined
@@ -89,20 +89,24 @@ export class PersistentTaskQueue implements PersistentTaskDispatcher {
       const task = await this.repository.claim(taskId, userId, lease)
       if (!task) return
       claimed = true
-      heartbeat = setInterval(() => {
-        if (renewing || controller.signal.aborted) return
-        renewing = true
-        void this.repository.renew(taskId, userId, lease)
-          .then((renewed) => { if (!renewed) controller.abort(new Error('Task lease was lost')) })
-          .catch(() => controller.abort(new Error('Task lease renewal failed')))
-          .finally(() => { renewing = false })
-      }, this.heartbeatIntervalMs)
+      const assertActive = async (): Promise<void> => {
+        controller.signal.throwIfAborted()
+        if (!renewing) {
+          renewing = this.repository.renew(taskId, userId, lease)
+            .then((renewed) => { if (!renewed) throw new Error('Task lease was lost') })
+            .catch((error) => { controller.abort(error); throw error })
+            .finally(() => { renewing = undefined })
+        }
+        await renewing
+        controller.signal.throwIfAborted()
+      }
+      heartbeat = setInterval(() => { void assertActive().catch(() => undefined) }, this.heartbeatIntervalMs)
       const unref = heartbeat as unknown as { unref?: () => void }
       unref.unref?.()
       const handler = this.handlers.get(task.type)
       if (!handler) throw new Error(`No task handler registered for ${task.type}`)
-      const result = await handler({ ...task, signal: controller.signal })
-      if (controller.signal.aborted) throw controller.signal.reason || new Error('Task lease was lost')
+      const result = await handler({ ...task, signal: controller.signal, assertActive })
+      await assertActive()
       stopHeartbeat()
       await this.repository.complete(taskId, userId, this.owner, result)
     } catch (error) {

@@ -106,6 +106,7 @@ export type TaskRecord = {
   created_at: string
   updated_at: string
   signal?: AbortSignal
+  assertActive?: () => Promise<void>
 }
 
 export type StartInterviewInput = {

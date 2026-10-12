@@ -116,9 +116,10 @@ export class JoseTokenService implements TokenService {
     private readonly versions?: TokenVersionStore,
   ) {}
 
-  async create(userId: string): Promise<string> {
+  async create(userId: string, verifiedVersion?: number): Promise<string> {
     const now = Math.floor(this.now() / 1000)
-    const version = await this.versions?.tokenVersion(userId)
+    // Never upgrade a verified login to a version issued by a later password change.
+    const version = verifiedVersion ?? await this.versions?.tokenVersion(userId)
     if (this.versions && version === undefined) throw new Error('Cannot create a token for an unknown user')
     return new SignJWT(version === undefined ? {} : { ver: version })
       .setProtectedHeader({ alg: 'HS256' })

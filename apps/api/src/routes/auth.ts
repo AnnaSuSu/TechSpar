@@ -85,7 +85,6 @@ export function registerAuthRoutes(
       if (deps.loginLimiter?.isLimited(address)) throw new AppError('Too many login attempts. Try again later.', 429)
       try {
         const result = await deps.auth.login(body.email, body.password)
-        deps.loginLimiter?.clear(address)
         return c.json(result)
       } catch (error) {
         if (error instanceof AppError && error.status === 401) deps.loginLimiter?.recordFailure(address)

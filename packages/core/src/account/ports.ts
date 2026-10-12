@@ -1,7 +1,7 @@
 import type { AuthUser } from './model.ts'
 
 export interface UserRepository {
-  findByEmail(email: string): Promise<(AuthUser & { password: string }) | undefined>
+  findByEmail(email: string): Promise<(AuthUser & { password: string; tokenVersion: number }) | undefined>
   findById(id: string): Promise<AuthUser | undefined>
   tokenVersion(id: string): Promise<number | undefined>
   create(input: { id: string; email: string; password: string; name: string }): Promise<AuthUser>
@@ -18,7 +18,8 @@ export interface PasswordHasher {
 }
 
 export interface TokenService {
-  create(userId: string): Promise<string>
+  /** A login supplies the version read alongside its verified password hash. */
+  create(userId: string, verifiedVersion?: number): Promise<string>
   decode(token: string): Promise<string | undefined>
 }
 

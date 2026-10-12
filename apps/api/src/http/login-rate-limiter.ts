@@ -26,10 +26,6 @@ export class LoginRateLimiter {
     this.prune(now)
   }
 
-  clear(key: string): void {
-    this.attempts.delete(key)
-  }
-
   private prune(now: number): void {
     for (const [key, attempt] of this.attempts) if (attempt.expiresAt <= now) this.attempts.delete(key)
     while (this.attempts.size > 10_000) this.attempts.delete(this.attempts.keys().next().value!)

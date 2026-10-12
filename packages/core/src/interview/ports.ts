@@ -72,7 +72,7 @@ export interface CandidateProfilePort {
   summary(userId: string, topic?: string, memoryQuery?: string): Promise<string>
   targetRole(userId: string): Promise<string>
   updateTargetRole(userId: string, role: string): Promise<void>
-  afterReview?(input: { userId: string; session: InterviewSession }): Promise<Record<string, unknown> | undefined>
+  afterReview?(input: { userId: string; session: InterviewSession; context?: RequestContext }): Promise<Record<string, unknown> | undefined>
   addPredictedWeakPoints?(input: { userId: string; topic: string; points: string[] }): Promise<void>
 }
 

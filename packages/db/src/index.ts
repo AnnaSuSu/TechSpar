@@ -43,9 +43,9 @@ export class BunUserRepository implements UserRepository {
     }
   }
 
-  async findByEmail(email: string): Promise<(AuthUser & { password: string }) | undefined> {
+  async findByEmail(email: string): Promise<(AuthUser & { password: string; tokenVersion: number }) | undefined> {
     const [row] = await this.db.select().from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1)
-    return row ? { ...authUser(row, this.defaultEmail), password: row.password } : undefined
+    return row ? { ...authUser(row, this.defaultEmail), password: row.password, tokenVersion: row.tokenVersion } : undefined
   }
 
   async findById(id: string): Promise<AuthUser | undefined> {
