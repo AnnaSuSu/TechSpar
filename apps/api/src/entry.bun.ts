@@ -64,7 +64,7 @@ usageRepository.initialize()
 const settingsRepository = new FileProviderSettingsRepository(config.dataDir)
 const persistedSystem = await settingsRepository.loadSystem()
 const registration = { allowRegistration: persistedSystem?.allow_registration ?? config.allowRegistration }
-const tokens = new JoseTokenService(config.jwtSecret)
+const tokens = new JoseTokenService(config.jwtSecret, Date.now, users)
 const auth = new AuthService(
   users,
   passwordHasher,
@@ -141,7 +141,7 @@ taskQueue.register('copilot_prep', (task) => copilotPrep.runPrepTask(task))
 taskQueue.register('retrospective', (task) => profile.runRetrospectiveTask(task))
 await taskQueue.start()
 const { upgradeWebSocket, websocket } = createBunWebSocket()
-const app = createApp({ auth, registration, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, recording, copilotPrep, copilotRealtime, websocketUpgrade: upgradeWebSocket, voiceprint, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir })
+const app = createApp({ auth, registration, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, recording, copilotPrep, copilotRealtime, websocketUpgrade: upgradeWebSocket, voiceprint, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir, trustProxy: config.trustProxy })
 
 const server = Bun.serve<BunWebSocketData>(withLongRequestTimeout({ hostname: config.host, port: config.port, fetch: (request, server) => app.fetch(request, server), websocket }))
 console.log(JSON.stringify({ event: 'techspar:ready', host: config.host, port: server.port }))

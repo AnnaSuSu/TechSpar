@@ -105,6 +105,8 @@ export type TaskRecord = {
   lease_expires_at?: string | null
   created_at: string
   updated_at: string
+  signal?: AbortSignal
+  assertActive?: () => Promise<void>
 }
 
 export type StartInterviewInput = {

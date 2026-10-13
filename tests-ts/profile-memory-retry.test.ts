@@ -3,8 +3,8 @@ import { Database } from 'bun:sqlite'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { ProfileService, InterviewService, RecordingService, defaultProfile, mergeProfiles, type CandidateProfileRepository, type InterviewSession, type InterviewDependencies, type ProfileDependencies, type ProfileMemoryEntry, type TaskRecord } from '@techspar/core'
-import { BunKnowledgeVectorRepository, BunInterviewSessionRepository } from '@techspar/db'
+import { PersistentTaskQueue, ProfileService, InterviewService, RecordingService, defaultProfile, mergeProfiles, type CandidateProfileRepository, type InterviewSession, type InterviewDependencies, type ProfileDependencies, type ProfileMemoryEntry, type TaskRecord, type RequestContext, type CandidateProfilePort } from '@techspar/core'
+import { BunKnowledgeVectorRepository, BunInterviewSessionRepository, BunTaskRepository } from '@techspar/db'
 import { FileCandidateProfileRepository } from '@techspar/platform'
 import { boundaryApp, jsonHeaders, unavailable } from './contracts/test-app.ts'
 
@@ -268,4 +268,152 @@ describe('retryable profile memory projection', () => {
       expect(await f.vectors.listChunks('user-a', 'personal_document_chunk')).toHaveLength(1)
     } finally { db.close() }
   })
+})
+
+function gate() {
+  let resolve!: () => void
+  const promise = new Promise<void>(done => { resolve = done })
+  return { promise, resolve }
+}
+async function waitUntil(predicate: () => Promise<boolean>) {
+  const deadline = Date.now() + 2_000
+  while (!await predicate()) {
+    if (Date.now() > deadline) throw new Error('Timed out waiting for replacement task')
+    await new Promise(resolve => setTimeout(resolve, 5))
+  }
+}
+
+for (const mode of ['resume', 'recording'] as const) {
+  for (const profileOnly of [false, true]) {
+    for (const implementation of ['real', 'ignores-cancellation', 'late-error'] as const) {
+      test(`lease takeover protects ${mode} review/profile writes (profileOnly=${profileOnly}, ${implementation})`, async () => {
+        const f = await fixture()
+        const sessions = new BunInterviewSessionRepository(f.path); sessions.initialize()
+        let now = Date.UTC(2026, 9, 13)
+        const oldRepo = new BunTaskRepository(f.path, () => new Date(now)); oldRepo.initialize()
+        const newRepo = new BunTaskRepository(f.path, () => new Date(now)); newRepo.initialize()
+        // Keep the heartbeat out of the way: writes must recheck ownership themselves.
+        const oldQueue = new PersistentTaskQueue(oldRepo, { owner: 'old', leaseDurationMs: 60_000, heartbeatIntervalMs: 20_000 })
+        const newQueue = new PersistentTaskQueue(newRepo, { owner: 'new', leaseDurationMs: 60_000, heartbeatIntervalMs: 20_000 })
+        const entered = gate(); const release = gate(); const finished = gate()
+        let oldContext: RequestContext | undefined
+        let calls = 0
+        const extract = async (context?: RequestContext) => {
+          const isOld = ++calls === 1
+          if (isOld) {
+            oldContext = context
+            entered.resolve()
+            await release.promise
+            if (implementation === 'late-error') throw new Error('late old extraction failure')
+          }
+          return { ...extraction, avg_score: isOld ? 2 : 9, session_summary: isOld ? 'stale extraction' : 'fresh extraction' }
+        }
+        f.deps.ai.complete = async context => JSON.stringify(await extract(context))
+        const profile: CandidateProfilePort = implementation === 'real' ? f.service : {
+          async summary() { return '' }, async targetRole() { return '' }, async updateTargetRole() {},
+          afterReview: ({ context }) => extract(context),
+        }
+        let reviews = 0
+        const ai: InterviewDependencies['ai'] = {
+          async complete() {
+            const summary = ++reviews === 1 ? 'old review' : 'fresh review'
+            return mode === 'resume' ? summary : JSON.stringify({ topics_covered: [], overall: { avg_score: 9, summary } })
+          }, async *stream() {},
+        }
+        const interview = new InterviewService({
+          sessions, tasks: oldQueue, ai, profile,
+          states: { async load() { return { messages: [], eval_history: [], resume_context: '' } } } as unknown as InterviewDependencies['states'],
+          ids: { next: () => 'unused' }, resume: unavailable as InterviewDependencies['resume'],
+          knowledge: unavailable as InterviewDependencies['knowledge'], knowledgeStore: unavailable as InterviewDependencies['knowledgeStore'],
+          settings: unavailable as InterviewDependencies['settings'],
+        })
+        const recording = new RecordingService({ sessions, tasks: oldQueue, ai, profile, ids: { next: () => 'unused' }, transcription: { async transcribe() { return '' } } })
+        const run = (task: TaskRecord) => mode === 'resume' ? interview.runReviewTask(task) : recording.runAnalysisTask(task)
+        oldQueue.register('review', async task => { try { return await run(task) } finally { finished.resolve() } })
+        newQueue.register('review', run)
+        try {
+          await sessions.create({ sessionId: 'lease-review', userId: 'user-a', mode, meta: { recording_mode: 'solo', source_transcript: 'interview transcript' } })
+          if (profileOnly) await sessions.saveReview({ sessionId: 'lease-review', userId: 'user-a', review: 'saved review' })
+          await oldRepo.upsert({ taskId: 'lease-review', userId: 'user-a', type: 'review', payload: { profile_only: profileOnly } })
+          await oldQueue.start()
+          await entered.promise
+          expect(oldContext).toBeDefined()
+          now += 60_001
+          await newQueue.start()
+          await waitUntil(async () => (await newRepo.get('lease-review', 'user-a'))?.status === 'done')
+          const fresh = await sessions.get('lease-review', 'user-a')
+          const freshProfile = await f.repository.load('user-a')
+          const freshMemories = await f.vectors.listProfileMemories({ userId: 'user-a' })
+          expect(fresh?.meta.profile_extract_failed).toBeFalse()
+          if (!profileOnly) expect(fresh?.review).toContain('fresh review')
+          expect(oldContext!.signal.aborted).toBeFalse()
+          release.resolve()
+          await finished.promise
+          expect(oldContext!.signal.aborted).toBeTrue()
+          expect(await sessions.get('lease-review', 'user-a')).toEqual(fresh)
+          expect(await f.repository.load('user-a')).toEqual(freshProfile)
+          expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toEqual(freshMemories)
+          expect(await oldRepo.get('lease-review', 'user-a')).toMatchObject({ status: 'done', attempts: 2 })
+        } finally {
+          release.resolve()
+          oldQueue.stop(); newQueue.stop()
+          // Let the old queue finish its owner-checked failure acknowledgement.
+          await new Promise(resolve => setTimeout(resolve, 5))
+          oldRepo.close(); newRepo.close(); sessions.close()
+        }
+      })
+    }
+  }
+}
+
+for (const operation of ['profile-update', 'memory-write']) {
+  test(`cancellation during ${operation} preserves profile and memory state`, async () => {
+    const f = await fixture()
+    const controller = new AbortController()
+    const entered = gate(); const release = gate()
+    f.deps.embeddings.embed = async (context, texts) => {
+      if (context.requestId.includes(operation)) {
+        expect(context.signal).toBe(controller.signal)
+        entered.resolve()
+        await release.promise // Simulate a provider that ignores cancellation.
+      }
+      return texts.map(() => Float32Array.from([1, 0]))
+    }
+    const pending = f.service.afterReview({ userId: 'user-a', session: session(), context: { requestId: 'task', userId: 'user-a', signal: controller.signal } })
+      .then(() => undefined, error => error)
+    await entered.promise
+    const before = await f.repository.load('user-a')
+    const memories = await f.vectors.listProfileMemories({ userId: 'user-a' })
+    controller.abort(new Error('lease lost'))
+    release.resolve()
+    expect(await pending).toMatchObject({ message: 'lease lost' })
+    expect(await f.repository.load('user-a')).toEqual(before)
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toEqual(memories)
+  })
+}
+
+test('rechecks cancellation after waiting for the profile repository lock', async () => {
+  const f = await fixture()
+  const controller = new AbortController()
+  const entered = gate(); const release = gate()
+  const repository: CandidateProfileRepository = {
+    load: f.repository.load.bind(f.repository), save: f.repository.save.bind(f.repository),
+    update(userId, mutate) {
+      return f.repository.update(userId, async profile => {
+        entered.resolve()
+        await release.promise
+        return mutate(profile)
+      })
+    },
+  }
+  const before = await f.repository.load('user-a')
+  const pending = new ProfileService({ ...f.deps, repository }).afterReview({
+    userId: 'user-a', session: session(), context: { requestId: 'task', userId: 'user-a', signal: controller.signal },
+  }).then(() => undefined, error => error)
+  await entered.promise
+  controller.abort(new Error('lease lost'))
+  release.resolve()
+  expect(await pending).toMatchObject({ message: 'lease lost' })
+  expect(await f.repository.load('user-a')).toEqual(before)
+  expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toEqual([])
 })

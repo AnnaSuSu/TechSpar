@@ -17,8 +17,9 @@ export class AuthService implements AuthUseCases {
     if (!row || !(await this.passwords.verify(password, row.password))) {
       throw new AppError('Invalid email or password', 401)
     }
-    const { password: _, ...user } = row
-    return { token: await this.tokens.create(user.id), user }
+    if (await this.users.tokenVersion(row.id) !== row.tokenVersion) throw new AppError('Invalid email or password', 401)
+    const { password: _, tokenVersion, ...user } = row
+    return { token: await this.tokens.create(user.id, tokenVersion), user }
   }
 
   async register(email: string, password: string, name: string): Promise<{ token: string; user: AuthUser }> {

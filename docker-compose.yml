@@ -3,8 +3,10 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
+    environment:
+      TRUST_PROXY: "true"
     volumes:
       - ./data:/app/data
     env_file:

@@ -48,14 +48,20 @@ export class DataMigrationService implements DataMigrationUseCases {
     let archive
     try { archive = await this.deps.codec.unpack(bytes) } catch (error) { throw new AppError(`归档解析失败: ${error instanceof Error ? error.message : String(error)}`, 400) }
     if (!archive.manifest?.user_id?.trim()) throw new AppError('归档解析失败: 仅支持带 user_id 的单账户备份，不能导入整站全量归档', 400)
-    const db = archive.database ? await this.deps.database.importPersonal(archive.database, userId, options.dbStrategy) : { inserted: 0, skipped: 0 }
-    let copied = 0; let skipped = 0; let importedProfile: CandidateProfile | undefined
+    let importedProfile: CandidateProfile | undefined
+    const filesToCopy: Array<{ relative: string; content: Uint8Array }> = []
     for (const [path, content] of archive.files) {
       const parts = path.split('/').filter(Boolean)
       if (parts.length < 4 || parts[0] !== 'data' || parts[1] !== 'users') continue
       const relative = parts.slice(3).join('/')
       if (!relative || relative.split('/').some((part) => part === '..' || part === '.index_cache' || part === '__pycache__')) continue
-      if (relative === 'profile/profile.json') { importedProfile = profileFrom(content); copied += 1; continue }
+      if (relative === 'profile/profile.json') { importedProfile = profileFrom(content); continue }
+      filesToCopy.push({ relative, content })
+    }
+
+    const db = archive.database ? await this.deps.database.importPersonal(archive.database, userId, options.dbStrategy) : { inserted: 0, skipped: 0 }
+    let copied = importedProfile ? 1 : 0; let skipped = 0
+    for (const { relative, content } of filesToCopy) {
       if (!options.overwriteFiles && await this.deps.files.exists(userId, relative)) { skipped += 1; continue }
       await this.deps.files.write(userId, relative, content); copied += 1
     }

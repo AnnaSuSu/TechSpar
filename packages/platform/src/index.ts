@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import bcrypt from 'bcryptjs'
 import { jwtVerify, SignJWT } from 'jose'
-import type { IdGenerator, PasswordHasher, ResolvedLlmConfig, TokenService } from '@techspar/core'
+import type { IdGenerator, PasswordHasher, ResolvedLlmConfig, TokenService, TokenVersionStore } from '@techspar/core'
 
 export type AppConfig = {
   baseDir: string
@@ -24,12 +24,14 @@ export type AppConfig = {
   platformTokenLimit: number
   platformTokenWindow: 'day' | 'month'
   voiceprintEncryptionKey: string
+  trustProxy: boolean
   host: string
   port: number
   webDir?: string
 }
 
 const truthy = new Set(['1', 'true', 'yes', 'on'])
+const placeholderSecret = /^(?:change-me|replace-with|replace-this|your[-_ ]|example)/i
 
 /**
  * 解析非负数字型环境变量。空值回退到默认值；非法值直接抛错。
@@ -51,13 +53,19 @@ function parseNonNegativeNumber(raw: string | undefined, fallback: number, name:
 export function loadConfig(env: Record<string, string | undefined> = process.env): AppConfig {
   const baseDir = resolve(env.TECHSPAR_BASE_DIR || process.cwd())
   const dataDir = resolve(baseDir, env.TECHSPAR_DATA_DIR || 'data')
+  const jwtSecret = env.JWT_SECRET?.trim() || ''
+  const voiceprintEncryptionKey = env.VOICEPRINT_ENCRYPTION_KEY?.trim() || jwtSecret
+  const defaultPassword = env.DEFAULT_PASSWORD || ''
+  if (jwtSecret.length < 32 || placeholderSecret.test(jwtSecret)) throw new Error('JWT_SECRET 必须设置为至少 32 个字符的随机值，不能使用示例占位值')
+  if (!voiceprintEncryptionKey || placeholderSecret.test(voiceprintEncryptionKey)) throw new Error('VOICEPRINT_ENCRYPTION_KEY 不能使用示例占位值')
+  if (defaultPassword.length < 12 || placeholderSecret.test(defaultPassword) || defaultPassword === 'admin123') throw new Error('DEFAULT_PASSWORD 必须设置为至少 12 个字符且不能使用示例占位值或默认密码')
   return {
     baseDir,
     dataDir,
     dbPath: resolve(baseDir, env.DB_PATH || 'data/interviews.db'),
-    jwtSecret: env.JWT_SECRET || 'change-me-in-production',
+    jwtSecret,
     defaultEmail: env.DEFAULT_EMAIL || 'admin@techspar.local',
-    defaultPassword: env.DEFAULT_PASSWORD || 'admin123',
+    defaultPassword,
     defaultName: env.DEFAULT_NAME || 'Admin',
     allowRegistration: truthy.has((env.ALLOW_REGISTRATION || '').toLowerCase()),
     platformLlmApiBase: env.PLATFORM_LLM_API_BASE || '',
@@ -79,7 +87,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     platformDailyCallLimit: parseNonNegativeNumber(env.PLATFORM_DAILY_CALL_LIMIT, 0, 'PLATFORM_DAILY_CALL_LIMIT'),
     platformTokenLimit: parseNonNegativeNumber(env.PLATFORM_TOKEN_LIMIT, 0, 'PLATFORM_TOKEN_LIMIT'),
     platformTokenWindow: env.PLATFORM_TOKEN_WINDOW === 'month' ? 'month' : 'day',
-    voiceprintEncryptionKey: env.VOICEPRINT_ENCRYPTION_KEY || env.JWT_SECRET || 'change-me-in-production',
+    voiceprintEncryptionKey,
+    trustProxy: truthy.has((env.TRUST_PROXY || '').toLowerCase()),
     host: env.HOST || '0.0.0.0',
     port: parseNonNegativeNumber(env.PORT, 8000, 'PORT'),
     ...(env.TECHSPAR_WEB_DIR ? { webDir: resolve(env.TECHSPAR_WEB_DIR) } : {}),
@@ -104,11 +113,15 @@ export class JoseTokenService implements TokenService {
   constructor(
     private readonly secret: string,
     private readonly now: () => number = Date.now,
+    private readonly versions?: TokenVersionStore,
   ) {}
 
-  async create(userId: string): Promise<string> {
+  async create(userId: string, verifiedVersion?: number): Promise<string> {
     const now = Math.floor(this.now() / 1000)
-    return new SignJWT({})
+    // Never upgrade a verified login to a version issued by a later password change.
+    const version = verifiedVersion ?? await this.versions?.tokenVersion(userId)
+    if (this.versions && version === undefined) throw new Error('Cannot create a token for an unknown user')
+    return new SignJWT(version === undefined ? {} : { ver: version })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject(userId)
       .setIssuedAt(now)
@@ -119,6 +132,13 @@ export class JoseTokenService implements TokenService {
   async decode(token: string): Promise<string | undefined> {
     try {
       const { payload } = await jwtVerify(token, jwtKey(this.secret), { algorithms: ['HS256'] })
+      if (this.versions) {
+        const userId = payload.sub
+        if (!userId) return undefined
+        const current = await this.versions.tokenVersion(userId)
+        const tokenVersion = payload.ver
+        if (current === undefined || (typeof tokenVersion === 'number' ? tokenVersion : 0) !== current) return undefined
+      }
       return payload.sub
     } catch {
       return undefined

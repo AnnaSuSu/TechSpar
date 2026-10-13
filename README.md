@@ -85,6 +85,8 @@ bun run dist:desktop:win-x64   # Windows x64：NSIS 安装包
 
 ### Web 本地开发
 
+首次启动 API 前先运行 `cp .env.example .env`，并为 `JWT_SECRET`、`VOICEPRINT_ENCRYPTION_KEY` 和 `DEFAULT_PASSWORD` 设置安全值；服务会拒绝 JWT 和密码的示例占位值。
+
 终端一启动 API：
 
 ```bash
@@ -97,14 +99,7 @@ bun run dev:api
 bun run dev:web
 ```
 
-访问 <http://localhost:5173>。服务端开发环境的默认登录信息：
-
-```text
-admin@techspar.local
-admin123
-```
-
-服务端首次登录后请立即在设置页修改默认密码，部署时也必须在 `.env` 中修改 `JWT_SECRET`。Electron 桌面版会生成随机的本机凭证并自动进入，不使用上述固定密码。
+访问 <http://localhost:5173>。服务端不再提供固定默认密码。Electron 桌面版会生成随机的本机凭证并自动进入。
 
 ### Docker
 

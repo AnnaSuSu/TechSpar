@@ -1,4 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   AuthService,
   ensureDefaultAccount,
@@ -14,21 +18,30 @@ import {
   type UserRepository,
 } from '@techspar/core'
 import { createApp } from '../apps/api/src/app.ts'
+import { LoginRateLimiter } from '../apps/api/src/http/login-rate-limiter.ts'
 import { BcryptPasswordHasher, JoseTokenService, loadConfig, ShortUuidGenerator } from '@techspar/platform'
+import { BunUserRepository } from '@techspar/db'
 import rootPackage from '../package.json' with { type: 'json' }
 
 class MemoryUsers implements UserRepository {
   rows = new Map<string, AuthUser & { password: string }>()
-  async findByEmail(email: string) { return [...this.rows.values()].find((row) => row.email === email.toLowerCase().trim()) }
+  tokenVersions = new Map<string, number>()
+  async findByEmail(email: string) {
+    const row = [...this.rows.values()].find((row) => row.email === email.toLowerCase().trim())
+    return row ? { ...row, tokenVersion: this.tokenVersions.get(row.id) ?? 0 } : undefined
+  }
   async findById(id: string) { return this.rows.get(id) }
+  async tokenVersion(id: string) { return this.rows.has(id) ? this.tokenVersions.get(id) ?? 0 : undefined }
   async create(input: { id: string; email: string; password: string; name: string }) {
     const user = { id: input.id, email: input.email.toLowerCase().trim(), name: input.name, is_admin: false }
     this.rows.set(user.id, { ...user, password: input.password })
+    this.tokenVersions.set(user.id, 0)
     return user
   }
   async updatePassword(id: string, password: string) {
     const row = this.rows.get(id)
     if (row) this.rows.set(id, { ...row, password })
+    if (row) this.tokenVersions.set(id, (this.tokenVersions.get(id) ?? 0) + 1)
   }
 }
 
@@ -51,14 +64,14 @@ const platform: PlatformProviderConfig = {
 
 function testApp(allowRegistration = false) {
   const users = new MemoryUsers()
-  const config = loadConfig({ TECHSPAR_BASE_DIR: '/tmp/techspar-test', JWT_SECRET: 'test-secret', ALLOW_REGISTRATION: String(allowRegistration) })
+  const config = loadConfig({ TECHSPAR_BASE_DIR: '/tmp/techspar-test', JWT_SECRET: 'test-jwt-secret-with-at-least-32-chars', VOICEPRINT_ENCRYPTION_KEY: 'test-voiceprint-key-with-at-least-32-chars', DEFAULT_PASSWORD: 'test-default-password', ALLOW_REGISTRATION: String(allowRegistration) })
   const passwords = new BcryptPasswordHasher()
-  const tokens = new JoseTokenService(config.jwtSecret)
+  const tokens = new JoseTokenService(config.jwtSecret, Date.now, users)
   const registration = { allowRegistration }
   const auth = new AuthService(users, passwords, tokens, new ShortUuidGenerator(), registration)
   const settings = new SettingsService(new MemorySettings(), users, { async invalidateUser() {}, resetEmbeddingClient() {} }, platform, registration)
   const usage = { initialize() {}, async record() {}, async platformCallsToday() { return 0 }, async platformTokensToday() { return 0 }, async platformTokensSince() { return 0 } }
-  return { users, config, passwords, app: createApp({ auth, registration, settings, quota: new QuotaService(usage, platform), tokens, knowledge: {} as KnowledgeUseCases, resume: {} as ResumeUseCases }) }
+  return { users, config, passwords, app: createApp({ auth, registration, settings, quota: new QuotaService(usage, platform), tokens, knowledge: {} as KnowledgeUseCases, resume: {} as ResumeUseCases, loginLimiter: new LoginRateLimiter(2), trustProxy: true }) }
 }
 
 describe('auth compatibility', () => {
@@ -104,6 +117,16 @@ describe('auth compatibility', () => {
     expect(await response.json()).toEqual({ detail: 'Invalid email or password' })
   })
 
+  test('limits repeated failed logins by client address and allows a different address', async () => {
+    const { app, users, passwords } = testApp()
+    users.rows.set('user01', { id: 'user01', email: 'user@example.com', name: 'User', is_admin: false, password: await passwords.hash('correct-password') })
+    const attempt = (address: string, password: string) => app.request('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json', 'x-real-ip': address }, body: JSON.stringify({ email: 'user@example.com', password }) })
+    expect((await attempt('192.0.2.1', 'wrong')).status).toBe(401)
+    expect((await attempt('192.0.2.1', 'wrong')).status).toBe(401)
+    expect((await attempt('192.0.2.1', 'correct-password')).status).toBe(429)
+    expect((await attempt('192.0.2.2', 'correct-password')).status).toBe(200)
+  })
+
   test('changes an authenticated account password and rejects the old credential', async () => {
     const { app, users, passwords } = testApp()
     users.rows.set('user01', { id: 'user01', email: 'user@example.com', name: 'User', is_admin: false, password: await passwords.hash('old-password') })
@@ -115,6 +138,7 @@ describe('auth compatibility', () => {
     })
     expect(changed.status).toBe(200)
     expect(await changed.json()).toEqual({ status: 'ok' })
+    expect((await app.request('/api/auth/me', { headers: { authorization: `Bearer ${token}` } })).status).toBe(401)
     expect((await app.request('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'user@example.com', password: 'old-password' }) })).status).toBe(401)
     expect((await app.request('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'user@example.com', password: 'new-password-2026' }) })).status).toBe(200)
   })
@@ -161,4 +185,84 @@ describe('default account bootstrap', () => {
     expect(result).toBe('unchanged')
     expect(await passwords.verify('my-custom-password', users.rows.get('owner001')!.password)).toBe(true)
   })
+})
+
+test('upgrades existing users with token versions and invalidates JWTs after a password update', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'techspar-user-token-version-'))
+  const path = join(directory, 'users.db')
+  try {
+    const legacy = new Database(path, { create: true })
+    legacy.exec("CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, name TEXT DEFAULT '', created_at TEXT DEFAULT CURRENT_TIMESTAMP); INSERT INTO users (id, email, password, name) VALUES ('user-a', 'a@example.com', 'old-hash', 'A')")
+    legacy.close()
+
+    const users = new BunUserRepository(path, 'admin@example.com')
+    users.initialize()
+    const tokens = new JoseTokenService('test-jwt-secret-with-at-least-32-chars', Date.now, users)
+    const oldToken = await tokens.create('user-a')
+    expect(await tokens.decode(oldToken)).toBe('user-a')
+    expect(await users.tokenVersion('user-a')).toBe(0)
+    await users.updatePassword('user-a', 'new-hash')
+    expect(await users.tokenVersion('user-a')).toBe(1)
+    expect(await tokens.decode(oldToken)).toBeUndefined()
+    const newToken = await tokens.create('user-a')
+    expect(await tokens.decode(newToken)).toBe('user-a')
+    users.close()
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('a successful own-account login cannot reset failures against another account', async () => {
+  const { app, users, passwords } = testApp()
+  for (const id of ['victim', 'attacker']) await users.create({ id, email: `${id}@example.com`, password: await passwords.hash('correct-password'), name: id })
+  const attempt = (email: string, password: string) => app.request('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json', 'x-real-ip': '192.0.2.1' }, body: JSON.stringify({ email, password }) })
+  expect((await attempt('victim@example.com', 'wrong')).status).toBe(401)
+  expect((await attempt('attacker@example.com', 'correct-password')).status).toBe(200)
+  expect((await attempt('victim@example.com', 'wrong')).status).toBe(401)
+  expect((await attempt('attacker@example.com', 'correct-password')).status).toBe(429)
+  expect((await attempt('victim@example.com', 'wrong')).status).toBe(429)
+})
+
+test('rejects an old-password login when the password changes during verification', async () => {
+  const users = new BunUserRepository(':memory:', 'admin@example.com'); users.initialize()
+  let start!: () => void; let release!: () => void
+  const started = new Promise<void>(resolve => { start = resolve })
+  const gate = new Promise<void>(resolve => { release = resolve })
+  try {
+    await users.create({ id: 'user-a', email: 'a@example.com', password: 'old-hash', name: 'A' })
+    const tokens = new JoseTokenService('test-jwt-secret-with-at-least-32-chars', Date.now, users)
+    const auth = new AuthService(users, {
+      async hash(value) { return value },
+      async verify(password, hash) { start(); await gate; return password === 'old-password' && hash === 'old-hash' },
+    }, tokens, new ShortUuidGenerator(), { allowRegistration: false })
+    const pending = auth.login('a@example.com', 'old-password').then(
+      value => ({ value, error: undefined }), error => ({ value: undefined, error }),
+    )
+    await started
+    await users.updatePassword('user-a', 'new-hash')
+    release()
+    const outcome = await pending
+    expect(outcome.value).toBeUndefined()
+    expect(outcome.error).toMatchObject({ status: 401 })
+    expect(await users.findByEmail('a@example.com')).toMatchObject({ password: 'new-hash', tokenVersion: 1 })
+  } finally { release?.(); users.close() }
+})
+
+test('tokens retain the verified version if the password changes just before signing', async () => {
+  const users = new BunUserRepository(':memory:', 'admin@example.com'); users.initialize()
+  try {
+    await users.create({ id: 'user-a', email: 'a@example.com', password: 'old-hash', name: 'A' })
+    const tokens = new JoseTokenService('test-jwt-secret-with-at-least-32-chars', Date.now, users)
+    const auth = new AuthService(users, { async hash(value) { return value }, async verify() { return true } }, {
+      async create(id, verifiedVersion) {
+        await users.updatePassword(id, 'new-hash')
+        return tokens.create(id, verifiedVersion)
+      }, decode: tokens.decode.bind(tokens),
+    }, new ShortUuidGenerator(), { allowRegistration: false })
+    const result = await auth.login('a@example.com', 'old-password')
+    expect(await tokens.decode(result.token)).toBeUndefined()
+    expect(result.user).not.toHaveProperty('tokenVersion')
+    expect(result.user).not.toHaveProperty('password')
+    expect(await tokens.decode(await tokens.create('user-a'))).toBe('user-a')
+  } finally { users.close() }
 })
