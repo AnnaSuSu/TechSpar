@@ -1115,7 +1115,8 @@
                   "type": "string"
                 },
                 "topic": {
-                  "type": "string"
+                  "type": "string",
+                  "nullable": true
                 },
                 "first_seen": {
                   "type": "string"
@@ -1224,7 +1225,8 @@
                   "type": "string"
                 },
                 "topic": {
-                  "type": "string"
+                  "type": "string",
+                  "nullable": true
                 },
                 "first_seen": {
                   "type": "string"
@@ -1297,7 +1299,8 @@
               "type": "object",
               "properties": {
                 "topic": {
-                  "type": "string"
+                  "type": "string",
+                  "nullable": true
                 },
                 "first_seen": {
                   "type": "string"
@@ -1562,7 +1565,8 @@
                   "type": "string"
                 },
                 "topic": {
-                  "type": "string"
+                  "type": "string",
+                  "nullable": true
                 },
                 "next_review": {
                   "type": "string"
@@ -1630,7 +1634,8 @@
             "type": "string"
           },
           "topic": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "first_seen": {
             "type": "string"
@@ -1738,7 +1743,8 @@
               "type": "string"
             },
             "topic": {
-              "type": "string"
+              "type": "string",
+              "nullable": true
             },
             "first_seen": {
               "type": "string"
