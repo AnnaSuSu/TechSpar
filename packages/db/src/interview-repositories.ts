@@ -39,13 +39,32 @@ function json<T>(value: string | null | undefined, fallback: T): T {
   try { return JSON.parse(value) as T } catch { return fallback }
 }
 
+function storedQuestions(value: string | null): InterviewQuestion[] {
+  const items = json<InterviewQuestion[]>(value, [])
+  if (!Array.isArray(items)) return items
+  return items.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item
+    // Python stored model output verbatim. Normalize only its known legacy
+    // representations on reads; leave extensions and the stored JSON intact.
+    const question = { ...item } as Record<string, unknown>
+    for (const field of ['focus_area', 'category', 'intent', 'difficulty']) {
+      if (question[field] === null) delete question[field]
+    }
+    if (typeof question.difficulty === 'string' && question.difficulty.trim()) {
+      const difficulty = Number(question.difficulty)
+      if (Number.isFinite(difficulty)) question.difficulty = difficulty
+    }
+    return question as InterviewQuestion
+  })
+}
+
 function asSession(row: SessionRow): InterviewSession {
   return {
     session_id: row.session_id,
     mode: row.mode,
     topic: row.topic,
     meta: json(row.meta, {}),
-    questions: json(row.questions, []),
+    questions: storedQuestions(row.questions),
     transcript: json(row.transcript, []),
     scores: json(row.scores, []),
     weak_points: json(row.weak_points, []),

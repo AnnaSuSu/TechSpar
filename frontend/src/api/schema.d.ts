@@ -3967,7 +3967,7 @@ export interface components {
             };
             weak_points: ({
                 point: string;
-                topic?: string;
+                topic?: string | null;
                 first_seen?: string;
                 last_seen?: string;
                 times_seen?: number;
@@ -4003,7 +4003,7 @@ export interface components {
             })[];
             strong_points: ({
                 point: string;
-                topic?: string;
+                topic?: string | null;
                 first_seen?: string;
                 last_seen?: string;
                 times_seen?: number;
@@ -4028,7 +4028,7 @@ export interface components {
             })[];
             behavior_signals: {
                 [key: string]: {
-                    topic?: string;
+                    topic?: string | null;
                     first_seen?: string;
                     last_seen?: string;
                     times_seen?: number;
@@ -4117,7 +4117,7 @@ export interface components {
             };
             due_reviews: {
                 point: string;
-                topic?: string;
+                topic?: string | null;
                 next_review?: string;
             }[];
             /** @description Persisted extraction cache; new LLM extractions are validated before writes. */
@@ -4136,7 +4136,7 @@ export interface components {
         };
         ProfilePatternFeedbackResponse: {
             point: string;
-            topic?: string;
+            topic?: string | null;
             first_seen?: string;
             last_seen?: string;
             times_seen?: number;
@@ -4172,7 +4172,7 @@ export interface components {
         };
         ProfileDueReviewsResponse: ({
             point: string;
-            topic?: string;
+            topic?: string | null;
             first_seen?: string;
             last_seen?: string;
             times_seen?: number;
