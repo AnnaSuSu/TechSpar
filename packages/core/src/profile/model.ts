@@ -1,6 +1,6 @@
 export type WeakPoint = {
   point: string
-  topic?: string
+  topic?: string | null
   first_seen?: string
   last_seen?: string
   times_seen?: number

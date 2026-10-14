@@ -658,7 +658,7 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
       current.last_consolidation_at = now
       return output
     })
-    if (created.length) await this.appendMemories(userId, created.map((point) => ({ chunkType: 'weak_point', content: point.point, topic: point.topic, metadata: { source: 'consolidated' } })), now, context)
+    if (created.length) await this.appendMemories(userId, created.map((point) => ({ chunkType: 'weak_point', content: point.point, topic: point.topic ?? undefined, metadata: { source: 'consolidated' } })), now, context)
   }
 
   async afterReview(input: { userId: string; session: InterviewSession; context?: RequestContext }): Promise<Record<string, unknown>> {

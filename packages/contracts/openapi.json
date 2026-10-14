@@ -131,9 +131,7 @@
               },
               "question_blueprint": {
                 "type": "array",
-                "items": {
-                  "nullable": true
-                },
+                "items": {},
                 "description": "New model-produced blueprint items are validated in core; persisted and caller-supplied legacy items remain compatible."
               },
               "jd_excerpt": {
@@ -207,16 +205,12 @@
                 "id",
                 "question"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "preview": {
             "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
+            "additionalProperties": {},
             "description": "Caller-supplied preview_data is echoed unchanged, including legacy partial previews."
           },
           "company": {
@@ -242,9 +236,7 @@
               },
               "preview": {
                 "type": "object",
-                "additionalProperties": {
-                  "nullable": true
-                },
+                "additionalProperties": {},
                 "description": "Caller-supplied preview_data is echoed unchanged, including legacy partial previews."
               }
             },
@@ -321,9 +313,7 @@
                     "id",
                     "question"
                   ],
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             },
@@ -348,8 +338,10 @@
                 ]
               },
               "topic": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "target_role": {
                 "type": "string"
@@ -498,8 +490,10 @@
             ]
           },
           "topic": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string",
@@ -513,8 +507,10 @@
             ]
           },
           "review_error": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "transcript": {
             "type": "array",
@@ -539,9 +535,7 @@
                 "role",
                 "content"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "questions": {
@@ -579,9 +573,7 @@
                 "id",
                 "question"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "target_role": {
@@ -592,9 +584,7 @@
           },
           "meta": {
             "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
+            "additionalProperties": {},
             "description": "Persisted session metadata; legacy/provider extensions are preserved."
           },
           "can_continue": {
@@ -638,14 +628,14 @@
             ]
           },
           "topic": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "meta": {
             "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
+            "additionalProperties": {},
             "description": "Persisted session metadata; legacy/provider extensions are preserved."
           },
           "questions": {
@@ -683,9 +673,7 @@
                 "id",
                 "question"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "transcript": {
@@ -711,32 +699,24 @@
                 "role",
                 "content"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "scores": {
             "type": "array",
             "items": {
               "type": "object",
-              "additionalProperties": {
-                "nullable": true
-              },
+              "additionalProperties": {},
               "description": "Persisted review content; new LLM output is validated before writes while legacy fields are preserved."
             }
           },
           "weak_points": {
             "type": "array",
-            "items": {
-              "nullable": true
-            }
+            "items": {}
           },
           "overall": {
             "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
+            "additionalProperties": {},
             "description": "Persisted review content; new LLM output is validated before writes while legacy fields are preserved."
           },
           "reference_answers": {
@@ -746,8 +726,10 @@
             }
           },
           "review": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string",
@@ -761,8 +743,10 @@
             ]
           },
           "review_error": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "user_id": {
             "type": "string"
@@ -806,17 +790,17 @@
                 "type": "string"
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
               "status",
               "type"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           {
             "type": "object",
@@ -831,17 +815,17 @@
                 "type": "string"
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
               "status",
               "type"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           {
             "type": "object",
@@ -863,8 +847,10 @@
                 ]
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "session_id": {
                 "type": "string",
@@ -896,8 +882,10 @@
                 "type": "string"
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -923,8 +911,10 @@
                 ]
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "topic": {
                 "type": "string"
@@ -969,17 +959,17 @@
                 "description": "Legacy/extension task type, explicitly excluding all known types."
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
               "status",
               "type"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           }
         ]
       },
@@ -1004,22 +994,24 @@
                   ]
                 },
                 "topic": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "meta": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  },
+                  "additionalProperties": {},
                   "description": "Persisted session metadata; legacy/provider extensions are preserved."
                 },
                 "created_at": {
                   "type": "string"
                 },
                 "avg_score": {
-                  "type": "number",
-                  "nullable": true
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 },
                 "status": {
                   "type": "string",
@@ -1033,8 +1025,10 @@
                   ]
                 },
                 "review_error": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -1101,9 +1095,7 @@
                   "type": "string"
                 }
               },
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "weak_points": {
@@ -1115,8 +1107,10 @@
                   "type": "string"
                 },
                 "topic": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "first_seen": {
                   "type": "string"
@@ -1169,9 +1163,7 @@
                         "type": "number"
                       }
                     },
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "additionalProperties": {}
                   }
                 },
                 "sr": {
@@ -1190,13 +1182,13 @@
                       "type": "string"
                     },
                     "last_score": {
-                      "type": "number",
-                      "nullable": true
+                      "type": [
+                        "number",
+                        "null"
+                      ]
                     }
                   },
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 },
                 "consolidates": {
                   "type": "array",
@@ -1211,9 +1203,7 @@
               "required": [
                 "point"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "strong_points": {
@@ -1225,8 +1215,10 @@
                   "type": "string"
                 },
                 "topic": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "first_seen": {
                   "type": "string"
@@ -1279,18 +1271,14 @@
                         "type": "number"
                       }
                     },
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "additionalProperties": {}
                   }
                 }
               },
               "required": [
                 "point"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "behavior_signals": {
@@ -1299,8 +1287,10 @@
               "type": "object",
               "properties": {
                 "topic": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "first_seen": {
                   "type": "string"
@@ -1353,9 +1343,7 @@
                         "type": "number"
                       }
                     },
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "additionalProperties": {}
                   }
                 },
                 "namespace": {
@@ -1382,15 +1370,11 @@
                         "type": "string"
                       }
                     },
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "additionalProperties": {}
                   }
                 }
               },
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "communication": {
@@ -1417,9 +1401,7 @@
               "habits",
               "suggestions"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           "thinking_patterns": {
             "type": "object",
@@ -1441,9 +1423,7 @@
               "strengths",
               "gaps"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           "stats": {
             "type": "object",
@@ -1475,8 +1455,10 @@
                       "type": "string"
                     },
                     "topic": {
-                      "type": "string",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     },
                     "avg_score": {
                       "type": "number"
@@ -1491,9 +1473,7 @@
                       }
                     }
                   },
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               },
               "total_answers": {
@@ -1532,9 +1512,7 @@
               "avg_score",
               "score_history"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           "view_marker": {
             "type": "object",
@@ -1552,9 +1530,7 @@
                 }
               }
             },
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           "due_reviews": {
             "type": "array",
@@ -1565,8 +1541,10 @@
                   "type": "string"
                 },
                 "topic": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "next_review": {
                   "type": "string"
@@ -1580,9 +1558,7 @@
           },
           "session_extractions": {
             "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
+            "additionalProperties": {},
             "description": "Persisted extraction cache; new LLM extractions are validated before writes."
           }
         },
@@ -1600,9 +1576,7 @@
           "stats",
           "due_reviews"
         ],
-        "additionalProperties": {
-          "nullable": true
-        }
+        "additionalProperties": {}
       },
       "ProfileViewedResponse": {
         "type": "object",
@@ -1634,8 +1608,10 @@
             "type": "string"
           },
           "topic": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "first_seen": {
             "type": "string"
@@ -1688,9 +1664,7 @@
                   "type": "number"
                 }
               },
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "sr": {
@@ -1709,13 +1683,13 @@
                 "type": "string"
               },
               "last_score": {
-                "type": "number",
-                "nullable": true
+                "type": [
+                  "number",
+                  "null"
+                ]
               }
             },
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           "consolidates": {
             "type": "array",
@@ -1730,9 +1704,7 @@
         "required": [
           "point"
         ],
-        "additionalProperties": {
-          "nullable": true
-        }
+        "additionalProperties": {}
       },
       "ProfileDueReviewsResponse": {
         "type": "array",
@@ -1743,8 +1715,10 @@
               "type": "string"
             },
             "topic": {
-              "type": "string",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "first_seen": {
               "type": "string"
@@ -1797,9 +1771,7 @@
                     "type": "number"
                   }
                 },
-                "additionalProperties": {
-                  "nullable": true
-                }
+                "additionalProperties": {}
               }
             },
             "sr": {
@@ -1818,13 +1790,13 @@
                   "type": "string"
                 },
                 "last_score": {
-                  "type": "number",
-                  "nullable": true
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               },
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             },
             "consolidates": {
               "type": "array",
@@ -1839,9 +1811,7 @@
           "required": [
             "point"
           ],
-          "additionalProperties": {
-            "nullable": true
-          }
+          "additionalProperties": {}
         }
       },
       "ProfileTopicHistoryResponse": {
@@ -1862,14 +1832,14 @@
               ]
             },
             "topic": {
-              "type": "string",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "meta": {
               "type": "object",
-              "additionalProperties": {
-                "nullable": true
-              },
+              "additionalProperties": {},
               "description": "Persisted session metadata; legacy/provider extensions are preserved."
             },
             "questions": {
@@ -1907,9 +1877,7 @@
                   "id",
                   "question"
                 ],
-                "additionalProperties": {
-                  "nullable": true
-                }
+                "additionalProperties": {}
               }
             },
             "transcript": {
@@ -1935,32 +1903,24 @@
                   "role",
                   "content"
                 ],
-                "additionalProperties": {
-                  "nullable": true
-                }
+                "additionalProperties": {}
               }
             },
             "scores": {
               "type": "array",
               "items": {
                 "type": "object",
-                "additionalProperties": {
-                  "nullable": true
-                },
+                "additionalProperties": {},
                 "description": "Persisted review content; new LLM output is validated before writes while legacy fields are preserved."
               }
             },
             "weak_points": {
               "type": "array",
-              "items": {
-                "nullable": true
-              }
+              "items": {}
             },
             "overall": {
               "type": "object",
-              "additionalProperties": {
-                "nullable": true
-              },
+              "additionalProperties": {},
               "description": "Persisted review content; new LLM output is validated before writes while legacy fields are preserved."
             },
             "reference_answers": {
@@ -1970,8 +1930,10 @@
               }
             },
             "review": {
-              "type": "string",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "status": {
               "type": "string",
@@ -1985,8 +1947,10 @@
               ]
             },
             "review_error": {
-              "type": "string",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "user_id": {
               "type": "string"
@@ -3480,8 +3444,10 @@
                       "minimum": 0
                     },
                     "limit": {
-                      "type": "integer",
-                      "nullable": true,
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
                       "minimum": 0
                     },
                     "unit": {
@@ -4410,18 +4376,14 @@
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "additionalProperties": {
-                          "nullable": true
-                        }
+                        "additionalProperties": {}
                       }
                     },
                     "links": {
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "additionalProperties": {
-                          "nullable": true
-                        }
+                        "additionalProperties": {}
                       }
                     }
                   },
@@ -4517,9 +4479,7 @@
             "description": "Resume PDF",
             "content": {
               "application/pdf": {
-                "schema": {
-                  "nullable": true
-                }
+                "schema": {}
               }
             }
           }
@@ -4581,9 +4541,7 @@
                     },
                     "parsed": {
                       "type": "object",
-                      "additionalProperties": {
-                        "nullable": true
-                      }
+                      "additionalProperties": {}
                     }
                   },
                   "required": [
@@ -4746,12 +4704,16 @@
                     "type": "string"
                   },
                   "company": {
-                    "type": "string",
-                    "nullable": true
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "position": {
-                    "type": "string",
-                    "nullable": true
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "use_resume": {
                     "type": "boolean",
@@ -4813,12 +4775,16 @@
                         "type": "string"
                       },
                       "company": {
-                        "type": "string",
-                        "nullable": true
+                        "type": [
+                          "string",
+                          "null"
+                        ]
                       },
                       "position": {
-                        "type": "string",
-                        "nullable": true
+                        "type": [
+                          "string",
+                          "null"
+                        ]
                       },
                       "use_resume": {
                         "type": "boolean",
@@ -4831,9 +4797,7 @@
                       },
                       "preview_data": {
                         "type": "object",
-                        "additionalProperties": {
-                          "nullable": true
-                        }
+                        "additionalProperties": {}
                       }
                     },
                     "required": [
@@ -4852,12 +4816,16 @@
                         "type": "string"
                       },
                       "company": {
-                        "type": "string",
-                        "nullable": true
+                        "type": [
+                          "string",
+                          "null"
+                        ]
                       },
                       "position": {
-                        "type": "string",
-                        "nullable": true
+                        "type": [
+                          "string",
+                          "null"
+                        ]
                       },
                       "use_resume": {
                         "type": "boolean",
@@ -4870,9 +4838,7 @@
                       },
                       "preview_data": {
                         "type": "object",
-                        "additionalProperties": {
-                          "nullable": true
-                        }
+                        "additionalProperties": {}
                       }
                     },
                     "required": [
@@ -4933,13 +4899,14 @@
                     ]
                   },
                   "topic": {
-                    "type": "string",
-                    "nullable": true
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "num_questions": {
                     "type": "integer",
-                    "minimum": 0,
-                    "exclusiveMinimum": true
+                    "exclusiveMinimum": 0
                   },
                   "divergence": {
                     "type": "integer",
@@ -5145,9 +5112,7 @@
                         "question_id",
                         "answer"
                       ],
-                      "additionalProperties": {
-                        "nullable": true
-                      }
+                      "additionalProperties": {}
                     },
                     "default": []
                   }
@@ -5229,9 +5194,7 @@
                         "question_id",
                         "answer"
                       ],
-                      "additionalProperties": {
-                        "nullable": true
-                      }
+                      "additionalProperties": {}
                     },
                     "default": []
                   }
@@ -5512,8 +5475,10 @@
         "parameters": [
           {
             "schema": {
-              "type": "integer",
-              "nullable": true
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "required": false,
             "name": "limit",
@@ -5521,8 +5486,10 @@
           },
           {
             "schema": {
-              "type": "integer",
-              "nullable": true
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "required": false,
             "name": "offset",
@@ -5935,9 +5902,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -5976,9 +5941,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -6062,9 +6025,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -6096,9 +6057,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -6180,8 +6139,10 @@
                 "type": "object",
                 "properties": {
                   "conversation_id": {
-                    "type": "string",
-                    "nullable": true
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "message": {
                     "type": "string",
@@ -6287,9 +6248,7 @@
             "description": "System backup",
             "content": {
               "application/gzip": {
-                "schema": {
-                  "nullable": true
-                }
+                "schema": {}
               }
             }
           }
@@ -6330,9 +6289,7 @@
             "description": "Personal backup",
             "content": {
               "application/gzip": {
-                "schema": {
-                  "nullable": true
-                }
+                "schema": {}
               }
             }
           },
@@ -6405,9 +6362,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -6472,9 +6427,7 @@
                     },
                     "segments": {
                       "type": "array",
-                      "items": {
-                        "nullable": true
-                      }
+                      "items": {}
                     }
                   },
                   "required": [
@@ -6524,13 +6477,17 @@
                     "default": "dual"
                   },
                   "company": {
-                    "type": "string",
-                    "nullable": true,
+                    "type": [
+                      "string",
+                      "null"
+                    ],
                     "maxLength": 200
                   },
                   "position": {
-                    "type": "string",
-                    "nullable": true,
+                    "type": [
+                      "string",
+                      "null"
+                    ],
                     "maxLength": 200
                   }
                 },
@@ -6685,9 +6642,7 @@
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "additionalProperties": {}
                   }
                 }
               }
@@ -6720,9 +6675,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -6814,9 +6767,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -6856,12 +6807,16 @@
                       "type": "boolean"
                     },
                     "enrolled_at": {
-                      "type": "string",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     },
                     "speaker_nick": {
-                      "type": "string",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   },
                   "required": [
@@ -7043,5 +6998,6 @@
         ]
       }
     }
-  }
+  },
+  "webhooks": {}
 }

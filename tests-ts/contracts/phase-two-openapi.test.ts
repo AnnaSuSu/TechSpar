@@ -6,7 +6,7 @@ import { phaseTwoCases } from './phase-two-cases.ts'
 
 type Schema = {
   $ref?: string
-  type?: string
+  type?: string | string[]
   nullable?: boolean
   properties?: Record<string, Schema>
   required?: string[]
@@ -18,6 +18,7 @@ type Schema = {
   additionalProperties?: boolean | Schema
 }
 type Document = {
+  openapi: string
   paths: Record<string, Record<string, { responses: Record<string, { content: Record<string, { schema: Schema }> }> }>>
   components: { schemas: Record<string, Schema> }
 }
@@ -48,7 +49,7 @@ describe('phase two OpenAPI and generated artifact contracts', () => {
       expect(response).toEqual(generated.paths[path]![method.toLowerCase()]!.responses['200']!)
       const schema = response.content['application/json']!.schema
       for (const branch of branches(current, schema)) {
-        expect(['object', 'array']).toContain(branch.type!)
+        expect<unknown>(['object', 'array']).toContain(branch.type!)
         if (branch.type === 'object') {
           expect(Object.keys(branch.properties ?? {}).length, entry.operation).toBeGreaterThan(0)
           expect(branch.required?.length, entry.operation).toBeGreaterThan(0)
@@ -75,7 +76,24 @@ describe('phase two OpenAPI and generated artifact contracts', () => {
     const profile = spec.components.schemas.CandidateProfileResponse!
     const mastery = resolve(spec, profile.properties!.topic_mastery!.additionalProperties as Schema)
     expect(mastery.properties?.score?.type).toBe('number')
-    expect(profile.additionalProperties).toEqual({ nullable: true })
+    expect(profile.additionalProperties).toEqual({})
+  })
+
+  test('expresses legacy nullable topics with OpenAPI 3.1 JSON Schema types', async () => {
+    const spec = await document()
+    expect(spec.openapi).toBe('3.1.0')
+    const profile = spec.components.schemas.CandidateProfileResponse!
+    const topics = [
+      resolve(spec, profile.properties!.weak_points!.items!).properties!.topic!,
+      resolve(spec, profile.properties!.strong_points!.items!).properties!.topic!,
+      resolve(spec, profile.properties!.due_reviews!.items!).properties!.topic!,
+    ]
+    for (const topic of topics) {
+      expect(topic.type).toEqual(expect.arrayContaining(['string', 'null']))
+      expect(topic).not.toHaveProperty('nullable')
+    }
+    // The document advertises 3.1; the 3.0-only nullable keyword must never be emitted.
+    expect(JSON.stringify(spec)).not.toContain('"nullable":')
   })
 
   test('documents task payload requirements and excludes known types from legacy fallback', async () => {

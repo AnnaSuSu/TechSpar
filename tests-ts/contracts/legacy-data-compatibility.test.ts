@@ -2,7 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { defaultProfile, type InterviewSession } from '@techspar/core'
+import { defaultProfile, type CandidateProfile, type InterviewSession } from '@techspar/core'
 import { FileCandidateProfileRepository } from '@techspar/platform'
 import { CandidateProfileResponseSchema, InterviewResumeResponseSchema, InterviewSessionResponseSchema, ProfileDueReviewsResponseSchema } from '@techspar/contracts'
 import { loadResponseFixture } from './fixture.ts'
@@ -34,7 +34,8 @@ describe('legacy stored data through the real HTTP boundary', () => {
     const weak = { point: '合成旧录音薄弱点', topic: null, source: 'observed', sr: { next_review: '2000-01-01', last_score: null }, legacy_extension: { kept: true } }
     const strong = { point: '合成旧强项', topic: null }
     const pattern = { point: '合成旧跨领域规律', topic: null, source: 'consolidated', confidence: 0.7 }
-    const stored = JSON.stringify({ ...defaultProfile(), weak_points: [weak, pattern], strong_points: [strong] })
+    const legacyProfile: CandidateProfile = { ...defaultProfile(), weak_points: [weak, pattern], strong_points: [strong] }
+    const stored = JSON.stringify(legacyProfile)
     const path = join(profileDirectory, 'profile.json')
     await writeFile(path, stored)
     const h = await setup([], new FileCandidateProfileRepository(directory))

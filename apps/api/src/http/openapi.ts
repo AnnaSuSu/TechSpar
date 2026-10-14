@@ -83,6 +83,6 @@ export function completeOpenApiDocument(document: OpenApiDocument): OpenApiDocum
 }
 
 export function createOpenApiDocument(app: OpenAPIHono): OpenApiDocument {
-  const document = app.getOpenAPIDocument({ openapi: '3.1.0', info: { title: 'TechSpar', version: SERVICE_VERSION } })
+  const document = app.getOpenAPI31Document({ openapi: '3.1.0', info: { title: 'TechSpar', version: SERVICE_VERSION } })
   return completeOpenApiDocument(document as unknown as OpenApiDocument)
 }
