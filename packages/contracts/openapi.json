@@ -1189,7 +1189,8 @@
                       "type": "string"
                     },
                     "last_score": {
-                      "type": "number"
+                      "type": "number",
+                      "nullable": true
                     }
                   },
                   "additionalProperties": {
@@ -1703,7 +1704,8 @@
                 "type": "string"
               },
               "last_score": {
-                "type": "number"
+                "type": "number",
+                "nullable": true
               }
             },
             "additionalProperties": {
@@ -1810,7 +1812,8 @@
                   "type": "string"
                 },
                 "last_score": {
-                  "type": "number"
+                  "type": "number",
+                  "nullable": true
                 }
               },
               "additionalProperties": {

@@ -6,7 +6,8 @@ import { InterviewSessionResponseSchema } from './interview-responses.ts'
 export const ProfileHistoryEventSchema = z.object({ date: z.string().optional(), event: z.string().optional(), evidence: z.string().optional(), score: z.number().optional() }).passthrough()
 export const SpacedRepetitionSchema = z.object({
   interval_days: z.number().optional(), ease_factor: z.number().optional(), repetitions: z.number().optional(),
-  next_review: z.string().optional(), last_score: z.number().optional(),
+  // Legacy backups use null until this weak point has been scored.
+  next_review: z.string().optional(), last_score: z.number().nullish(),
 }).passthrough()
 const observation = {
   topic: z.string().optional(), first_seen: z.string().optional(), last_seen: z.string().optional(), times_seen: z.number().optional(),

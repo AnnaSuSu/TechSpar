@@ -2,12 +2,15 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import AuthContext, { type AuthUser } from "./AuthContextBase";
 import { setResumeAccount } from "../resume/store/resumeAccount";
 import { clearSession, readSession, saveSession, SESSION_KEY } from "../lib/authSession";
+import { verifySession } from "../lib/sessionVerification";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState(readSession);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(Boolean(session));
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [verificationAttempt, setVerificationAttempt] = useState(0);
   const revision = useRef(0);
 
   function resetSession() {
@@ -16,7 +19,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(readSession());
     setUser(null);
     setNeedsOnboarding(false);
+    setVerificationError(null);
     setLoading(Boolean(readSession()));
+  }
+
+  function retryVerification() {
+    setVerificationError(null);
+    setLoading(true);
+    setVerificationAttempt((attempt) => attempt + 1);
   }
 
   function logout() {
@@ -42,37 +52,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const startedAt = revision.current;
     const isCurrent = () => !cancelled && startedAt === revision.current &&
       readSession()?.token === session.token && readSession()?.user.id === session.user.id;
-    const headers = { Authorization: `Bearer ${session.token}` };
-    Promise.all([
-      fetch("/api/auth/me", { headers }),
-      fetch("/api/settings", { headers }),
-    ])
-      .then(async ([identityRes, settingsRes]) => {
-        const identity = identityRes.ok ? await identityRes.json() : null;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+    verifySession(session.token, session.user.id, { signal: controller.signal })
+      .then((result) => {
         if (!isCurrent()) return;
-        // Local metadata is never evidence of ownership. The server verifies
-        // the exact token used above and returns its subject.
-        if (typeof identity?.id !== "string" || identity.id !== session.user.id) {
+        if (result.status === "expired") {
           clearSession();
           resetSession();
           return;
         }
-        const settings = settingsRes.ok ? await settingsRes.json() : null;
-        if (!isCurrent()) return;
-        const configured = settings?.configured;
-        setNeedsOnboarding(settingsRes.ok && !(configured?.llm && configured?.embedding));
-        setResumeAccount(identity.id);
+        setNeedsOnboarding(result.needsOnboarding);
+        setResumeAccount(result.id);
         setUser(session.user);
       })
       .catch(() => {
-        if (isCurrent()) {
-          clearSession();
-          resetSession();
-        }
+        if (isCurrent()) setVerificationError("请检查网络后重试。");
       })
-      .finally(() => { if (isCurrent()) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [session]);
+      .finally(() => {
+        window.clearTimeout(timeout);
+        if (isCurrent()) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [session, verificationAttempt]);
 
   useEffect(() => {
     const syncSession = (event: StorageEvent) => {
@@ -89,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token: session?.token ?? null, loading,
+    <AuthContext.Provider value={{ user, token: session?.token ?? null, loading, verificationError, retryVerification,
       needsOnboarding, setNeedsOnboarding, login, logout }}>
       {children}
     </AuthContext.Provider>

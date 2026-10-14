@@ -11,6 +11,8 @@ export interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
+  verificationError: string | null;
+  retryVerification: () => void;
   needsOnboarding: boolean;
   setNeedsOnboarding: (value: boolean) => void;
   login: (token: string, userData: AuthUser) => void;

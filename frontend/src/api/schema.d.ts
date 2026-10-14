@@ -3992,7 +3992,7 @@ export interface components {
                     ease_factor?: number;
                     repetitions?: number;
                     next_review?: string;
-                    last_score?: number;
+                    last_score?: number | null;
                 } & {
                     [key: string]: unknown;
                 };
@@ -4161,7 +4161,7 @@ export interface components {
                 ease_factor?: number;
                 repetitions?: number;
                 next_review?: string;
-                last_score?: number;
+                last_score?: number | null;
             } & {
                 [key: string]: unknown;
             };
@@ -4197,7 +4197,7 @@ export interface components {
                 ease_factor?: number;
                 repetitions?: number;
                 next_review?: string;
-                last_score?: number;
+                last_score?: number | null;
             } & {
                 [key: string]: unknown;
             };
