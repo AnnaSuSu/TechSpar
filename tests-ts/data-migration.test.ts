@@ -5,9 +5,11 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { gunzipSync, gzipSync } from 'fflate'
-import { DataMigrationService, defaultProfile, mergeProfiles, type RequestContext, type UserRepository } from '@techspar/core'
+import { DataMigrationService, defaultProfile, mergeProfiles, ProfileService, type ProfileDependencies, type RequestContext, type UserRepository } from '@techspar/core'
 import { BunDataMigrationRepository, BunInterviewSessionRepository, BunPersonalAgentRepository } from '@techspar/db'
 import { FileCandidateProfileRepository, FileMigrationStore, TarGzipArchiveCodec, atomicWriteJson } from '@techspar/platform'
+
+import { boundaryApp, jsonHeaders } from './contracts/test-app.ts'
 
 const TAR_BLOCK = 512
 const encoder = new TextEncoder()
@@ -138,6 +140,25 @@ describe('tar.gz archive safety', () => {
 })
 
 describe('personal archive migration', () => {
+  test('keeps legacy unscored weak points readable after importing a personal backup', async () => {
+    const base = await root(); const target = service(base)
+    const profile = defaultProfile()
+    profile.weak_points = [{ point: '合成待复习知识点', topic: 'python', sr: { last_score: null, next_review: '2026-10-01', interval_days: 0 }, legacy_extension: { kept: true } }]
+    const bytes = await new TarGzipArchiveCodec().pack({
+      manifest: { schema_version: 2, exported_at: '', user_id: 'legacy-user', backup_kind: 'personal', includes_sensitive_credentials: false },
+      files: new Map([['data/users/legacy-user/profile/profile.json', encoder.encode(JSON.stringify(profile))]]),
+    })
+    await target.value.importPersonal(context('user-a'), 'legacy.tar.gz', bytes, { dbStrategy: 'skip', overwriteFiles: false })
+    const profilePath = join(base, 'data/users/user-a/profile/profile.json')
+    const before = await readFile(profilePath)
+    const app = boundaryApp({ profile: new ProfileService({ repository: target.profiles } as unknown as ProfileDependencies) })
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await app.request('/api/profile', { headers: jsonHeaders })
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({ weak_points: [{ sr: { last_score: null, interval_days: 0 }, legacy_extension: { kept: true } }] })
+    }
+    expect(await readFile(profilePath)).toEqual(before)
+  })
   test('merges behavior and mastery state by evidence recency', () => {
     const local = defaultProfile(); const archive = defaultProfile()
     local.behavior_signals.reasoning = { description: '旧描述', last_seen: '2026-08-01T00:00:00Z', times_seen: 2, improved: false, history: [{ event: 'seen', date: '2026-08-01' }] }

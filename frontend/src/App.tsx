@@ -23,6 +23,7 @@ import Settings from "./pages/Settings";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 import PersonalAgent from "./pages/PersonalAgent";
+import SessionRecovery from "./components/SessionRecovery";
 
 // 简历模块体量大(编辑器 + 9 套模板),按需加载避免拖慢首屏
 const ResumeManager = lazy(() => import("./pages/ResumeManager"));
@@ -69,6 +70,8 @@ function AppShell({ children }: { children: ReactNode }) {
 }
 
 function AppRoutes() {
+  const { verificationError } = useAuth();
+  if (verificationError) return <SessionRecovery />;
   return (
     <Routes>
       <Route path="/" element={<PublicHome />} />
