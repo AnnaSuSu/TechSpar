@@ -1,6 +1,7 @@
-import { type DragEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   BookOpen,
   Brain,
@@ -39,6 +40,45 @@ import {
 
 const PAGE_CLASS = "flex-1 w-full max-w-[1800px] mx-auto px-4 py-5 md:px-7 md:py-6 xl:px-8";
 const ACCEPTED_DOCUMENTS = ".pdf,.docx,.pptx,.xlsx,.txt,.md,.markdown,.csv,.tsv,.json,.yaml,.yml,.xml,.html,.htm,.rtf,.log,.py,.js,.jsx,.ts,.tsx,.java,.go,.rs,.sql,.css,.sh";
+
+const MARKDOWN_COMPONENTS: Components = {
+  table: ({ children }) => (
+    <div className="md-table-wrapper" role="region" aria-label="Markdown 表格" tabIndex={0}>
+      <table>{children}</table>
+    </div>
+  ),
+};
+
+function MessageMarkdown({ content }: { content: string }) {
+  const messageId = useId();
+  const clobberPrefix = `user-content-agent-${messageId}-`;
+  const footnoteLabelId = `${clobberPrefix}footnote-label`;
+  // clobberPrefix 隔离脚注及回链；上游固定的 footnote-label 和 aria-describedby 需单独隔离。
+  //
+  // clobberPrefix scopes footnotes and backlinks; the upstream fixed footnote-label and aria-describedby need separate scoping.
+  const components = useMemo<Components>(() => ({
+    ...MARKDOWN_COMPONENTS,
+    h2: ({ node, ...props }) => (
+      <h2 {...props} id={node?.properties.id === "footnote-label" ? footnoteLabelId : props.id} />
+    ),
+    a: ({ node, ...props }) => (
+      <a
+        {...props}
+        aria-describedby={node?.properties.dataFootnoteRef ? footnoteLabelId : props["aria-describedby"]}
+      />
+    ),
+  }), [footnoteLabelId]);
+
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      remarkRehypeOptions={{ clobberPrefix }}
+      components={components}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
 
 const STARTERS = [
   { icon: Brain, text: "根据我的画像，告诉我现在最该补什么" },
@@ -502,7 +542,7 @@ export default function PersonalAgent() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="md-content text-[14px] leading-7 text-text">
-                              <ReactMarkdown>{message.content}</ReactMarkdown>
+                              <MessageMarkdown content={message.content} />
                             </div>
                             {!!message.sources?.length && (
                               <div className="mt-3 flex flex-wrap gap-1.5">
