@@ -31,6 +31,8 @@ describe('chat provider compatibility', () => {
     }
     expect(requests[0]).toMatchObject({ reasoning_effort: 'none', max_tokens: 600, stream: true })
     expect(requests[1]).not.toHaveProperty('reasoning_effort')
+    expect(requests[1]).toMatchObject({ temperature: 0.7, max_tokens: 600 })
+    expect(requests[1]).not.toHaveProperty('max_completion_tokens')
   })
 
   test('retries null choices with backoff and preserves the output limit', async () => {
@@ -89,6 +91,8 @@ describe('chat provider compatibility', () => {
     )
     expect(requests[0]?.response_format).toBeUndefined()
     expect(requests[0]?.reasoning_effort).toBeUndefined()
+    expect(requests[0]).toMatchObject({ temperature: 0.7, max_tokens: 4096 })
+    expect(requests[0]).not.toHaveProperty('max_completion_tokens')
 
     requests.length = 0
     await factory.create({ ...config, compatibility: 'deepseek' }).complete(
@@ -98,6 +102,91 @@ describe('chat provider compatibility', () => {
     )
     expect(requests[0]?.response_format).toBeUndefined()
     expect(requests[0]?.reasoning_effort).toBeUndefined()
+  })
+
+  test.each(['low', 'medium', 'high', 'xhigh', 'max'] as const)('sends the selected %s effort without conflicting GPT parameters', async (effort) => {
+    const requests: Array<Record<string, unknown>> = []
+    const factory = new OpenAiChatDriverFactory({ fetch: chatFetch([valid], requests) })
+    await factory.create({ ...config, reasoning_effort: effort }).complete(
+      [{ role: 'user', content: 'return json' }], new AbortController().signal,
+      { maxTokens: 8192, jsonMode: true, reasoningEffort: 'low', temperature: 0 },
+    )
+    expect(requests[0]).toMatchObject({ reasoning_effort: effort, max_completion_tokens: 8192 })
+    expect(requests[0]).not.toHaveProperty('temperature')
+    expect(requests[0]).not.toHaveProperty('max_tokens')
+    expect(requests[0]).not.toHaveProperty('response_format')
+  })
+
+  test.each(['', 'xhigh'] as const)('uses the saved streaming effort %s and preserves usage reporting', async (effort) => {
+    const requests: Array<Record<string, unknown>> = []
+    const factory = new OpenAiChatDriverFactory({ fetch: (async (_input, init) => {
+      requests.push(JSON.parse(String(init?.body)))
+      return new Response('data: {"choices":[{"delta":{"content":"回答"}}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":20,"completion_tokens":2}}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
+    }) as typeof fetch })
+    let usage: unknown
+    const chunks: string[] = []
+    for await (const token of factory.create({ ...config, reasoning_effort: effort }).stream(
+      [{ role: 'user', content: '问题' }], new AbortController().signal,
+      { reasoningEffort: 'none', maxTokens: 8192, onUsage: (value) => { usage = value } },
+    )) chunks.push(token)
+    expect(chunks.join('')).toBe('回答')
+    expect(requests[0]).toMatchObject({ stream: true, stream_options: { include_usage: true } })
+    if (effort) {
+      expect(requests[0]).toMatchObject({ reasoning_effort: effort, max_completion_tokens: 8192 })
+      expect(requests[0]).not.toHaveProperty('temperature')
+      expect(requests[0]).not.toHaveProperty('max_tokens')
+    } else {
+      expect(requests[0]).toMatchObject({ temperature: 0.7, max_tokens: 8192 })
+      expect(requests[0]).not.toHaveProperty('reasoning_effort')
+      expect(requests[0]).not.toHaveProperty('max_completion_tokens')
+    }
+    expect(usage).toEqual({ promptTokens: 20, completionTokens: 2, cachedTokens: 0 })
+  })
+
+  test.each(['none', 'low', 'high', 'max'] as const)('lets explicit DeepSeek %s effort override scenario defaults without changing its protocol', async (effort) => {
+    const requests: Array<Record<string, unknown>> = []
+    const factory = new OpenAiChatDriverFactory({ fetch: chatFetch([valid], requests) })
+    await factory.create({ ...config, compatibility: 'deepseek', reasoning_effort: effort }).complete(
+      [{ role: 'user', content: 'return json' }], new AbortController().signal,
+      { maxTokens: 4096, jsonMode: true, reasoningEffort: 'low' },
+    )
+    expect(requests[0]).toMatchObject({ reasoning_effort: effort, max_tokens: 4096, temperature: 0.7, response_format: { type: 'json_object' } })
+    expect(requests[0]).not.toHaveProperty('max_completion_tokens')
+  })
+
+  test('uses explicit DeepSeek effort for normal completion and streaming', async () => {
+    const requests: Array<Record<string, unknown>> = []
+    const factory = new OpenAiChatDriverFactory({ fetch: (async (_input, init) => {
+      const request = JSON.parse(String(init?.body))
+      requests.push(request)
+      return request.stream
+        ? new Response('data: {"choices":[{"delta":{"content":"回答"}}]}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
+        : new Response(JSON.stringify(valid), { headers: { 'content-type': 'application/json' } })
+    }) as typeof fetch })
+    const driver = factory.create({ ...config, compatibility: 'deepseek', reasoning_effort: 'high' })
+    await driver.complete([{ role: 'user', content: 'question' }], new AbortController().signal)
+    const chunks: string[] = []
+    for await (const token of driver.stream([{ role: 'user', content: 'question' }], new AbortController().signal, { reasoningEffort: 'none' })) chunks.push(token)
+    expect(chunks.join('')).toBe('回答')
+    expect(requests).toHaveLength(2)
+    for (const request of requests) {
+      expect(request).toMatchObject({ reasoning_effort: 'high', temperature: 0.7 })
+      expect(request).not.toHaveProperty('response_format')
+      expect(request).not.toHaveProperty('max_tokens')
+    }
+  })
+
+  test('does not silently downgrade a rejected effort', async () => {
+    const requests: Array<Record<string, unknown>> = []
+    const factory = new OpenAiChatDriverFactory({ fetch: (async (_input, init) => {
+      requests.push(JSON.parse(String(init?.body)))
+      return new Response(JSON.stringify({ error: { message: 'Unsupported reasoning_effort: max', type: 'invalid_request_error' } }), { status: 400, headers: { 'content-type': 'application/json' } })
+    }) as typeof fetch })
+    await expect(factory.create({ ...config, reasoning_effort: 'max' }).complete(
+      [{ role: 'user', content: 'question' }], new AbortController().signal,
+    )).rejects.toThrow('Unsupported reasoning_effort: max')
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.reasoning_effort).toBe('max')
   })
 })
 

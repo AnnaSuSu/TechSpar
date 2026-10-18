@@ -70,7 +70,7 @@ export class SettingsOperationsService implements SettingsOperationsUseCases {
       if (!value.api_key.trim() || !value.model.trim()) throw new Error('请先填写必填字段')
       const probeOptions = value.compatibility === 'deepseek'
         ? { maxTokens: 4096, temperature: 0, jsonMode: true, reasoningEffort: 'low' as const }
-        : { maxTokens: 2048, temperature: 0 }
+        : { maxTokens: value.reasoning_effort ? 8192 : 2048, temperature: 0 }
       const result = await this.deps.chats.create({ ...value, source: USER_PROVIDER }).complete(LLM_PROBE_MESSAGES, context.signal, probeOptions)
       validateLlmProbe(result.text)
       return { ok: true }

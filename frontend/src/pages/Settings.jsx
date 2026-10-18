@@ -66,11 +66,51 @@ const LLM_SOURCE_OPTIONS = [
   },
 ];
 
+// 连接测试行仅渲染状态并转交点击事件；禁用原因非空时禁止发起测试。
+//
+// The connection test row only renders state and forwards click events; a non-empty disabled hint prevents testing.
+function ConnectionTestRow({ test, onTest, disabledHint = "" }) {
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border/40 pt-5">
+      <Button
+        variant="outline"
+        onClick={onTest}
+        disabled={Boolean(disabledHint) || test?.status === "testing"}
+        className="h-10 rounded-xl"
+      >
+        {test?.status === "testing" ? (
+          <>
+            <Loader2 size={15} className="mr-1.5 animate-spin" /> 测试中…
+          </>
+        ) : (
+          <>
+            <Plug size={15} className="mr-1.5" /> 测试连接
+          </>
+        )}
+      </Button>
+      {test?.status === "ok" ? (
+        <span className="flex items-center gap-1.5 text-[13px] text-emerald-500">
+          <Check size={15} /> 连接正常
+        </span>
+      ) : test?.status === "fail" ? (
+        <span className="flex items-start gap-1.5 text-[13px] text-red-500">
+          <XCircle size={15} className="mt-0.5 shrink-0" /> {test.error || "连接失败"}
+        </span>
+      ) : test?.status === "testing" ? null : (
+        <span className="text-[12px] text-dim">
+          {disabledHint || "用当前填写的配置发一个最小请求，验证是否可用"}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   const [apiBase, setApiBase] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [compatibility, setCompatibility] = useState("generic");
+  const [reasoningEffort, setReasoningEffort] = useState("");
   const [temperature, setTemperature] = useState(0.7);
   // key 来源：部署方是否提供共享 key，以及用户是否显式选它
   const [platformLlm, setPlatformLlm] = useState(false);
@@ -81,6 +121,7 @@ export default function Settings() {
 
   // 连接测试结果：null | { status: "testing" | "ok" | "fail", error? }
   const [llmTest, setLlmTest] = useState(null);
+  const llmTestVersion = useRef(0);
   const [embTest, setEmbTest] = useState(null);
 
   // Embedding 配置（每用户，hot-reload；空字段继承全局默认）
@@ -165,6 +206,7 @@ export default function Settings() {
         setApiKey(data.llm.api_key || "");
         setModel(data.llm.model || "");
         setCompatibility(data.llm.compatibility || "generic");
+        setReasoningEffort(data.llm.reasoning_effort || "");
         setTemperature(data.llm.temperature ?? 0.7);
         setPlatformLlm(Boolean(data.platform?.llm));
         setUsePlatform(data.source === "platform");
@@ -196,6 +238,7 @@ export default function Settings() {
   }, []);
 
   useEffect(() => () => {
+    llmTestVersion.current += 1;
     if (scrollSpyUnlockTimer.current != null) {
       window.clearTimeout(scrollSpyUnlockTimer.current);
     }
@@ -327,12 +370,23 @@ export default function Settings() {
     }
   };
 
+  // 连接配置变化或卸载会使旧版本失效；不能只清空界面，否则迟到的成功或失败仍会覆盖当前测试。
+  //
+  // Connection changes or unmount invalidate older versions; clearing the UI alone would let late success or failure overwrite the current test.
+  const invalidateLlmTest = () => {
+    llmTestVersion.current += 1;
+    setLlmTest(null);
+  };
+
   const handleTestLLM = async () => {
+    const version = ++llmTestVersion.current;
     setLlmTest({ status: "testing" });
     try {
-      const r = await testLLMConnection({ api_base: apiBase, api_key: apiKey, model, compatibility });
+      const r = await testLLMConnection({ api_base: apiBase, api_key: apiKey, model, compatibility, reasoning_effort: reasoningEffort });
+      if (llmTestVersion.current !== version) return;
       setLlmTest(r.ok ? { status: "ok" } : { status: "fail", error: r.error });
     } catch (err) {
+      if (llmTestVersion.current !== version) return;
       setLlmTest({ status: "fail", error: err.message });
     }
   };
@@ -362,13 +416,14 @@ export default function Settings() {
   // 选了平台就把自己的那一片停掉:不只是看着灰,而是真的填不进去——
   // 禁用的输入框浏览器也不会往里自动填。
   const ownLlmDisabled = llmSource === "platform";
+  const temperatureDisabled = compatibility === "generic" && reasoningEffort !== "" && reasoningEffort !== "none";
 
   const handleSave = async () => {
     setSaving(true);
     setError("");
     try {
       const res = await updateSettings({
-        llm: { api_base: apiBase, api_key: apiKey, model, compatibility, temperature, use_platform: usePlatform },
+        llm: { api_base: apiBase, api_key: apiKey, model, compatibility, reasoning_effort: reasoningEffort, temperature, use_platform: usePlatform },
         embedding: {
           backend: embBackend,
           api_base: embApiBase,
@@ -439,42 +494,6 @@ export default function Settings() {
 
   const labelClass = "text-[11px] font-semibold uppercase tracking-[0.18em] text-dim/80";
   const inputClass = "h-12 rounded-2xl bg-card/90";
-
-  // 「测试连接」按钮 + 结果，LLM / Embedding 两处复用
-  // disabledHint 非空即代表按钮不可用,内容就是不可用的原因
-  const renderTestRow = (test, onTest, disabledHint = "") => (
-    <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border/40 pt-5">
-      <Button
-        variant="outline"
-        onClick={onTest}
-        disabled={Boolean(disabledHint) || test?.status === "testing"}
-        className="h-10 rounded-xl"
-      >
-        {test?.status === "testing" ? (
-          <>
-            <Loader2 size={15} className="mr-1.5 animate-spin" /> 测试中…
-          </>
-        ) : (
-          <>
-            <Plug size={15} className="mr-1.5" /> 测试连接
-          </>
-        )}
-      </Button>
-      {test?.status === "ok" ? (
-        <span className="flex items-center gap-1.5 text-[13px] text-emerald-500">
-          <Check size={15} /> 连接正常
-        </span>
-      ) : test?.status === "fail" ? (
-        <span className="flex items-start gap-1.5 text-[13px] text-red-500">
-          <XCircle size={15} className="mt-0.5 shrink-0" /> {test.error || "连接失败"}
-        </span>
-      ) : test?.status === "testing" ? null : (
-        <span className="text-[12px] text-dim">
-          {disabledHint || "用当前填写的配置发一个最小请求，验证是否可用"}
-        </span>
-      )}
-    </div>
-  );
 
   const TABS = [
     { id: "llm", label: "LLM 服务", icon: Server },
@@ -549,7 +568,10 @@ export default function Settings() {
                       <button
                         key={option.value}
                         type="button"
-                        onClick={() => setUsePlatform(option.platform)}
+                        onClick={() => {
+                          invalidateLlmTest();
+                          setUsePlatform(option.platform);
+                        }}
                         className={cn(
                           "rounded-2xl border p-3.5 text-left transition-colors",
                           active
@@ -592,7 +614,10 @@ export default function Settings() {
                   disabled={ownLlmDisabled}
                   placeholder="例：https://api.openai.com/v1"
                   value={apiBase}
-                  onChange={(e) => setApiBase(e.target.value)}
+                  onChange={(e) => {
+                    invalidateLlmTest();
+                    setApiBase(e.target.value);
+                  }}
                 />
                 <div className="text-[12px] text-dim/70">
                   {compatibility === "deepseek" ? "DeepSeek 官方 API 填 https://api.deepseek.com（不要加 /v1）" : "多数 OpenAI 兼容服务填写包含 /v1 的 Base URL。"}
@@ -606,7 +631,10 @@ export default function Settings() {
                   disabled={ownLlmDisabled}
                   placeholder="例：gpt-4o"
                   value={model}
-                  onChange={(e) => setModel(e.target.value)}
+                  onChange={(e) => {
+                    invalidateLlmTest();
+                    setModel(e.target.value);
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -617,14 +645,44 @@ export default function Settings() {
                     className="min-w-0 flex-1 bg-transparent text-right text-text outline-none disabled:cursor-not-allowed"
                     disabled={ownLlmDisabled}
                     value={compatibility}
-                    onChange={(e) => setCompatibility(e.target.value)}
+                    onChange={(e) => {
+                      invalidateLlmTest();
+                      setCompatibility(e.target.value);
+                      setReasoningEffort("");
+                    }}
                   >
                     <option value="generic">通用 OpenAI 兼容</option>
                     <option value="deepseek">DeepSeek V4</option>
                   </select>
                 </label>
                 <div className="text-[12px] text-dim/70">
-                  DeepSeek 模式只对结构化请求发送 JSON 输出和低推理参数，其他平台不会收到这些字段。
+                  {compatibility === "deepseek"
+                    ? "DeepSeek 模式为结构化请求启用 JSON 输出；默认按场景选择推理强度，显式选择时使用所选档位。"
+                    : "通用模式支持 OpenAI 兼容服务；推理模型可单独选择强度。"}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="llm-reasoning-effort" className={labelClass}>推理强度</Label>
+                <select
+                  id="llm-reasoning-effort"
+                  className={cn(inputClass, "w-full border border-border px-3.5 text-sm text-text outline-none focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50")}
+                  disabled={ownLlmDisabled}
+                  value={reasoningEffort}
+                  onChange={(e) => {
+                    invalidateLlmTest();
+                    setReasoningEffort(e.target.value);
+                  }}
+                >
+                  <option value="">{compatibility === "deepseek" ? "默认（按场景）" : "跟随上游（默认）"}</option>
+                  {compatibility === "deepseek" && <option value="none">关闭推理（none）</option>}
+                  <option value="low">轻量（low）</option>
+                  {compatibility !== "deepseek" && <option value="medium">标准（medium）</option>}
+                  <option value="high">深入（high）</option>
+                  {compatibility !== "deepseek" && <option value="xhigh">更深入（xhigh）</option>}
+                  <option value="max">最高（max）</option>
+                </select>
+                <div className="text-[12px] text-dim/70">
+                  档位需模型和网关支持；强度越高通常响应越慢。选择后用于连接测试，保存后应用于后续请求。
                 </div>
               </div>
             </div>
@@ -640,7 +698,10 @@ export default function Settings() {
                     masked={!showKey}
                     placeholder="sk-...（你自己的 key）"
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={(e) => {
+                      invalidateLlmTest();
+                      setApiKey(e.target.value);
+                    }}
                   />
                   <button
                     type="button"
@@ -657,25 +718,29 @@ export default function Settings() {
                 <Input
                   className={inputClass}
                   type="number"
-                  disabled={ownLlmDisabled}
+                  disabled={ownLlmDisabled || temperatureDisabled}
                   step={0.1}
                   min={0}
                   max={2}
                   value={temperature}
-                  onChange={(e) => setTemperature(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    invalidateLlmTest();
+                    setTemperature(parseFloat(e.target.value) || 0);
+                  }}
                 />
+                {temperatureDisabled && <div className="text-[12px] text-dim/70">已启用推理强度，此模式下不使用 Temperature。</div>}
               </div>
             </div>
 
-            {renderTestRow(
-              llmTest,
-              handleTestLLM,
-              ownLlmDisabled
+            <ConnectionTestRow
+              test={llmTest}
+              onTest={handleTestLLM}
+              disabledHint={ownLlmDisabled
                 ? "现在用的是平台的 key，不需要测试"
                 : apiKey && model
                   ? ""
-                  : "填上自己的 Model 和 API Key 才能测试"
-            )}
+                  : "填上自己的 Model 和 API Key 才能测试"}
+            />
           </CardContent>
         </Card>
 
@@ -811,7 +876,7 @@ export default function Settings() {
               </div>
             )}
 
-            {renderTestRow(embTest, handleTestEmbedding)}
+            <ConnectionTestRow test={embTest} onTest={handleTestEmbedding} />
 
             {needsReindex && (
               <div className="mt-6 flex items-start gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/5 p-4 text-[13px] text-amber-500/90">

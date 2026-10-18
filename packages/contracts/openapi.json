@@ -2956,6 +2956,18 @@
                           ],
                           "default": "generic"
                         },
+                        "reasoning_effort": {
+                          "type": "string",
+                          "enum": [
+                            "",
+                            "none",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max"
+                          ]
+                        },
                         "use_platform": {
                           "type": "boolean",
                           "default": false
@@ -3187,6 +3199,18 @@
                           "deepseek"
                         ],
                         "default": "generic"
+                      },
+                      "reasoning_effort": {
+                        "type": "string",
+                        "enum": [
+                          "",
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
                       },
                       "use_platform": {
                         "type": "boolean",
@@ -3518,6 +3542,18 @@
                       "deepseek"
                     ],
                     "default": "generic"
+                  },
+                  "reasoning_effort": {
+                    "type": "string",
+                    "enum": [
+                      "",
+                      "none",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
                   },
                   "use_platform": {
                     "type": "boolean",

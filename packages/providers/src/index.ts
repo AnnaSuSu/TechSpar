@@ -51,6 +51,27 @@ async function abortableSleep(milliseconds: number, signal: AbortSignal): Promis
   })
 }
 
+/**
+ * 用户显式选择的档位优先于场景默认值；未选择时保留 DeepSeek 专用参数的原有发送边界。
+ * 通用推理请求使用包含推理 token 的输出预算，并在启用推理时省略不兼容的温度参数。
+ *
+ * Explicit user effort overrides scenario defaults; unset effort preserves the existing DeepSeek-only fields.
+ * Generic reasoning requests use a reasoning-inclusive token budget and omit temperature while reasoning is enabled.
+ */
+function chatRequestOptions(config: ResolvedLlmConfig, options?: ChatCompleteOptions, streaming = false) {
+  const explicitEffort = config.reasoning_effort || undefined
+  const effort = explicitEffort ?? (config.compatibility === 'deepseek' && (streaming || options?.jsonMode) ? options?.reasoningEffort : undefined)
+  const genericReasoning = config.compatibility === 'generic' && Boolean(explicitEffort)
+  const maxTokens = streaming
+    ? options?.maxTokens || undefined
+    : options?.maxTokens ?? (config.compatibility === 'deepseek' && options?.jsonMode ? 8192 : undefined)
+  return {
+    ...(!genericReasoning || effort === 'none' ? { temperature: options?.temperature ?? config.temperature } : {}),
+    ...(effort ? { reasoning_effort: effort } : {}),
+    ...(maxTokens === undefined ? {} : genericReasoning ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
+  }
+}
+
 export class OpenAiChatDriverFactory implements ChatDriverFactory {
   constructor(private readonly options: ChatFactoryOptions = {}) {}
 
@@ -72,12 +93,8 @@ export class OpenAiChatDriverFactory implements ChatDriverFactory {
             {
               model: config.model,
               messages: [...messages],
-              temperature: options?.temperature ?? config.temperature,
-              ...(options?.maxTokens === undefined
-                ? (config.compatibility === 'deepseek' && options?.jsonMode ? { max_tokens: 8192 } : {})
-                : { max_tokens: options.maxTokens }),
+              ...chatRequestOptions(config, options),
               ...(config.compatibility === 'deepseek' && options?.jsonMode ? { response_format: { type: 'json_object' } } : {}),
-              ...(config.compatibility === 'deepseek' && options?.jsonMode && options?.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
             },
             { signal },
           )
@@ -97,10 +114,8 @@ export class OpenAiChatDriverFactory implements ChatDriverFactory {
           {
             model: config.model,
             messages: [...messages],
-            temperature: options?.temperature ?? config.temperature,
+            ...chatRequestOptions(config, options, true),
             stream: true,
-            ...(options?.maxTokens ? { max_tokens: options.maxTokens } : {}),
-            ...(config.compatibility === 'deepseek' && options?.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
             // usage 只随最后一个分片下发,不显式索取就完全拿不到,
             // 流式调用会被记成 0 token
             stream_options: { include_usage: true },

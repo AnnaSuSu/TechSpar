@@ -328,6 +328,8 @@ export interface paths {
                                  * @enum {string}
                                  */
                                 compatibility: "generic" | "deepseek";
+                                /** @enum {string} */
+                                reasoning_effort?: "" | "none" | "low" | "medium" | "high" | "xhigh" | "max";
                                 /** @default false */
                                 use_platform: boolean;
                             };
@@ -459,6 +461,8 @@ export interface paths {
                              * @enum {string}
                              */
                             compatibility?: "generic" | "deepseek";
+                            /** @enum {string} */
+                            reasoning_effort?: "" | "none" | "low" | "medium" | "high" | "xhigh" | "max";
                             /** @default false */
                             use_platform?: boolean;
                         };
@@ -672,6 +676,8 @@ export interface paths {
                          * @enum {string}
                          */
                         compatibility?: "generic" | "deepseek";
+                        /** @enum {string} */
+                        reasoning_effort?: "" | "none" | "low" | "medium" | "high" | "xhigh" | "max";
                         /** @default false */
                         use_platform?: boolean;
                     };
