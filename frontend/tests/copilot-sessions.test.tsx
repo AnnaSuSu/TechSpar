@@ -18,17 +18,18 @@ let items: Array<Record<string, unknown>>;
 let taskIds: string[];
 let calls: string[];
 let reviewError = "";
-const stored = { session_id: "live", prep_id: "prep", status: "stopped", hr_turns: 2, candidate_turns: 2, created_at: "2026-10-19T02:00:00Z", updated_at: "2026-10-19T03:00:00Z", review_session_id: null };
+const stored = { session_id: "live", prep_id: "prep", status: "stopped", hr_turns: 2, candidate_turns: 2, created_at: "2026-10-19T02:00:00Z", updated_at: "2026-10-19T03:00:00Z", in_progress: false, review_session_id: null as string | null, review_status: null as string | null };
 beforeEach(() => {
   items = [{ ...stored }]; taskIds = []; calls = []; reviewError = "";
   globalThis.fetch = (async (url, options) => {
     const method = options?.method || "GET"; const path = String(url); calls.push(`${method} ${path}`);
     let body: unknown;
     let status = 200;
-    if (path.endsWith("/review")) {
+    if (path.endsWith("/generate")) { items[0]!.review_status = "pending"; body = { session_id: "review", mode: "copilot", status: "pending" }; }
+    else if (path.endsWith("/review")) {
       body = reviewError ? { detail: reviewError } : { copilot_session_id: "live", review_session_id: "review", mode: "copilot", status: "pending", created: true };
       if (reviewError) status = 400;
-      else items[0]!.review_session_id = "review";
+      else { items[0]!.review_session_id = "review"; items[0]!.review_status = "pending"; }
     } else if (method === "DELETE") { items = []; body = { ok: true }; }
     else if (path.endsWith("/sessions")) body = items;
     else body = { ...stored, company: "合成公司", position: "后端工程师", conversation: [{ role: "hr", text: "解释队列背压", at: stored.created_at }, { role: "candidate", text: "通过限流保护消费者", at: stored.updated_at }] };
@@ -53,7 +54,27 @@ test("starts review only after an explicit click and registers the review ID for
   expect(document.body.textContent).toContain("写入长期画像");
   await click("生成实战复盘");
   expect(taskIds).toEqual(["review"]); expect(document.body.textContent).toContain("实战复盘已开始");
-  expect(document.querySelector('a[href="/review/review"]')).not.toBeNull();
+  expect(document.body.textContent).toContain("复盘生成中");
+  expect(button("查看复盘进度").disabled).toBeFalse();
+  expect(document.querySelector('a[href="/review/review"]')).toBeNull();
+});
+test("links finished reviews and retries failed ones from their saved snapshot", async () => {
+  items[0] = { ...stored, review_session_id: "review", review_status: "done" }; await mount();
+  expect(document.querySelector('a[href="/review/review"]')?.textContent).toBe("查看复盘");
+  expect(document.body.textContent).toContain("已复盘");
+  items[0] = { ...stored, review_session_id: "review", review_status: "error" };
+  await act(async () => { document.querySelector<HTMLButtonElement>('[aria-label="刷新实战记录"]')!.click(); });
+  expect(document.body.textContent).toContain("复盘失败");
+  await click("重新生成复盘");
+  expect(calls).toContain("POST /api/interview/review/review/generate");
+  expect(calls.some((call) => call.endsWith("/api/copilot/sessions/live/review"))).toBeFalse();
+  expect(taskIds).toEqual(["review"]); expect(document.body.textContent).toContain("复盘生成中");
+});
+test("explains deleted reviews before generating a new one", async () => {
+  items[0] = { ...stored, review_session_id: "deleted", review_status: "missing" }; await mount();
+  expect(document.body.textContent).toContain("原复盘已在历史记录中删除");
+  await click("重新生成复盘");
+  expect(calls).toContain("POST /api/copilot/sessions/live/review"); expect(taskIds).toEqual(["review"]);
 });
 test("blocks review without both speakers and reports server validation failures", async () => {
   items[0]!.candidate_turns = 0; await mount(); expect(button("生成实战复盘").disabled).toBeTrue();
@@ -63,7 +84,8 @@ test("blocks review without both speakers and reports server validation failures
   expect(document.querySelector('[role="alert"]')?.textContent).toContain(reviewError); expect(taskIds).toEqual([]);
 });
 test("protects active sessions from review and deletion", async () => {
-  items[0] = { ...stored, status: "active", updated_at: new Date().toISOString() }; await mount();
+  items[0] = { ...stored, status: "active", in_progress: true }; await mount();
+  expect(document.body.textContent).toContain("进行中");
   expect(button("生成实战复盘").disabled).toBeTrue(); expect(button("删除记录").disabled).toBeTrue();
 });
 test("displays saved conversation roles and confirms deletion with the retained-copy notice", async () => {

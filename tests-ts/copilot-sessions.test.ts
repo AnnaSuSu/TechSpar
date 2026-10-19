@@ -22,13 +22,15 @@ async function fixture() {
   await repository.saveSession(state)
   let next = 0
   const reviews = new Map<string, CopilotReviewInput>()
+  const statuses = new Map<string, 'pending' | 'done' | 'error'>()
   const port = {
     async ensureSubmitted(_context: RequestContext, id: string) { return reviews.has(id) },
+    async status(_context: RequestContext, id: string) { return reviews.has(id) ? statuses.get(id) ?? 'pending' : undefined },
     async analyzeConversation(_context: RequestContext, input: CopilotReviewInput) { reviews.set(input.sessionId, input); return { session_id: input.sessionId, status: 'pending' as const } },
   }
   const deps = { repository, reviews: port, ids: { next: () => `review-${++next}` }, now: () => Date.parse(at) }
   const service = new CopilotSessionService(deps)
-  return { repository, state, reviews, port, deps, service, path }
+  return { repository, state, reviews, statuses, port, deps, service, path }
 }
 
 describe('Copilot session review', () => {
@@ -91,6 +93,23 @@ describe('Copilot session review', () => {
     expect(await f.service.review(context, 'live')).toMatchObject({ created: true, review_session_id: 'review-1' })
     await f.repository.unlinkReview('live', 'user-a', 'abandoned')
     expect((await f.repository.loadSession('live', 'user-a'))?.review_session_id).toBe('review-1')
+  })
+  test('reports progress, the real review status and deleted reviews without querying reservations', async () => {
+    const f = await fixture()
+    expect(await f.service.list(context, 'prep')).toMatchObject([{ in_progress: false, review_session_id: null, review_status: null }])
+    expect(await f.repository.linkReview('live', 'user-a', 'reserved', null, at)).toBeTrue()
+    expect((await f.service.get(context, 'live')).review_status).toBe('pending')
+    await f.repository.unlinkReview('live', 'user-a', 'reserved')
+    const created = await f.service.review(context, 'live')
+    expect(created).toMatchObject({ status: 'pending', created: true })
+    f.statuses.set(created.review_session_id, 'done')
+    expect(await f.service.review(context, 'live')).toMatchObject({ review_session_id: created.review_session_id, status: 'done', created: false })
+    f.statuses.set(created.review_session_id, 'error')
+    expect((await f.service.list(context, 'prep'))[0]).toMatchObject({ review_status: 'error' })
+    f.reviews.delete(created.review_session_id)
+    expect((await f.service.list(context, 'prep'))[0]).toMatchObject({ review_session_id: created.review_session_id, review_status: 'missing' })
+    await f.repository.saveSession({ ...f.state, status: 'active' })
+    expect((await f.service.list(context, 'prep'))[0]).toMatchObject({ in_progress: true, review_status: 'missing' })
   })
   test('lists by recency, isolates users and deletes only the realtime record', async () => {
     const f = await fixture()

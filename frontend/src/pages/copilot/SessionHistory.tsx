@@ -2,13 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, MessageSquare, RefreshCw } from "lucide-react";
 import { deleteCopilotSession, getCopilotSession, listCopilotSessions, reviewCopilotSession, type CopilotSessionDetail, type CopilotSessionSummary } from "../../api/copilot";
+import { retryReview } from "../../api/interview";
 import useTaskStatus from "../../hooks/useTaskStatus";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import * as Dialog from "@radix-ui/react-dialog";
 
 function date(value: string) { return new Date(value).toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
-function active(session: CopilotSessionSummary) { return session.status === "active" && (!Number.isFinite(Date.parse(session.updated_at)) || Date.now() - Date.parse(session.updated_at) < 120_000); }
+const REVIEW_LABELS = { none: "已结束", pending: "复盘生成中", done: "已复盘", error: "复盘失败", missing: "复盘已删除" } as const;
+const REVIEW_TASK_LABEL = "Copilot 实战复盘生成中";
 
 export default function SessionHistory({ prepId, initialSessionId }: { prepId: string; initialSessionId?: string }) {
   const [sessions, setSessions] = useState<CopilotSessionSummary[]>([]);
@@ -36,8 +38,17 @@ export default function SessionHistory({ prepId, initialSessionId }: { prepId: s
   };
   const review = (session: CopilotSessionSummary) => run(session.session_id, async () => {
     const result = await reviewCopilotSession(session.session_id);
-    startTask(result.review_session_id, "copilot_review", "Copilot 实战复盘生成中");
-    setNotice(result.created ? "实战复盘已开始，完成后可从任务通知打开。" : "已找到关联复盘，可从任务通知查看结果；失败的复盘可在历史记录中重试。");
+    if (result.status === "pending") {
+      startTask(result.review_session_id, "copilot_review", REVIEW_TASK_LABEL);
+      setNotice(result.created ? "实战复盘已开始，完成后可从任务通知打开。" : "复盘仍在生成，完成后可从任务通知打开。");
+    } else setNotice(result.status === "done" ? "复盘已完成，可点击「查看复盘」打开。" : "复盘生成失败，可点击「重新生成复盘」重试。");
+    await refresh();
+  });
+  // A failed review is regenerated from its saved snapshot, like the history page does.
+  const retry = (session: CopilotSessionSummary, reviewId: string) => run(session.session_id, async () => {
+    await retryReview(reviewId);
+    startTask(reviewId, "copilot_review", REVIEW_TASK_LABEL);
+    setNotice("已按原对话快照重新生成复盘，完成后可从任务通知打开。");
     await refresh();
   });
 
@@ -53,18 +64,24 @@ export default function SessionHistory({ prepId, initialSessionId }: { prepId: s
         {loading ? <p className="text-sm text-dim flex items-center gap-2"><Loader2 size={14} className="animate-spin" />加载记录...</p> : sessions.length === 0 ? <p className="py-5 text-sm text-dim text-center">暂无实战记录。结束面试后可在这里查看对话和生成复盘。</p> : (
           <ul className="space-y-3">
             {sessions.map((session) => {
-              const ongoing = active(session);
+              const ongoing = session.in_progress;
+              const status = session.review_status;
+              const reviewId = session.review_session_id;
               const canReview = session.hr_turns > 0 && session.candidate_turns > 0 && !ongoing;
+              const spinner = busy === session.session_id && <Loader2 size={13} className="animate-spin mr-1" />;
               return <li key={session.session_id} className={`rounded-2xl border p-4 space-y-3 ${session.session_id === initialSessionId ? "border-primary/40 bg-primary/5" : "border-border/70"}`}>
-                <div className="flex flex-wrap justify-between gap-2 text-sm"><span className="font-medium">{date(session.created_at)}{session.session_id === initialSessionId && " · 本次面试"}</span><span className="text-dim">{ongoing ? "进行中" : session.review_session_id ? "已关联复盘" : "已结束"}</span></div>
+                <div className="flex flex-wrap justify-between gap-2 text-sm"><span className="font-medium">{date(session.created_at)}{session.session_id === initialSessionId && " · 本次面试"}</span><span className="text-dim">{ongoing ? "进行中" : REVIEW_LABELS[status ?? "none"]}</span></div>
                 <p className="text-xs text-dim">面试官 {session.hr_turns} 句 · 本人 {session.candidate_turns} 句</p>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void run(session.session_id, async () => setDetail(await getCopilotSession(session.session_id)))}>查看对话</Button>
-                  {session.review_session_id && <Button size="sm" variant="outline" asChild><Link to={`/review/${encodeURIComponent(session.review_session_id)}`}>查看复盘</Link></Button>}
-                  <Button size="sm" disabled={busy !== null || (!session.review_session_id && !canReview)} onClick={() => void review(session)}>{busy === session.session_id && <Loader2 size={13} className="animate-spin mr-1" />}{session.review_session_id ? "检查复盘状态" : "生成实战复盘"}</Button>
+                  {status === "done" && reviewId && <Button size="sm" asChild><Link to={`/review/${encodeURIComponent(reviewId)}`}>查看复盘</Link></Button>}
+                  {status === "pending" && <Button size="sm" disabled={busy !== null} onClick={() => void review(session)}>{spinner}查看复盘进度</Button>}
+                  {status === "error" && reviewId && <Button size="sm" disabled={busy !== null} onClick={() => void retry(session, reviewId)}>{spinner}重新生成复盘</Button>}
+                  {(status === null || status === "missing") && <Button size="sm" disabled={busy !== null || !canReview} onClick={() => void review(session)}>{spinner}{status === "missing" ? "重新生成复盘" : "生成实战复盘"}</Button>}
                   <Button size="sm" variant="ghost" disabled={busy !== null || ongoing} onClick={() => setRemoving(session)}>删除记录</Button>
                 </div>
-                {!session.review_session_id && !ongoing && !canReview && <p className="text-xs text-dim">需要至少一段面试官提问和一段本人回答才能生成复盘。</p>}
+                {status === "missing" && <p className="text-xs text-dim">原复盘已在历史记录中删除。重新生成会再次调用模型并写入长期画像。</p>}
+                {(status === null || status === "missing") && !ongoing && !canReview && <p className="text-xs text-dim">需要至少一段面试官提问和一段本人回答才能生成复盘。</p>}
               </li>;
             })}
           </ul>

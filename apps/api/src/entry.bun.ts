@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import {
+  AppError,
   AuthService,
   ensureDefaultAccount,
   AiService,
@@ -135,6 +136,10 @@ const copilotPrep = new CopilotPrepService(copilotDependencies)
 const copilotSessions = new CopilotSessionService({ repository: copilotRepository, ids: new ShortUuidGenerator(), reviews: {
   analyzeConversation: (context, input) => recording.analyzeConversation(context, input),
   ensureSubmitted: (context, reviewId) => recording.recoverConversation(context, reviewId),
+  async status(context, reviewId) {
+    try { return (await interview.task(context, reviewId)).status }
+    catch (error) { if (error instanceof AppError && error.status === 404) return undefined; throw error }
+  },
 } })
 const copilotRealtime = new CopilotRealtimeService(copilotDependencies)
 const migration = new DataMigrationService({ codec: new TarGzipArchiveCodec(), database: new BunDataMigrationRepository(config.dbPath), files: new FileMigrationStore(config.dataDir, config.voiceprintEncryptionKey), profiles: profileRepository, users })

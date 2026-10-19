@@ -3319,7 +3319,11 @@ export interface paths {
                             candidate_turns: number;
                             created_at: string;
                             updated_at: string;
+                            /** @description Still receiving turns; review and deletion return 409 until it ends. */
+                            in_progress: boolean;
                             review_session_id: string | null;
+                            /** @description null: never reviewed; missing: the linked review was deleted and can be generated again. */
+                            review_status: ("pending" | "done" | "error") | "missing" | null;
                         }[];
                     };
                 };
@@ -3419,7 +3423,11 @@ export interface paths {
                             candidate_turns: number;
                             created_at: string;
                             updated_at: string;
+                            /** @description Still receiving turns; review and deletion return 409 until it ends. */
+                            in_progress: boolean;
                             review_session_id: string | null;
+                            /** @description null: never reviewed; missing: the linked review was deleted and can be generated again. */
+                            review_status: ("pending" | "done" | "error") | "missing" | null;
                             company: string;
                             position: string;
                             conversation: {
@@ -3603,7 +3611,7 @@ export interface paths {
                             /** @enum {string} */
                             mode: "copilot";
                             /** @enum {string} */
-                            status: "pending";
+                            status: "pending" | "done" | "error";
                             created: boolean;
                         };
                     };

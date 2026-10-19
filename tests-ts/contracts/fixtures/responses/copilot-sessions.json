@@ -7,6 +7,8 @@
     "candidate_turns": 1,
     "created_at": "2026-10-19T02:00:00Z",
     "updated_at": "2026-10-19T03:00:00Z",
-    "review_session_id": null
+    "in_progress": false,
+    "review_session_id": null,
+    "review_status": null
   }
 ]

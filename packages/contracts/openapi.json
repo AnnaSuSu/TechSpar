@@ -6636,11 +6636,37 @@
                       "updated_at": {
                         "type": "string"
                       },
+                      "in_progress": {
+                        "type": "boolean",
+                        "description": "Still receiving turns; review and deletion return 409 until it ends."
+                      },
                       "review_session_id": {
                         "type": [
                           "string",
                           "null"
                         ]
+                      },
+                      "review_status": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "done",
+                              "error"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "missing"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "null: never reviewed; missing: the linked review was deleted and can be generated again."
                       }
                     },
                     "required": [
@@ -6651,7 +6677,9 @@
                       "candidate_turns",
                       "created_at",
                       "updated_at",
-                      "review_session_id"
+                      "in_progress",
+                      "review_session_id",
+                      "review_status"
                     ],
                     "additionalProperties": false
                   }
@@ -6796,11 +6824,37 @@
                     "updated_at": {
                       "type": "string"
                     },
+                    "in_progress": {
+                      "type": "boolean",
+                      "description": "Still receiving turns; review and deletion return 409 until it ends."
+                    },
                     "review_session_id": {
                       "type": [
                         "string",
                         "null"
                       ]
+                    },
+                    "review_status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "done",
+                            "error"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "missing"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "null: never reviewed; missing: the linked review was deleted and can be generated again."
                     },
                     "company": {
                       "type": "string"
@@ -6844,7 +6898,9 @@
                     "candidate_turns",
                     "created_at",
                     "updated_at",
+                    "in_progress",
                     "review_session_id",
+                    "review_status",
                     "company",
                     "position",
                     "conversation"
@@ -7101,7 +7157,9 @@
                     "status": {
                       "type": "string",
                       "enum": [
-                        "pending"
+                        "pending",
+                        "done",
+                        "error"
                       ]
                     },
                     "created": {

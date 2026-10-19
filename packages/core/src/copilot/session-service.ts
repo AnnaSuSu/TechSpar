@@ -1,7 +1,7 @@
 import type { IdGenerator } from '../account/ports.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import { AppError, AuthenticationError } from '../kernel/errors.ts'
-import type { CopilotConversationTurn, CopilotReviewSubmission, CopilotSessionState, CopilotSessionSummary } from './model.ts'
+import type { CopilotConversationTurn, CopilotReviewStatus, CopilotReviewSubmission, CopilotSessionState, CopilotSessionSummary } from './model.ts'
 import type { CopilotRepository, CopilotReviewPort, CopilotSessionUseCases } from './ports.ts'
 
 export const COPILOT_TRANSCRIPT_LIMIT = 40_000
@@ -22,13 +22,8 @@ export function copilotTranscript(turns: readonly CopilotConversationTurn[]) {
   return { text: blocks.map((block) => `${labels[block.role]}: ${block.text}`).join('\n\n'), hrBlocks: blocks.filter((block) => block.role === 'hr').length, candidateBlocks: blocks.filter((block) => block.role === 'candidate').length }
 }
 
-function summary(state: CopilotSessionState): CopilotSessionSummary {
-  return { session_id: state.session_id, prep_id: state.prep_id, status: state.status, created_at: state.created_at, updated_at: state.updated_at, review_session_id: state.review_session_id || null,
-    hr_turns: state.conversation.filter((turn) => turn.role === 'hr' && turn.text.trim()).length,
-    candidate_turns: state.conversation.filter((turn) => turn.role === 'candidate' && turn.text.trim()).length }
-}
-function submission(sessionId: string, reviewId: string, created: boolean): CopilotReviewSubmission {
-  return { copilot_session_id: sessionId, review_session_id: reviewId, mode: 'copilot', status: 'pending', created }
+function submission(sessionId: string, reviewId: string, created: boolean, status: CopilotReviewStatus = 'pending'): CopilotReviewSubmission {
+  return { copilot_session_id: sessionId, review_session_id: reviewId, mode: 'copilot', status, created }
 }
 
 export class CopilotSessionService implements CopilotSessionUseCases {
@@ -48,19 +43,33 @@ export class CopilotSessionService implements CopilotSessionUseCases {
   private active(state: CopilotSessionState): boolean {
     return state.status === 'active' && (!Number.isFinite(Date.parse(state.updated_at)) || this.now() - Date.parse(state.updated_at) < ACTIVE_WINDOW_MS)
   }
+  private claimed(state: CopilotSessionState): boolean {
+    return Boolean(state.review_claimed_at) && this.now() - Date.parse(state.review_claimed_at!) < CLAIM_WINDOW_MS
+  }
+  private async status(context: RequestContext, reviewId: string): Promise<CopilotReviewStatus> {
+    return await this.deps.reviews.status(context, reviewId) ?? 'pending'
+  }
+  private async summary(context: RequestContext, state: CopilotSessionState): Promise<CopilotSessionSummary> {
+    const reviewId = state.review_session_id || null
+    return { session_id: state.session_id, prep_id: state.prep_id, status: state.status, created_at: state.created_at, updated_at: state.updated_at,
+      hr_turns: state.conversation.filter((turn) => turn.role === 'hr' && turn.text.trim()).length,
+      candidate_turns: state.conversation.filter((turn) => turn.role === 'candidate' && turn.text.trim()).length,
+      in_progress: this.active(state), review_session_id: reviewId,
+      review_status: !reviewId ? null : this.claimed(state) ? 'pending' : await this.deps.reviews.status(context, reviewId) ?? 'missing' }
+  }
   async list(context: RequestContext, prepId: string) {
     await this.prep(context, prepId)
-    return (await this.deps.repository.listSessions(prepId, user(context))).map(summary)
+    return Promise.all((await this.deps.repository.listSessions(prepId, user(context))).map((state) => this.summary(context, state)))
   }
   async get(context: RequestContext, sessionId: string) {
     const state = await this.load(context, sessionId)
     const prep = await this.prep(context, state.prep_id)
-    return { ...summary(state), company: prep.company, position: prep.position, conversation: state.conversation }
+    return { ...await this.summary(context, state), company: prep.company, position: prep.position, conversation: state.conversation }
   }
   async delete(context: RequestContext, sessionId: string): Promise<{ ok: true }> {
     const state = await this.load(context, sessionId)
     if (this.active(state)) throw new AppError('面试仍在进行，请先结束面试', 409)
-    if (state.review_claimed_at && this.now() - Date.parse(state.review_claimed_at) < CLAIM_WINDOW_MS) throw new AppError('复盘正在创建，请稍后重试', 409)
+    if (this.claimed(state)) throw new AppError('复盘正在创建，请稍后重试', 409)
     if (!await this.deps.repository.deleteSession(sessionId, user(context))) throw new AppError('实战记录不存在', 404)
     return { ok: true }
   }
@@ -79,10 +88,10 @@ export class CopilotSessionService implements CopilotSessionUseCases {
     if (state.review_session_id) {
       // A missing review during another process's submission is a reservation,
       // not a deleted review. Expiry also allows recovery after a process crash.
-      if (state.review_claimed_at && this.now() - Date.parse(state.review_claimed_at) < CLAIM_WINDOW_MS) throw new AppError('复盘正在创建，请稍后重试', 409)
+      if (this.claimed(state)) throw new AppError('复盘正在创建，请稍后重试', 409)
       if (await this.deps.reviews.ensureSubmitted(context, state.review_session_id)) {
         await this.deps.repository.completeReviewLink(sessionId, user(context), state.review_session_id)
-        return submission(sessionId, state.review_session_id, false)
+        return submission(sessionId, state.review_session_id, false, await this.status(context, state.review_session_id))
       }
     }
     if (this.active(state)) throw new AppError('面试仍在进行，请先结束面试', 409)
@@ -94,7 +103,7 @@ export class CopilotSessionService implements CopilotSessionUseCases {
     const claimed = await this.deps.repository.linkReview(sessionId, user(context), reviewId, state.review_session_id || null, new Date(this.now()).toISOString())
     if (!claimed) {
       const current = await this.load(context, sessionId)
-      if (current.review_session_id && !current.review_claimed_at && await this.deps.reviews.ensureSubmitted(context, current.review_session_id)) return submission(sessionId, current.review_session_id, false)
+      if (current.review_session_id && !current.review_claimed_at && await this.deps.reviews.ensureSubmitted(context, current.review_session_id)) return submission(sessionId, current.review_session_id, false, await this.status(context, current.review_session_id))
       throw new AppError('复盘正在创建，请稍后重试', 409)
     }
     try {

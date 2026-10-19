@@ -5,7 +5,7 @@ import type { RequestContext } from '../kernel/context.ts'
 import type { EmbeddingUseCases, ProviderSettingsRepository, TextGenerationUseCases } from '../provider/ports.ts'
 import type { ResumeUseCases } from '../resume/ports.ts'
 import type { VoiceRoleDetector } from '../voiceprint/ports.ts'
-import type { CopilotClientMessage, CopilotPrepRecord, CopilotServerEvent, CopilotSessionState, CopilotSessionSummary, CopilotSessionDetail, CopilotReviewSubmission, CopilotReviewInput } from './model.ts'
+import type { CopilotClientMessage, CopilotPrepRecord, CopilotServerEvent, CopilotSessionState, CopilotSessionSummary, CopilotSessionDetail, CopilotReviewSubmission, CopilotReviewInput, CopilotReviewStatus } from './model.ts'
 
 export interface CopilotRepository {
   initialize(): void
@@ -75,6 +75,8 @@ export type CopilotDependencies = {
 export interface CopilotReviewPort {
   analyzeConversation(context: RequestContext, input: CopilotReviewInput): Promise<{ session_id: string; status: 'pending' }>
   ensureSubmitted(context: RequestContext, reviewId: string): Promise<boolean>
+  /** Read-only review status; undefined when the review no longer exists. */
+  status(context: RequestContext, reviewId: string): Promise<CopilotReviewStatus | undefined>
 }
 export interface CopilotSessionUseCases {
   list(context: RequestContext, prepId: string): Promise<CopilotSessionSummary[]>
