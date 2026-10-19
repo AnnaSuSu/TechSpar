@@ -290,8 +290,6 @@ export default function DetailView({ prepId: initialPrepId, onBack, onStartInter
             <div className="rounded-2xl border border-red/20 bg-red/10 px-4 py-3 text-sm text-red">{error}</div>
           )}
 
-          {prepId && <SessionHistory prepId={prepId} />}
-
           {isDone && status ? (
             <div className="space-y-5">
               <PrepResultCards status={status} />
@@ -309,6 +307,8 @@ export default function DetailView({ prepId: initialPrepId, onBack, onStartInter
               </CardContent>
             </Card>
           )}
+
+          {prepId && <SessionHistory prepId={prepId} />}
         </div>
 
         <div className="space-y-5 xl:sticky xl:top-6 xl:self-start">

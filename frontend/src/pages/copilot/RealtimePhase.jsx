@@ -178,7 +178,7 @@ export default function RealtimePhase({ prepId, onBack }) {
 
   if (ended) return (
     <div className="flex-1 overflow-y-auto px-5 py-8 max-w-4xl w-full mx-auto space-y-6">
-      <div><h1 className="text-2xl font-semibold">面试已结束</h1><p className="mt-2 text-sm text-dim">可以保留实战记录，或手动生成复盘并写回长期画像。</p></div>
+      <div><h1 className="text-2xl font-semibold">面试已结束</h1><p className="mt-2 text-sm text-dim">可以保留实战记录，或手动生成复盘并写回长期画像。结束时尚未识别完成的最后一句不会被保存，可在对话中核对。</p></div>
       {endError && <p role="alert" className="text-sm text-red">{endError}</p>}
       <SessionHistory prepId={prepId} initialSessionId={sessionId} />
       <Button variant="outline" onClick={onBack}>返回准备详情</Button>
@@ -231,7 +231,7 @@ export default function RealtimePhase({ prepId, onBack }) {
           <Button size="icon" variant="ghost" className="rounded-2xl h-9 w-9" onClick={toggleFullscreen}>
             {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </Button>
-          <Button size="sm" variant="ghost" className="rounded-2xl" onClick={handleEnd} disabled={ending}>
+          <Button size="sm" variant="ghost" className="rounded-2xl" onClick={handleEnd} disabled={ending} title="请等最后一句识别完成后再结束，正在识别的内容不会保存">
             {ending ? "正在保存记录..." : "结束面试"}
           </Button>
         </div>
