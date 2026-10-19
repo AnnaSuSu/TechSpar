@@ -176,6 +176,28 @@ describe('chat provider compatibility', () => {
     }
   })
 
+  test.each([false, true])('handles exhausted streaming budgets without losing usage (visible output: %s)', async (hasOutput) => {
+    const factory = new OpenAiChatDriverFactory({ fetch: (async (_input: string | URL | Request, _init?: RequestInit) => {
+      const chunks = [
+        { choices: [{ index: 0, delta: hasOutput ? { content: '部分回答' } : {}, finish_reason: 'length' }] },
+        { choices: [], usage: { prompt_tokens: 20, completion_tokens: 8192 } },
+      ]
+      return new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
+    }) as typeof fetch })
+    let usage: unknown
+    const consume = async () => {
+      const chunks: string[] = []
+      for await (const token of factory.create({ ...config, reasoning_effort: 'high' }).stream(
+        [{ role: 'user', content: '问题' }], new AbortController().signal,
+        { reasoningEffort: 'none', maxTokens: 600, onUsage: value => { usage = value } },
+      )) chunks.push(token)
+      return chunks.join('')
+    }
+    if (hasOutput) expect(await consume()).toBe('部分回答')
+    else await expect(consume()).rejects.toMatchObject({ status: 502, code: 'provider_response_error', message: expect.stringContaining('推理强度') })
+    expect(usage).toEqual({ promptTokens: 20, completionTokens: 8192, cachedTokens: 0 })
+  })
+
   test('does not silently downgrade a rejected effort', async () => {
     const requests: Array<Record<string, unknown>> = []
     const factory = new OpenAiChatDriverFactory({ fetch: (async (_input, init) => {

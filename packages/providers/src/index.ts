@@ -29,6 +29,7 @@ export { normalizeEmbeddingApiBase } from '@techspar/core'
 export { QwenStreamingAsrFactory } from './qwen-streaming-asr.ts'
 
 const DEFAULT_EMPTY_COMPLETION_RETRY_DELAYS_MS = [250, 750] as const
+const MIN_REASONING_STREAM_TOKENS = 8192
 
 type ChatFactoryOptions = {
   fetch?: typeof globalThis.fetch
@@ -65,10 +66,15 @@ function chatRequestOptions(config: ResolvedLlmConfig, options?: ChatCompleteOpt
   const maxTokens = streaming
     ? options?.maxTokens || undefined
     : options?.maxTokens ?? (config.compatibility === 'deepseek' && options?.jsonMode ? 8192 : undefined)
+  // 推理和正文共享输出预算，不能直接沿用 Copilot 等非思考场景的短回答上限。
+  // Reasoning shares the output budget with visible text, so short non-thinking limits need headroom.
+  const tokenBudget = streaming && effort && effort !== 'none' && maxTokens !== undefined
+    ? Math.max(maxTokens, MIN_REASONING_STREAM_TOKENS)
+    : maxTokens
   return {
     ...(!genericReasoning || effort === 'none' ? { temperature: options?.temperature ?? config.temperature } : {}),
     ...(effort ? { reasoning_effort: effort } : {}),
-    ...(maxTokens === undefined ? {} : genericReasoning ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
+    ...(tokenBudget === undefined ? {} : genericReasoning ? { max_completion_tokens: tokenBudget } : { max_tokens: tokenBudget }),
   }
 }
 
@@ -123,6 +129,8 @@ export class OpenAiChatDriverFactory implements ChatDriverFactory {
           { signal },
         )
         let usage: ChatUsage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 }
+        let hasVisibleOutput = false
+        let finishReason: string | null = null
         for await (const chunk of response) {
           const raw = (chunk as { usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_cache_hit_tokens?: number } }).usage
           if (raw) {
@@ -132,10 +140,18 @@ export class OpenAiChatDriverFactory implements ChatDriverFactory {
               cachedTokens: raw.prompt_cache_hit_tokens || 0,
             }
           }
-          const token = chunk.choices[0]?.delta.content
-          if (token) yield token
+          const choice = chunk.choices[0]
+          if (choice?.finish_reason) finishReason = choice.finish_reason
+          const token = choice?.delta.content
+          if (token) {
+            if (token.trim()) hasVisibleOutput = true
+            yield token
+          }
         }
         options?.onUsage?.(usage)
+        if (!hasVisibleOutput && finishReason === 'length') {
+          throw new ProviderResponseError('模型在生成回答前已耗尽本次输出预算，请调低推理强度后重试。')
+        }
       },
     }
   }
