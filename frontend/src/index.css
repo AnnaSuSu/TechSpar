@@ -645,6 +645,23 @@
   overflow-x: auto;
 }
 .md-content pre code { background: none; padding: 0; }
+.md-content .md-table-wrapper {
+  max-width: 100%;
+  margin: 12px 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.md-content table { width: 100%; border-collapse: collapse; }
+.md-content th, .md-content td {
+  min-width: 8rem;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.md-content th { background: var(--secondary); font-weight: 600; }
+.md-content th + th, .md-content td + td { border-left: 1px solid var(--border); }
+.md-content tbody tr:last-child td { border-bottom: none; }
 .md-content ul, .md-content ol { margin: 6px 0; padding-left: 20px; }
 .md-content li { margin: 2px 0; }
 .md-content h1, .md-content h2, .md-content h3 { margin: 12px 0 6px; font-weight: 600; }
