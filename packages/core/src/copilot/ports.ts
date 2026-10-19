@@ -18,6 +18,8 @@ export interface CopilotRepository {
   deletePrep(prepId: string, userId: string): Promise<boolean>
   loadSession(sessionId: string, userId: string): Promise<CopilotSessionState | undefined>
   saveSession(state: CopilotSessionState): Promise<void>
+  /** Updates an existing session only, so a record deleted mid-connection is never recreated. */
+  updateSession(state: CopilotSessionState): Promise<boolean>
   listSessions(prepId: string, userId: string): Promise<CopilotSessionState[]>
   deleteSession(sessionId: string, userId: string): Promise<boolean>
   linkReview(sessionId: string, userId: string, reviewId: string, expected: string | null, claimedAt: string): Promise<boolean>

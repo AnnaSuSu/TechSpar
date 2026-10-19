@@ -143,7 +143,8 @@ class RealtimeConnection implements CopilotRealtimeConnection {
     }
   }
 
-  private async persist(): Promise<void> { if (this.state) { this.state.updated_at = new Date().toISOString(); await this.deps.repository.saveSession(this.state) } }
+  // start() creates the record; later writes only update it so a deleted record stays deleted.
+  private async persist(): Promise<void> { if (this.state) { this.state.updated_at = new Date().toISOString(); await this.deps.repository.updateSession(this.state) } }
 
   private async utterance(text: string, role: 'hr' | 'candidate', answer?: AbortController): Promise<void> {
     if (!this.state || !this.navigator) return
@@ -218,7 +219,8 @@ class RealtimeConnection implements CopilotRealtimeConnection {
       try { await this.stopAsr() }
       finally {
         this.stopped = true
-        if (this.state) {
+        // stop() already persisted a requested stop; only abrupt disconnects need this write.
+        if (this.state && this.state.status !== 'stopped') {
           this.state.status = 'stopped'
           try { await this.persist() }
           catch { console.error({ operation: 'copilot.close', requestId: this.context.requestId, code: 'persist_stopped_failed' }) }

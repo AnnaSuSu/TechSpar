@@ -47,6 +47,10 @@ export class BunCopilotRepository implements CopilotRepository {
       ON CONFLICT(session_id) DO UPDATE SET prep_id = excluded.prep_id, conversation = excluded.conversation, last_node_id = excluded.last_node_id, turn_count = excluded.turn_count, status = excluded.status, updated_at = excluded.updated_at
       WHERE copilot_realtime_sessions.user_id = excluded.user_id`).run({ $id: state.session_id, $userId: state.user_id, $prepId: state.prep_id, $conversation: JSON.stringify(state.conversation), $lastNodeId: state.last_node_id || null, $turnCount: state.turn_count, $status: state.status, $createdAt: state.created_at, $updatedAt: state.updated_at })
   }
+  async updateSession(state: CopilotSessionState): Promise<boolean> {
+    return this.sqlite.query(`UPDATE copilot_realtime_sessions SET prep_id = $prepId, conversation = $conversation, last_node_id = $lastNodeId, turn_count = $turnCount, status = $status, updated_at = $updatedAt
+      WHERE session_id = $id AND user_id = $userId`).run({ $id: state.session_id, $userId: state.user_id, $prepId: state.prep_id, $conversation: JSON.stringify(state.conversation), $lastNodeId: state.last_node_id || null, $turnCount: state.turn_count, $status: state.status, $updatedAt: state.updated_at }).changes > 0
+  }
   async listSessions(prepId: string, userId: string): Promise<CopilotSessionState[]> {
     return this.sqlite.query<SessionRow, [string, string]>('SELECT * FROM copilot_realtime_sessions WHERE prep_id = ? AND user_id = ? ORDER BY updated_at DESC, rowid DESC').all(prepId, userId).map(session)
   }
