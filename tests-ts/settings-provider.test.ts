@@ -19,6 +19,7 @@ import {
   type UserRepository,
 } from '@techspar/core'
 import { FileProviderSettingsRepository } from '@techspar/platform'
+import { LlmSettingsSchema } from '@techspar/contracts'
 
 const emptyPlatform: PlatformProviderConfig = {
   llm: { api_base: '', api_key: '', model: '' },
@@ -27,6 +28,12 @@ const emptyPlatform: PlatformProviderConfig = {
 }
 
 describe('provider resolution', () => {
+  test('accepts legacy settings without effort and rejects unsupported effort values', () => {
+    expect(LlmSettingsSchema.parse({}).reasoning_effort).toBeUndefined()
+    expect(LlmSettingsSchema.safeParse({ reasoning_effort: 'ultra' }).success).toBe(false)
+    expect(resolveLlmConfig(undefined, emptyPlatform).reasoning_effort).toBe('')
+  })
+
   test('unconfigured users stay unconfigured without a platform fallback', () => {
     expect(resolveLlmConfig(undefined, emptyPlatform)).toMatchObject({ api_key: '', source: USER_PROVIDER })
   })
@@ -106,7 +113,7 @@ describe('settings persistence', () => {
   let root = ''
   afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = '' })
 
-  test('persists admin registration changes atomically and canonicalizes embedding base', async () => {
+  test('persists registration and reasoning preferences atomically and canonicalizes embedding base', async () => {
     root = await mkdtemp(join(tmpdir(), 'techspar-settings-'))
     const repository = new FileProviderSettingsRepository(join(root, 'data'))
     const users: UserRepository = {
@@ -121,12 +128,17 @@ describe('settings persistence', () => {
     const context = { requestId: 'test', userId: 'admin', signal: new AbortController().signal }
     const current = await service.get(context)
     current.system.allow_registration = true
+    current.llm = { ...current.llm, api_key: 'synthetic', model: 'test-model', reasoning_effort: 'xhigh' }
     current.embedding = { ...current.embedding, backend: 'api', api_base: 'https://example.test/v1/embeddings/', api_key: 'key', api_model: 'model' }
     await service.update(context, current)
 
     expect(registration.allowRegistration).toBe(true)
     expect(JSON.parse(await readFile(join(root, 'data', 'system_settings.json'), 'utf8'))).toEqual({ allow_registration: true })
     expect((await repository.loadProvider('admin')).embedding?.api_base).toBe('https://example.test/v1')
+    const reloaded = await service.get(context)
+    expect(reloaded.llm.reasoning_effort).toBe('xhigh')
+    expect(resolveLlmConfig((await repository.loadProvider('admin')).llm, emptyPlatform).reasoning_effort).toBe('xhigh')
+    expect((await service.get({ ...context, userId: 'other-user' })).llm.reasoning_effort).toBe('')
   })
 
   test('canonicalizes legacy local model ids while loading existing provider files', async () => {
@@ -169,6 +181,11 @@ describe('settings operations', () => {
     expect(llmConfig).toMatchObject({ api_base: 'https://submitted.test/v1', api_key: 'submitted-key', model: 'submitted-model', source: USER_PROVIDER })
     expect(llmMessages?.map((message) => message.content).join('\n')).toContain('专项训练')
     expect(llmOptions).toEqual({ maxTokens: 4096, temperature: 0, jsonMode: true, reasoningEffort: 'low' })
+    expect(await service.testLlm(context, { api_base: 'https://submitted.test/v1', api_key: 'submitted-key', model: 'submitted-model', temperature: 0.2, compatibility: 'generic', reasoning_effort: 'high', use_platform: false })).toEqual({ ok: true })
+    expect(llmConfig).toMatchObject({ reasoning_effort: 'high', source: USER_PROVIDER })
+    expect(llmOptions).toEqual({ maxTokens: 8192, temperature: 0 })
+    expect(await service.testLlm(context, { api_base: 'https://submitted.test/v1', api_key: 'submitted-key', model: 'submitted-model', temperature: 0.2, compatibility: 'generic', reasoning_effort: '', use_platform: false })).toEqual({ ok: true })
+    expect(llmOptions).toEqual({ maxTokens: 2048, temperature: 0 })
     expect(await service.testEmbedding(context, { backend: 'local', api_base: '', api_key: '', api_model: '', local_model: 'Xenova/bge-m3', local_path: '', api_batch_size: 10 })).toEqual({ ok: true })
     expect(embeddingConfig).toMatchObject({ backend: 'local', local_model: 'Xenova/bge-m3', source: USER_PROVIDER })
   })

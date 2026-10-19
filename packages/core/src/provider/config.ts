@@ -39,6 +39,7 @@ export function normalizeLlmSettings(settings?: Partial<LlmSettings>): LlmSettin
     model: settings?.model || '',
     temperature: typeof settings?.temperature === 'number' ? settings.temperature : 0.7,
     compatibility: settings?.compatibility === 'deepseek' ? 'deepseek' : 'generic',
+    reasoning_effort: settings?.reasoning_effort || '',
     use_platform: settings?.use_platform === true,
   }
 }

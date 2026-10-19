@@ -59,6 +59,7 @@ export const LlmSettingsSchema = z.object({
   model: z.string().default(''),
   temperature: z.number().min(0).max(2).default(0.7),
   compatibility: z.enum(['generic', 'deepseek']).default('generic'),
+  reasoning_effort: z.enum(['', 'none', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
   /** 显式选用部署方的共享 key,即使自己也填了 key */
   use_platform: z.boolean().default(false),
 })

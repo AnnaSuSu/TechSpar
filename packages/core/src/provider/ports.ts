@@ -1,6 +1,7 @@
 import type { IndexRebuildEvent } from './events.ts'
 import type { RequestContext } from '../kernel/context.ts'
 import type {
+  ChatReasoningEffort,
   ResolvedLlmConfig,
   ResolvedEmbeddingConfig,
   EmbeddingSettings,
@@ -11,7 +12,7 @@ import type {
   ProviderSource,
 } from './model.ts'
 
-export type ChatReasoningEffort = 'none' | 'low' | 'high' | 'max'
+export type { ChatReasoningEffort } from './model.ts'
 export type ChatCompleteOptions = {
   maxTokens?: number
   temperature?: number

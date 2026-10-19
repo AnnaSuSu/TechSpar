@@ -9,6 +9,7 @@ export const DEFAULT_EMBEDDING_BATCH_SIZE = 10
 export type ProviderSource = typeof USER_PROVIDER | typeof PLATFORM_PROVIDER
 
 export type LlmCompatibility = 'generic' | 'deepseek'
+export type ChatReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 export type LlmSettings = {
   api_base: string
@@ -16,6 +17,12 @@ export type LlmSettings = {
   model: string
   temperature: number
   compatibility: LlmCompatibility
+  /**
+   * 空值保留兼容模式的默认行为；显式档位优先于调用场景的默认推理强度。
+   *
+   * An empty value preserves compatibility defaults; an explicit effort overrides per-call defaults.
+   */
+  reasoning_effort?: '' | ChatReasoningEffort
   /** 显式选用部署方的共享 key。填了自己的 key 但仍想走平台额度时才需要它。 */
   use_platform: boolean
 }
@@ -71,7 +78,7 @@ export type SettingsView = {
 export type ResolvedLlmConfig = LlmSettings & { source: ProviderSource }
 export type ResolvedEmbeddingConfig = EmbeddingSettings & { source: ProviderSource }
 
-export const emptyLlmSettings = (): LlmSettings => ({ api_base: '', api_key: '', model: '', temperature: 0.7, compatibility: 'generic', use_platform: false })
+export const emptyLlmSettings = (): LlmSettings => ({ api_base: '', api_key: '', model: '', temperature: 0.7, compatibility: 'generic', reasoning_effort: '', use_platform: false })
 export const emptyEmbeddingSettings = (): EmbeddingSettings => ({
   backend: '', api_base: '', api_key: '', api_model: '', local_model: '', local_path: '', api_batch_size: DEFAULT_EMBEDDING_BATCH_SIZE,
 })
