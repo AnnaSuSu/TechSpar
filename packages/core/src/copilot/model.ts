@@ -20,6 +20,8 @@ export type CopilotSessionState = {
   user_id: string
   prep_id: string
   conversation: CopilotConversationTurn[]
+  review_session_id?: string | null
+  review_claimed_at?: string | null
   last_node_id?: string | null
   turn_count: number
   status: 'active' | 'stopped'
@@ -49,3 +51,12 @@ export type CopilotServerEvent =
   // validate all required model fields before creating these events.
   | { type: 'hr_profile_update'; style?: string; focus?: string; satisfaction_signals?: string; advice?: string; [key: string]: unknown }
   | { type: 'monitor_update'; phase?: string; last_answer_feedback?: string; covered_topics?: string[]; uncovered_topics?: string[]; strategy_tip?: string; [key: string]: unknown }
+
+export type CopilotSessionSummary = Pick<CopilotSessionState, 'session_id' | 'prep_id' | 'status' | 'created_at' | 'updated_at'> & {
+  hr_turns: number
+  candidate_turns: number
+  review_session_id: string | null
+}
+export type CopilotSessionDetail = CopilotSessionSummary & { company: string; position: string; conversation: CopilotConversationTurn[] }
+export type CopilotReviewSubmission = { copilot_session_id: string; review_session_id: string; mode: 'copilot'; status: 'pending'; created: boolean }
+export type CopilotReviewInput = { sessionId: string; transcript: string; company?: string; position?: string; meta: { copilot_session_id: string; prep_id: string } }

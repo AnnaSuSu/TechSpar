@@ -16,6 +16,7 @@ import {
   type DataMigrationUseCases,
   type RecordingUseCases,
   type CopilotPrepUseCases,
+  type CopilotSessionUseCases,
   type CopilotRealtimeUseCases,
   type VoiceprintUseCases,
   type SettingsUseCases,
@@ -31,7 +32,7 @@ import { registerProfileRoutes } from './routes/profile.ts'
 import { registerPersonalAgentRoutes } from './routes/personal-agent.ts'
 import { registerDataMigrationRoutes } from './routes/data-migration.ts'
 import { registerRecordingRoutes } from './routes/recording.ts'
-import { registerCopilotRoutes, registerCopilotWebSocket } from './routes/copilot.ts'
+import { registerCopilotRoutes, registerCopilotSessionRoutes, registerCopilotWebSocket } from './routes/copilot.ts'
 import { registerVoiceprintRoutes } from './routes/voiceprint.ts'
 import { registerStaticFrontend } from './http/static-frontend.ts'
 import { createOpenApiDocument } from './http/openapi.ts'
@@ -54,6 +55,7 @@ export type AppDependencies = {
   personalAgent?: PersonalAgentUseCases
   migration?: DataMigrationUseCases
   recording?: RecordingUseCases
+  copilotSessions?: CopilotSessionUseCases
   copilotPrep?: CopilotPrepUseCases
   copilotRealtime?: CopilotRealtimeUseCases
   websocketUpgrade?: UpgradeWebSocket
@@ -98,6 +100,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono {
   if (deps.personalAgent) registerPersonalAgentRoutes(app, { personalAgent: deps.personalAgent, tokens: deps.tokens })
   if (deps.migration) registerDataMigrationRoutes(app, { migration: deps.migration, tokens: deps.tokens })
   if (deps.recording) registerRecordingRoutes(app, { recording: deps.recording, tokens: deps.tokens })
+  if (deps.copilotSessions) registerCopilotSessionRoutes(app, { sessions: deps.copilotSessions, tokens: deps.tokens })
   if (deps.copilotPrep) registerCopilotRoutes(app, { prep: deps.copilotPrep, tokens: deps.tokens })
   if (deps.copilotRealtime && deps.websocketUpgrade) registerCopilotWebSocket(app, { realtime: deps.copilotRealtime, tokens: deps.tokens, upgrade: deps.websocketUpgrade })
   if (deps.voiceprint) registerVoiceprintRoutes(app, { voiceprint: deps.voiceprint, tokens: deps.tokens })

@@ -1,4 +1,4 @@
-export const INTERVIEW_MODES = ['resume', 'topic_drill', 'jd_prep', 'recording'] as const
+export const INTERVIEW_MODES = ['resume', 'topic_drill', 'jd_prep', 'recording', 'copilot'] as const
 export type InterviewMode = (typeof INTERVIEW_MODES)[number]
 
 export const SESSION_STATUSES = ['prepared', 'ongoing', 'ended', 'reviewing', 'reviewed', 'review_failed'] as const

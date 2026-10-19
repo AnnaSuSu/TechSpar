@@ -202,7 +202,7 @@ class RealtimeConnection implements CopilotRealtimeConnection {
     if (failed?.status === 'rejected') throw failed.reason
   }
 
-  private async stop(): Promise<void> { this.stopped = true; await this.stopAsr(); if (this.state) { this.state.status = 'stopped'; await this.persist() }; await this.emit({ type: 'stopped' }) }
+  private async stop(): Promise<void> { this.stopped = true; try { await this.stopAsr() } finally { if (this.state) { this.state.status = 'stopped'; await this.persist() } }; await this.emit({ type: 'stopped' }) }
   close(): Promise<void> {
     this.closed = true; this.stopped = true
     this.answer?.abort()
@@ -215,8 +215,15 @@ class RealtimeConnection implements CopilotRealtimeConnection {
     finally {
       await this.chain.catch(() => {})
       // Also cover startup that was still acquiring dependencies when close began.
-      await this.stopAsr()
-      this.stopped = true
+      try { await this.stopAsr() }
+      finally {
+        this.stopped = true
+        if (this.state) {
+          this.state.status = 'stopped'
+          try { await this.persist() }
+          catch { console.error({ operation: 'copilot.close', requestId: this.context.requestId, code: 'persist_stopped_failed' }) }
+        }
+      }
     }
   }
 }

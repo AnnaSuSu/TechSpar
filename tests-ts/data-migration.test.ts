@@ -240,3 +240,35 @@ describe('personal archive migration', () => {
     sourceSessions.close(); targetSessions.close()
   })
 })
+
+test('old and new Copilot archives import with review links and reviewed-only statistics', async () => {
+  const { BunCopilotRepository } = await import('@techspar/db')
+  const sourcePath = join(await root(), 'source.db'); const targetPath = join(await root(), 'target.db')
+  const source = new BunCopilotRepository(sourcePath); source.initialize()
+  const sessions = new BunInterviewSessionRepository(sourcePath); sessions.initialize()
+  const target = new BunCopilotRepository(targetPath); target.initialize()
+  try {
+    await source.createPrep({ prepId: 'prep', userId: 'source', company: '', position: '', jdText: '' })
+    const state = { session_id: 'live', user_id: 'source', prep_id: 'prep', conversation: [], turn_count: 0, status: 'stopped' as const, created_at: '', updated_at: '' }
+    await source.saveSession(state)
+    await source.saveSession({ ...state, session_id: 'unreviewed' })
+    await sessions.create({ sessionId: 'review', userId: 'source', mode: 'copilot' })
+    await sessions.saveReview({ sessionId: 'review', userId: 'source', review: '复盘', scores: [{ question_id: 1, score: 8 }], overall: { avg_score: 8 } })
+    await source.linkReview('live', 'source', 'review', null, '2026-10-19T00:00:00Z')
+    await source.completeReviewLink('live', 'source', 'review')
+    const migration = new BunDataMigrationRepository(targetPath)
+    await migration.importPersonal((await new BunDataMigrationRepository(sourcePath).exportPersonal('source'))!, 'target', 'skip')
+    expect(await target.loadSession('live', 'target')).toMatchObject({ review_session_id: 'review', review_claimed_at: null })
+    expect(await migration.rebuiltStats('target')).toMatchObject({ stats: { copilot_sessions: 1, copilot_avg_score: 8, total_sessions: 1 } })
+    const sqlite = new Database(sourcePath)
+    sqlite.exec('ALTER TABLE copilot_realtime_sessions DROP COLUMN review_session_id; ALTER TABLE copilot_realtime_sessions DROP COLUMN review_claimed_at')
+    const legacyArchivePath = join(await root(), 'legacy.db')
+    sqlite.exec(`VACUUM INTO '${legacyArchivePath}'`)
+    sqlite.close()
+    const legacyTargetPath = join(await root(), 'legacy-target.db')
+    await new BunDataMigrationRepository(legacyTargetPath).importPersonal(await readFile(legacyArchivePath), 'legacy-target', 'skip')
+    const legacy = new BunCopilotRepository(legacyTargetPath); legacy.initialize()
+    try { expect(await legacy.loadSession('live', 'legacy-target')).toMatchObject({ review_session_id: null, conversation: [] }) }
+    finally { legacy.close() }
+  } finally { source.close(); sessions.close(); target.close() }
+})

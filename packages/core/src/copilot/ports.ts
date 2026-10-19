@@ -5,7 +5,7 @@ import type { RequestContext } from '../kernel/context.ts'
 import type { EmbeddingUseCases, ProviderSettingsRepository, TextGenerationUseCases } from '../provider/ports.ts'
 import type { ResumeUseCases } from '../resume/ports.ts'
 import type { VoiceRoleDetector } from '../voiceprint/ports.ts'
-import type { CopilotClientMessage, CopilotPrepRecord, CopilotServerEvent, CopilotSessionState } from './model.ts'
+import type { CopilotClientMessage, CopilotPrepRecord, CopilotServerEvent, CopilotSessionState, CopilotSessionSummary, CopilotSessionDetail, CopilotReviewSubmission, CopilotReviewInput } from './model.ts'
 
 export interface CopilotRepository {
   initialize(): void
@@ -18,6 +18,11 @@ export interface CopilotRepository {
   deletePrep(prepId: string, userId: string): Promise<boolean>
   loadSession(sessionId: string, userId: string): Promise<CopilotSessionState | undefined>
   saveSession(state: CopilotSessionState): Promise<void>
+  listSessions(prepId: string, userId: string): Promise<CopilotSessionState[]>
+  deleteSession(sessionId: string, userId: string): Promise<boolean>
+  linkReview(sessionId: string, userId: string, reviewId: string, expected: string | null, claimedAt: string): Promise<boolean>
+  completeReviewLink(sessionId: string, userId: string, reviewId: string): Promise<void>
+  unlinkReview(sessionId: string, userId: string, reviewId: string): Promise<void>
 }
 
 export type SearchResult = { title: string; content: string; url: string }
@@ -63,4 +68,15 @@ export type CopilotDependencies = {
   search: WebSearchDriver
   asr: RealtimeAsrFactory
   asrConfig?: { apiKey: string; workspaceId?: string }
+}
+
+export interface CopilotReviewPort {
+  analyzeConversation(context: RequestContext, input: CopilotReviewInput): Promise<{ session_id: string; status: 'pending' }>
+  ensureSubmitted(context: RequestContext, reviewId: string): Promise<boolean>
+}
+export interface CopilotSessionUseCases {
+  list(context: RequestContext, prepId: string): Promise<CopilotSessionSummary[]>
+  get(context: RequestContext, sessionId: string): Promise<CopilotSessionDetail>
+  delete(context: RequestContext, sessionId: string): Promise<{ ok: true }>
+  review(context: RequestContext, sessionId: string): Promise<CopilotReviewSubmission>
 }

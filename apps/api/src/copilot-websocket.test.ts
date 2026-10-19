@@ -245,6 +245,7 @@ describe('Copilot contracts over real Bun WebSockets', () => {
       h.ws.close()
       await within(cleaned.promise)
     }
+    expect((await repository.loadSession('live-1', 'user-a'))?.status).toBe('stopped')
     expect(asrSocket.closeCalls).toBe(1)
     expect(asrSocket.listenerCount).toBe(0)
     asrSocket.open()
@@ -319,7 +320,9 @@ describe('Copilot contracts over real Bun WebSockets', () => {
     await resumed.until(() => resumed.events.some((event) => (event as { message?: string }).message === 'ASR 触发的模型流错误'))
     expect(resumed.events).toContainEqual({ type: 'answer_chunk', text: '部分回答' })
     expect(resumed.events).toContainEqual(expect.objectContaining({ type: 'answer_done', chunk_count: 1 }))
+    resumed.send({ type: 'candidate_response', text: '结束前的最后一句回答' })
     resumed.send({ type: 'stop' })
     await resumed.until(() => resumed.events.some((event) => (event as { type: string }).type === 'stopped'))
+    expect((await repository.loadSession('live-1', 'user-a'))?.conversation.at(-1)?.text).toBe('结束前的最后一句回答')
   })
 })

@@ -279,3 +279,26 @@ describe('long-term profile loop', () => {
     } finally { sessions.close(); vectors.close() }
   })
 })
+
+test('Copilot reviews validate predicted weaknesses, update SM-2 and count once without topic pollution', async () => {
+  const { service, repository, sessions, vectors } = await fixture([
+    JSON.stringify({ session_summary: 'GIL 讲解清晰', weak_points: [], strong_points: [{ point: 'GIL 原理清晰', topic: 'python' }], behavior_signals: [], avg_score: 9 }),
+    JSON.stringify({ session_summary: 'GIL 原理仍不清楚', weak_points: [{ point: 'GIL 原理不清楚', topic: 'python' }], strong_points: [], behavior_signals: [], avg_score: 3 }),
+  ])
+  const initial = defaultProfile()
+  initial.weak_points.push({ point: 'GIL 原理', topic: 'python', source: 'predicted', improved: false, times_seen: 1, sr: {} })
+  await repository.save('user-a', initial)
+  try {
+    const first = reviewedSession({ session_id: 'copilot-good', mode: 'copilot', topic: null, scores: [{ question_id: 1, score: 9 }], overall: { avg_score: 9 } })
+    await service.afterReview({ userId: 'user-a', session: first })
+    await service.afterReview({ userId: 'user-a', session: first })
+    let stored = await repository.load('user-a')
+    expect(stored.stats).toMatchObject({ copilot_sessions: 1, copilot_avg_score: 9, total_sessions: 1, score_history: [{ mode: 'copilot' }] })
+    expect(stored.weak_points[0]).toMatchObject({ improved: true, sr: { last_score: 9 } })
+    await service.afterReview({ userId: 'user-a', session: reviewedSession({ session_id: 'copilot-bad', mode: 'copilot', topic: null }) })
+    stored = await repository.load('user-a')
+    expect(stored.stats).toMatchObject({ copilot_sessions: 2, copilot_avg_score: 6, total_sessions: 2 })
+    expect(stored.weak_points[0]).toMatchObject({ improved: false, sr: { last_score: 3, repetitions: 0 } })
+    expect(stored.topic_mastery).toEqual({})
+  } finally { sessions.close(); vectors.close() }
+})

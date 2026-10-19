@@ -18,6 +18,7 @@ import {
   LongTranscriptionService,
   RecordingService,
   CopilotPrepService,
+  CopilotSessionService,
   CopilotRealtimeService,
   VoiceprintService,
   SettingsService,
@@ -131,17 +132,22 @@ const voiceprint = new VoiceprintService(new EncryptedFileVoiceprintRepository(c
 const copilotAi = new AiService(settingsRepository, platform, quota, chatDrivers, config.copilotLlm)
 const copilotDependencies = { repository: copilotRepository, tasks: taskQueue, ids: new ShortUuidGenerator(), ai: copilotAi, embeddings, profile, resume, settings: settingsRepository, search: new TavilyWebSearchDriver(), asr: new QwenStreamingAsrFactory(), asrConfig: config.copilotAsr }
 const copilotPrep = new CopilotPrepService(copilotDependencies)
+const copilotSessions = new CopilotSessionService({ repository: copilotRepository, ids: new ShortUuidGenerator(), reviews: {
+  analyzeConversation: (context, input) => recording.analyzeConversation(context, input),
+  ensureSubmitted: (context, reviewId) => recording.recoverConversation(context, reviewId),
+} })
 const copilotRealtime = new CopilotRealtimeService(copilotDependencies)
 const migration = new DataMigrationService({ codec: new TarGzipArchiveCodec(), database: new BunDataMigrationRepository(config.dbPath), files: new FileMigrationStore(config.dataDir, config.voiceprintEncryptionKey), profiles: profileRepository, users })
 taskQueue.register('resume_review', (task) => interview.runReviewTask(task))
 taskQueue.register('drill_review', (task) => interview.runReviewTask(task))
 taskQueue.register('jd_review', (task) => interview.runReviewTask(task))
+taskQueue.register('copilot_review', (task) => recording.runAnalysisTask(task))
 taskQueue.register('recording_review', (task) => recording.runAnalysisTask(task))
 taskQueue.register('copilot_prep', (task) => copilotPrep.runPrepTask(task))
 taskQueue.register('retrospective', (task) => profile.runRetrospectiveTask(task))
 await taskQueue.start()
 const { upgradeWebSocket, websocket } = createBunWebSocket()
-const app = createApp({ auth, registration, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, recording, copilotPrep, copilotRealtime, websocketUpgrade: upgradeWebSocket, voiceprint, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir, trustProxy: config.trustProxy })
+const app = createApp({ auth, registration, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, recording, copilotPrep, copilotSessions, copilotRealtime, websocketUpgrade: upgradeWebSocket, voiceprint, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir, trustProxy: config.trustProxy })
 
 const server = Bun.serve<BunWebSocketData>(withLongRequestTimeout({ hostname: config.host, port: config.port, fetch: (request, server) => app.fetch(request, server), websocket }))
 console.log(JSON.stringify({ event: 'techspar:ready', host: config.host, port: server.port }))

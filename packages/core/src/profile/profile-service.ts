@@ -362,7 +362,7 @@ function roundedAverage(values: number[]): number | undefined {
 function updateStats(profile: CandidateProfile, session: InterviewSession, extraction: Record<string, unknown>, now: string): void {
   const stats = profile.stats
   stats.total_sessions = Number(stats.total_sessions || 0) + 1
-  const countKey = ({ resume: 'resume_sessions', topic_drill: 'drill_sessions', jd_prep: 'job_prep_sessions', recording: 'recording_sessions' } as const)[session.mode]
+  const countKey = ({ resume: 'resume_sessions', topic_drill: 'drill_sessions', jd_prep: 'job_prep_sessions', recording: 'recording_sessions', copilot: 'copilot_sessions' } as const)[session.mode]
   stats[countKey] = Number(stats[countKey] || 0) + 1
   const scoredAnswers = session.scores.filter((raw) => number(raw.score) !== undefined).length
   const answerCount = scoredAnswers || session.transcript.filter((message) => message.role === 'user' && message.content.trim()).length
@@ -377,7 +377,7 @@ function updateStats(profile: CandidateProfile, session: InterviewSession, extra
   const entry = { date: now.slice(0, 10), mode: session.mode, topic: session.topic, avg_score: avg, session_id: session.session_id, ...(Object.keys(dimensions).length ? { dimension_scores: dimensions } : {}) }
   stats.score_history.push(entry)
 
-  const windows: Record<string, [string, number]> = { topic_drill: ['drill_avg_score', 20], resume: ['resume_avg_score', 10], jd_prep: ['job_prep_avg_score', 10], recording: ['recording_avg_score', 20] }
+  const windows: Record<string, [string, number]> = { topic_drill: ['drill_avg_score', 20], resume: ['resume_avg_score', 10], jd_prep: ['job_prep_avg_score', 10], recording: ['recording_avg_score', 20], copilot: ['copilot_avg_score', 10] }
   for (const [mode, [key, window]] of Object.entries(windows)) {
     const value = roundedAverage(stats.score_history.filter((item) => item.mode === mode).map((item) => number(item.avg_score)).filter((item): item is number => item !== undefined).slice(-window))
     if (value !== undefined) stats[key] = value
