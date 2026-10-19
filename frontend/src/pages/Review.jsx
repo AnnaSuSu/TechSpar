@@ -527,7 +527,7 @@ export default function Review() {
 
   const handleRestart = async () => {
     const currentMode = mode || stateData.mode;
-    if (!currentMode || currentMode === "recording" || restartBusy.current) return;
+    if (!currentMode || (currentMode === "recording" || currentMode === "copilot") || restartBusy.current) return;
     restartBusy.current = true;
     setRestarting(true);
     try {
@@ -586,6 +586,7 @@ export default function Review() {
           if (
             data.mode === "topic_drill"
             || data.mode === "jd_prep"
+            || data.mode === "copilot"
             || (data.mode === "recording" && data.meta?.recording_mode === "dual")
           ) {
             setAnswers(inferAnswers(data.questions || [], data.transcript || []));
@@ -612,13 +613,14 @@ export default function Review() {
   }
 
   const currentMode = mode || stateData.mode;
+  const isCopilot = currentMode === "copilot";
   const isRecording = currentMode === "recording";
   const isJobPrep = currentMode === "jd_prep";
   const isRecordingDual = isRecording && (
     stateData.recording_mode === "dual" || meta?.recording_mode === "dual" || questions.length > 0
   );
-  const showDrill = currentMode === "topic_drill" || isRecordingDual;
-  const title = isRecording ? "录音复盘" : isJobPrep ? "JD 备面复盘" : showDrill ? "训练复盘" : "面试复盘";
+  const showDrill = currentMode === "topic_drill" || isRecordingDual || isCopilot;
+  const title = isCopilot ? "Copilot 实战复盘" : isRecording ? "录音复盘" : isJobPrep ? "JD 备面复盘" : showDrill ? "训练复盘" : "面试复盘";
 
   return (
     <div className="flex-1 px-4 py-8 md:px-6 md:py-10 max-w-3xl mx-auto w-full">
@@ -680,7 +682,7 @@ export default function Review() {
       </div>
 
       <div className="flex items-center gap-3 mt-6">
-        {currentMode && currentMode !== "recording" && (
+        {currentMode && currentMode !== "recording" && !isCopilot && (
           <Button variant="gradient" onClick={handleRestart} disabled={restarting}>
             <RotateCcw size={15} className={restarting ? "animate-spin" : ""} />
             {restarting ? "正在生成题目..." : "再次练习"}

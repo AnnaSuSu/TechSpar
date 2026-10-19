@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+import SessionHistory from "./SessionHistory";
 import PrepResultCards from "./PrepResultCards";
 import { PAGE_CLASS, formatFileSize } from "./shared";
 
@@ -288,6 +289,8 @@ export default function DetailView({ prepId: initialPrepId, onBack, onStartInter
           {error && (
             <div className="rounded-2xl border border-red/20 bg-red/10 px-4 py-3 text-sm text-red">{error}</div>
           )}
+
+          {prepId && <SessionHistory prepId={prepId} />}
 
           {isDone && status ? (
             <div className="space-y-5">

@@ -16,9 +16,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
+import SessionHistory from "./SessionHistory";
 import CopilotPanel from "./CopilotPanel";
 
 export default function RealtimePhase({ prepId, onBack }) {
+  const [ended, setEnded] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [endError, setEndError] = useState("");
   const [sessionId] = useState(() => crypto.randomUUID().slice(0, 12));
   const [conversation, setConversation] = useState([]);
   const [manualInput, setManualInput] = useState("");
@@ -104,7 +108,7 @@ export default function RealtimePhase({ prepId, onBack }) {
     stopListening,
     sendManualText,
     sendCandidateResponse,
-    disconnect,
+    endSession,
   } = useCopilotStream({ prepId, onUpdate: handleUpdate });
 
   useEffect(() => {
@@ -164,10 +168,22 @@ export default function RealtimePhase({ prepId, onBack }) {
     }
   };
 
-  const handleEnd = () => {
-    disconnect();
-    onBack();
+  const handleEnd = async () => {
+    setEnding(true);
+    setEndError("");
+    try { await endSession(); }
+    catch (error) { setEndError(error.message); }
+    finally { setEnding(false); setEnded(true); }
   };
+
+  if (ended) return (
+    <div className="flex-1 overflow-y-auto px-5 py-8 max-w-4xl w-full mx-auto space-y-6">
+      <div><h1 className="text-2xl font-semibold">面试已结束</h1><p className="mt-2 text-sm text-dim">可以保留实战记录，或手动生成复盘并写回长期画像。</p></div>
+      {endError && <p role="alert" className="text-sm text-red">{endError}</p>}
+      <SessionHistory prepId={prepId} initialSessionId={sessionId} />
+      <Button variant="outline" onClick={onBack}>返回准备详情</Button>
+    </div>
+  );
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -215,8 +231,8 @@ export default function RealtimePhase({ prepId, onBack }) {
           <Button size="icon" variant="ghost" className="rounded-2xl h-9 w-9" onClick={toggleFullscreen}>
             {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </Button>
-          <Button size="sm" variant="ghost" className="rounded-2xl" onClick={handleEnd}>
-            结束面试
+          <Button size="sm" variant="ghost" className="rounded-2xl" onClick={handleEnd} disabled={ending}>
+            {ending ? "正在保存记录..." : "结束面试"}
           </Button>
         </div>
       </div>
