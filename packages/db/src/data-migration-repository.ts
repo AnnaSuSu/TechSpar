@@ -9,7 +9,7 @@ const TABLES = {
   personal_documents: { primary: 'document_id', ddl: `CREATE TABLE IF NOT EXISTS personal_documents (document_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, filename TEXT NOT NULL, stored_name TEXT NOT NULL, extension TEXT NOT NULL, size_bytes INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'indexing', chunk_count INTEGER NOT NULL DEFAULT 0, error TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)` },
   personal_conversations: { primary: 'conversation_id', ddl: `CREATE TABLE IF NOT EXISTS personal_conversations (conversation_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT '新对话', messages TEXT NOT NULL DEFAULT '[]', created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)` },
   copilot_preps: { primary: 'prep_id', ddl: `CREATE TABLE IF NOT EXISTS copilot_preps (prep_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, company TEXT DEFAULT '', position TEXT DEFAULT '', jd_text TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'running', progress TEXT DEFAULT '', error TEXT DEFAULT '', result TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)` },
-  copilot_realtime_sessions: { primary: 'session_id', ddl: `CREATE TABLE IF NOT EXISTS copilot_realtime_sessions (session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, prep_id TEXT NOT NULL, conversation TEXT NOT NULL DEFAULT '[]', last_node_id TEXT, turn_count INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)` },
+  copilot_realtime_sessions: { primary: 'session_id', ddl: `CREATE TABLE IF NOT EXISTS copilot_realtime_sessions (session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, prep_id TEXT NOT NULL, conversation TEXT NOT NULL DEFAULT '[]', last_node_id TEXT, review_session_id TEXT, review_claimed_at TEXT, turn_count INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)` },
 } as const
 
 function exists(database: Database, table: string): boolean { return Boolean(database.query<{ present: number }, { $table: string }>("SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = $table").get({ $table: table })) }
@@ -66,6 +66,11 @@ export class BunDataMigrationRepository implements MigrationDatabase {
         for (const [table, spec] of Object.entries(TABLES)) {
           target.exec(spec.ddl)
           if (!exists(source, table)) continue
+          if (table === 'copilot_realtime_sessions') {
+            for (const column of ['review_session_id', 'review_claimed_at']) {
+              if (!columns(target, table).includes(column)) target.exec(`ALTER TABLE copilot_realtime_sessions ADD COLUMN ${column} TEXT`)
+            }
+          }
           const targetColumns = columns(target, table)
           const common = columns(source, table).filter((column) => targetColumns.includes(column))
           if (!common.includes(spec.primary) || !common.includes('user_id')) throw new Error(`${table} 表缺少主键或 user_id，无法合并`)
@@ -101,8 +106,7 @@ export class BunDataMigrationRepository implements MigrationDatabase {
         if (average !== undefined) history.push({ date: row.created_at.slice(0, 10), mode: row.mode, topic: row.topic, avg_score: average, session_id: row.session_id, ...(overall.dimension_scores && typeof overall.dimension_scores === 'object' ? { dimension_scores: overall.dimension_scores } : {}) })
       }
       const recent = history.slice(-30).map((item) => item.avg_score as number)
-      const realtimeCopilot = exists(database, 'copilot_realtime_sessions') ? database.query<{ total: number }, { $userId: string }>('SELECT COUNT(*) AS total FROM copilot_realtime_sessions WHERE user_id = $userId').get({ $userId: userId })?.total || 0 : 0
-      const copilotSessions = Math.max(counts.copilot || 0, realtimeCopilot)
+      const copilotSessions = counts.copilot || 0
       const modeAverages = Object.fromEntries(Object.entries(MODE_AVERAGES).flatMap(([mode, config]) => {
         const value = average(history.filter((item) => item.mode === mode).slice(-config.window).map((item) => item.avg_score as number))
         return value === undefined ? [] : [[config.key, value]]
@@ -114,7 +118,7 @@ export class BunDataMigrationRepository implements MigrationDatabase {
         return value === undefined ? [] : [[key, value]]
       }))
       return { stats: {
-        total_sessions: rows.length + Math.max(0, copilotSessions - (counts.copilot || 0)), total_answers: totalAnswers,
+        total_sessions: rows.length, total_answers: totalAnswers,
         resume_sessions: counts.resume || 0, drill_sessions: counts.topic_drill || 0, job_prep_sessions: counts.jd_prep || 0,
         recording_sessions: counts.recording || 0, copilot_sessions: copilotSessions, score_history: history,
         ...modeAverages, ...(recent.length ? { avg_score: average(recent) } : {}), ...(Object.keys(dimensionScores).length ? { dimension_scores: dimensionScores } : {}),

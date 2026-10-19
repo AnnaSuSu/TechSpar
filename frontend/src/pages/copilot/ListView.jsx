@@ -40,6 +40,7 @@ export default function ListView({ onNew, onSelect }) {
 
   const handleDelete = async (prepId, event) => {
     event.stopPropagation();
+    if (!window.confirm("删除这份准备及其所有实战记录？已生成的复盘、对话副本和长期画像会保留。")) return;
     try {
       await deleteCopilotPrep(prepId);
       setItems((prev) => prev.filter((item) => item.prep_id !== prepId));

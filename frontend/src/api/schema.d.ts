@@ -1792,7 +1792,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+                        mode: "resume" | "topic_drill" | "jd_prep" | "recording" | "copilot";
                         topic?: string | null;
                         num_questions?: number;
                         divergence?: number;
@@ -2298,7 +2298,7 @@ export interface paths {
                 query?: {
                     limit?: number | null;
                     offset?: number | null;
-                    mode?: "resume" | "topic_drill" | "jd_prep" | "recording";
+                    mode?: "resume" | "topic_drill" | "jd_prep" | "recording" | "copilot";
                     topic?: string;
                 };
                 header?: never;
@@ -3286,6 +3286,397 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/copilot/prep/{prep_id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    prep_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Copilot session list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            session_id: string;
+                            prep_id: string;
+                            /** @enum {string} */
+                            status: "active" | "stopped";
+                            hr_turns: number;
+                            candidate_turns: number;
+                            created_at: string;
+                            updated_at: string;
+                            /** @description Still receiving turns; review and deletion return 409 until it ends. */
+                            in_progress: boolean;
+                            review_session_id: string | null;
+                            /** @description null: never reviewed; missing: the linked review was deleted and can be generated again. */
+                            review_status: ("pending" | "done" | "error") | "missing" | null;
+                        }[];
+                    };
+                };
+                /** @description Request could not be completed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/copilot/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Copilot session get */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            session_id: string;
+                            prep_id: string;
+                            /** @enum {string} */
+                            status: "active" | "stopped";
+                            hr_turns: number;
+                            candidate_turns: number;
+                            created_at: string;
+                            updated_at: string;
+                            /** @description Still receiving turns; review and deletion return 409 until it ends. */
+                            in_progress: boolean;
+                            review_session_id: string | null;
+                            /** @description null: never reviewed; missing: the linked review was deleted and can be generated again. */
+                            review_status: ("pending" | "done" | "error") | "missing" | null;
+                            company: string;
+                            position: string;
+                            conversation: {
+                                /** @enum {string} */
+                                role: "hr" | "candidate";
+                                text: string;
+                                at: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Copilot session delete */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            ok: true;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/copilot/sessions/{session_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Copilot session review */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            copilot_session_id: string;
+                            review_session_id: string;
+                            /** @enum {string} */
+                            mode: "copilot";
+                            /** @enum {string} */
+                            status: "pending" | "done" | "error";
+                            created: boolean;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Request could not be completed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            detail: string;
+                        };
+                    };
+                };
+                /** @description Validation Error */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HTTPValidationError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/copilot/prep": {
         parameters: {
             query?: never;
@@ -3787,7 +4178,7 @@ export interface components {
         InterviewReviewSubmissionResponse: {
             session_id: string;
             /** @enum {string} */
-            mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+            mode: "resume" | "topic_drill" | "jd_prep" | "recording" | "copilot";
             /** @enum {string} */
             status: "pending" | "done";
         };
@@ -3807,7 +4198,7 @@ export interface components {
         InterviewResumeResponse: {
             session_id: string;
             /** @enum {string} */
-            mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+            mode: "resume" | "topic_drill" | "jd_prep" | "recording" | "copilot";
             topic?: string | null;
             /** @enum {string} */
             status: "prepared" | "ongoing" | "ended" | "reviewing" | "reviewed" | "review_failed";
@@ -3843,7 +4234,7 @@ export interface components {
         InterviewSessionResponse: {
             session_id: string;
             /** @enum {string} */
-            mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+            mode: "resume" | "topic_drill" | "jd_prep" | "recording" | "copilot";
             topic?: string | null;
             /** @description Persisted session metadata; legacy/provider extensions are preserved. */
             meta: {
@@ -3904,7 +4295,7 @@ export interface components {
             /** @enum {string} */
             status: "done";
             /** @enum {string} */
-            type: "resume_review" | "drill_review" | "jd_review" | "recording_review" | "review";
+            type: "resume_review" | "drill_review" | "jd_review" | "recording_review" | "copilot_review" | "review";
             error?: string | null;
             /** @description Omitted when a reviewed session short-circuits task polling. */
             session_id?: string;
@@ -3939,7 +4330,7 @@ export interface components {
             items: {
                 session_id: string;
                 /** @enum {string} */
-                mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+                mode: "resume" | "topic_drill" | "jd_prep" | "recording" | "copilot";
                 topic?: string | null;
                 /** @description Persisted session metadata; legacy/provider extensions are preserved. */
                 meta: {
@@ -4215,7 +4606,7 @@ export interface components {
         ProfileTopicHistoryResponse: {
             session_id: string;
             /** @enum {string} */
-            mode: "resume" | "topic_drill" | "jd_prep" | "recording";
+            mode: "resume" | "topic_drill" | "jd_prep" | "recording" | "copilot";
             topic?: string | null;
             /** @description Persisted session metadata; legacy/provider extensions are preserved. */
             meta: {

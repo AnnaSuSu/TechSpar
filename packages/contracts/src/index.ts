@@ -226,3 +226,5 @@ export type RegisterRequest = z.infer<typeof RegisterRequestSchema>
 export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>
 export type CopilotClientMessage = z.infer<typeof CopilotClientMessageSchema>
 export type SettingsViewContract = z.infer<typeof SettingsViewSchema>
+
+export * from './copilot-sessions.ts'

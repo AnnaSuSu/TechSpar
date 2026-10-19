@@ -245,10 +245,44 @@ describe('Copilot contracts over real Bun WebSockets', () => {
       h.ws.close()
       await within(cleaned.promise)
     }
+    expect((await repository.loadSession('live-1', 'user-a'))?.status).toBe('stopped')
     expect(asrSocket.closeCalls).toBe(1)
     expect(asrSocket.listenerCount).toBe(0)
     asrSocket.open()
     expect(asrSocket.sent).toEqual([])
+  })
+
+  test('a record deleted during a live connection stays deleted after later turns and close', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'techspar-ws-delete-'))
+    disposers.push(() => rm(directory, { recursive: true, force: true }))
+    const repository = new BunCopilotRepository(join(directory, 'test.db'))
+    repository.initialize()
+    disposers.push(() => repository.close())
+    await repository.createPrep({ prepId: 'ready', userId: 'user-a', company: '', position: '', jdText: '合成JD' })
+    await repository.completePrep('ready', 'user-a', { question_strategy_tree: { nodes: {} } })
+    const cleaned = Promise.withResolvers<void>()
+    const service = new CopilotRealtimeService(dependencyStub<CopilotDependencies>({
+      repository,
+      embeddings: dependencyStub<CopilotDependencies['embeddings']>({ async embed(_context: RequestContext, texts: readonly string[]) { return texts.map(() => Float32Array.from([1, 0])) } }),
+      settings: dependencyStub<CopilotDependencies['settings']>({ async loadProvider() { return { services: { dashscope_api_key: '', tavily_api_key: '', oss_access_key_id: '', oss_access_key_secret: '', oss_bucket: '', oss_endpoint: '' } } } }),
+      ai: { async complete() { return '{}' }, async *stream() { yield '合成回答' } },
+    }))
+    const h = await socketHarness({ connect(ctx, id, emit) {
+      const connection = service.connect(ctx, id, emit)
+      return { handle: (message) => connection.handle(message), audio: (bytes) => connection.audio(bytes), async close() { await connection.close(); cleaned.resolve() } }
+    } })
+    const answers = () => h.events.filter((event) => (event as { type: string }).type === 'answer_done').length
+    h.send({ type: 'start', prep_id: 'ready' })
+    await h.until(() => h.events.some((event) => (event as { type: string }).type === 'started'))
+    h.send({ type: 'manual', text: '第一个问题' })
+    await h.until(() => answers() === 1)
+    expect(await repository.deleteSession('live-1', 'user-a')).toBeTrue()
+    h.send({ type: 'manual', text: '删除后的问题' })
+    await h.until(() => answers() === 2)
+    expect(await repository.loadSession('live-1', 'user-a')).toBeUndefined()
+    h.ws.close()
+    await within(cleaned.promise)
+    expect(await repository.loadSession('live-1', 'user-a')).toBeUndefined()
   })
 
   test('real service matches every fixture, preserves roles and recovers the user conversation', async () => {
@@ -319,7 +353,9 @@ describe('Copilot contracts over real Bun WebSockets', () => {
     await resumed.until(() => resumed.events.some((event) => (event as { message?: string }).message === 'ASR 触发的模型流错误'))
     expect(resumed.events).toContainEqual({ type: 'answer_chunk', text: '部分回答' })
     expect(resumed.events).toContainEqual(expect.objectContaining({ type: 'answer_done', chunk_count: 1 }))
+    resumed.send({ type: 'candidate_response', text: '结束前的最后一句回答' })
     resumed.send({ type: 'stop' })
     await resumed.until(() => resumed.events.some((event) => (event as { type: string }).type === 'stopped'))
+    expect((await repository.loadSession('live-1', 'user-a'))?.conversation.at(-1)?.text).toBe('结束前的最后一句回答')
   })
 })
