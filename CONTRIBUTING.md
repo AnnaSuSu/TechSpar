@@ -21,6 +21,8 @@ bun install --frozen-lockfile
 cp .env.example .env
 ```
 
+首次启动 Web API 前，请先修改 `.env` 中的 `JWT_SECRET`、`VOICEPRINT_ENCRYPTION_KEY` 和 `DEFAULT_PASSWORD`，不要保留示例占位值。`JWT_SECRET` 至少需要 32 个字符的随机值，`DEFAULT_PASSWORD` 至少需要 12 个字符。
+
 Web 开发使用两个终端：
 
 ```bash
@@ -34,7 +36,7 @@ Electron 开发由一个命令启动 Vite、Hono sidecar 和桌面进程：
 bun run dev:desktop
 ```
 
-服务端开发环境首次登录可使用 README 中的默认账号，登录后应立即在设置页修改默认密码。Electron 会为本机生成随机凭证并自动进入，不使用固定默认密码。
+全新服务端开发环境初始化后，使用 `.env` 中的 `DEFAULT_EMAIL` 和自行设置的 `DEFAULT_PASSWORD` 登录；服务端不提供固定默认密码。Electron 会为本机生成随机凭证并自动进入，不使用固定默认密码。
 
 ## 项目结构
 
