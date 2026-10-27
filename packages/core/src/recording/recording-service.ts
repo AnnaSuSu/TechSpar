@@ -7,7 +7,7 @@ import { validateOverall, validateScoreDetails } from '../interview/structured-r
 import { assertContextActive, type RequestContext } from '../kernel/context.ts'
 import { STRUCTURED_CHAT_OPTIONS } from '../provider/ports.ts'
 import { formatDualReview, formatSoloReview } from './formatters.ts'
-import type { RecordingAnalyzeInput } from './model.ts'
+import type { RecordingAnalyzeInput, ConversationAnalyzeInput } from './model.ts'
 import type { RecordingDependencies, RecordingUseCases } from './ports.ts'
 import { RECORDING_DUAL_EVAL_PROMPT, RECORDING_SOLO_EVAL_PROMPT, RECORDING_STRUCTURE_PROMPT } from './prompts.ts'
 
@@ -79,18 +79,38 @@ export class RecordingService implements RecordingUseCases {
   }
 
   async analyze(context: RequestContext, input: RecordingAnalyzeInput): Promise<{ session_id: string; status: 'pending' }> {
+    return this.submit(context, input, this.deps.ids.next(), 'recording')
+  }
+
+  async analyzeConversation(context: RequestContext, input: ConversationAnalyzeInput): Promise<{ session_id: string; status: 'pending' }> {
+    return this.submit(context, { ...input, recording_mode: 'dual' }, input.sessionId, 'copilot', input.meta)
+  }
+
+  /** Finish a submission interrupted between storing its snapshot and enqueueing. */
+  async recoverConversation(context: RequestContext, sessionId: string): Promise<boolean> {
+    const userId = id(context)
+    const session = await this.deps.sessions.get(sessionId, userId)
+    if (!session || session.mode !== 'copilot') return false
+    if ((session.status === 'ongoing' || session.status === 'reviewing') && !await this.deps.tasks.get(sessionId, userId)) {
+      await this.deps.sessions.updateStatus(sessionId, userId, 'reviewing')
+      await this.deps.tasks.enqueue({ taskId: sessionId, userId, type: 'copilot_review', payload: { session_id: sessionId } })
+    }
+    return true
+  }
+
+  private async submit(context: RequestContext, input: RecordingAnalyzeInput, sessionId: string, mode: 'recording' | 'copilot', source: Record<string, unknown> = {}): Promise<{ session_id: string; status: 'pending' }> {
     const userId = id(context)
     const transcript = input.transcript.trim()
     if (!transcript) throw new AppError('Transcript must not be blank.', 400)
-    const sessionId = this.deps.ids.next()
-    const meta = { recording_mode: input.recording_mode || 'dual', company: (input.company || '').trim(), position: (input.position || '').trim(), source_transcript: input.transcript }
-    await this.deps.sessions.create({ sessionId, userId, mode: 'recording', meta })
+    const meta = { ...source, recording_mode: input.recording_mode || 'dual', company: (input.company || '').trim(), position: (input.position || '').trim(), source_transcript: input.transcript }
+    await this.deps.sessions.create({ sessionId, userId, mode, meta })
     try {
       await this.deps.sessions.appendMessage(sessionId, userId, 'user', input.transcript)
       await this.deps.sessions.updateStatus(sessionId, userId, 'reviewing')
-      await this.deps.tasks.enqueue({ taskId: sessionId, userId, type: 'recording_review', payload: { session_id: sessionId } })
+      await this.deps.tasks.enqueue({ taskId: sessionId, userId, type: mode === 'copilot' ? 'copilot_review' : 'recording_review', payload: { session_id: sessionId } })
     } catch (error) {
-      await this.deps.sessions.updateStatus(sessionId, userId, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })
+      if (mode === 'copilot') await this.deps.sessions.delete(sessionId, userId)
+      else await this.deps.sessions.updateStatus(sessionId, userId, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })
       throw error
     }
     return { session_id: sessionId, status: 'pending' }

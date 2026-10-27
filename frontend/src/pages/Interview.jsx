@@ -120,7 +120,8 @@ export default function Interview() {
         if (data.status === "reviewing") {
           const type = data.mode === "resume" ? "resume_review"
             : data.mode === "jd_prep" ? "jd_review"
-              : data.mode === "recording" ? "recording" : "drill_review";
+              : data.mode === "copilot" ? "copilot_review"
+                : data.mode === "recording" ? "recording" : "drill_review";
           startTask(sessionId, type, "复盘生成中");
         }
       } catch (err) {

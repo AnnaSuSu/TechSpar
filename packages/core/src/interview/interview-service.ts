@@ -364,7 +364,7 @@ export class InterviewService implements InterviewUseCases {
   }
 
   private taskType(mode: InterviewMode): string {
-    return ({ resume: 'resume_review', topic_drill: 'drill_review', jd_prep: 'jd_review', recording: 'recording_review' } as const)[mode]
+    return ({ resume: 'resume_review', topic_drill: 'drill_review', jd_prep: 'jd_review', recording: 'recording_review', copilot: 'copilot_review' } as const)[mode]
   }
 
   private async dispatch(session: InterviewSession, answersOverride?: InterviewAnswer[], profileOnly = false): Promise<InterviewReviewSubmissionResult> {

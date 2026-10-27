@@ -135,6 +135,30 @@ export default function useCopilotStream({ prepId, onUpdate }: CopilotStreamOpti
     ws?.close();
     setConnected(false);
   }, [stopListening]);
+  // Wait for the server to persist the final turns and stopped state before
+  // exposing the review action. Closing immediately can discard queued input.
+  const endSession = useCallback(async () => {
+    stopListening();
+    clearTimeout(reconnectTimer.current);
+    manualClose.current = true;
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) { disconnect(); return; }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => { clearTimeout(timer); ws.removeEventListener('message', onMessage); ws.removeEventListener('close', onClose); };
+        const onMessage = (event: MessageEvent) => {
+          try {
+            if (decodeCopilotEvent(event.data).type === 'stopped') { cleanup(); resolve(); }
+          } catch { /* The normal event handler reports invalid messages. */ }
+        };
+        const onClose = () => { cleanup(); reject(new Error('连接已断开，请在实战记录中确认保存状态后生成复盘')); };
+        const timer = setTimeout(() => { cleanup(); reject(new Error('结束确认超时，请在实战记录中刷新状态')); }, 10_000);
+        ws.addEventListener('message', onMessage);
+        ws.addEventListener('close', onClose);
+        ws.send(JSON.stringify({ type: 'stop' }));
+      });
+    } finally { disconnect(); }
+  }, [disconnect, stopListening]);
   useEffect(() => () => disconnect(), [disconnect]);
-  return { connected, listening, starting, audioReady, audioError, levels, asrText, connect, startListening, stopListening, sendManualText, sendCandidateResponse, disconnect };
+  return { connected, listening, starting, audioReady, audioError, levels, asrText, connect, startListening, stopListening, sendManualText, sendCandidateResponse, disconnect, endSession };
 }

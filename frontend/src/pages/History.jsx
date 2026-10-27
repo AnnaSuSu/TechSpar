@@ -18,6 +18,7 @@ const MODE_BADGES = {
   resume: { text: "简历面试", variant: "default" },
   topic_drill: { text: "专项训练", variant: "success" },
   jd_prep: { text: "JD 备面", variant: "blue" },
+  copilot: { text: "Copilot 实战", variant: "default" },
   recording: { text: "录音复盘", variant: "blue" },
 };
 
@@ -26,6 +27,7 @@ const FILTER_OPTIONS = [
   { key: "resume", label: "简历面试" },
   { key: "topic_drill", label: "专项训练" },
   { key: "jd_prep", label: "JD 备面" },
+  { key: "copilot", label: "Copilot 实战" },
   { key: "recording", label: "录音复盘" },
 ];
 
@@ -135,10 +137,12 @@ export default function History() {
       const label = session.mode === "resume"
         ? "简历面试复盘生成中"
         : session.mode === "jd_prep" ? "JD 备面复盘生成中"
+          : session.mode === "copilot" ? "Copilot 实战复盘生成中"
           : session.mode === "recording" ? "录音复盘生成中" : "专项训练复盘生成中";
       const type = session.mode === "resume"
         ? "resume_review"
         : session.mode === "jd_prep" ? "jd_review"
+          : session.mode === "copilot" ? "copilot_review"
           : session.mode === "recording" ? "recording" : "drill_review";
       startTask(session.session_id, type, label);
       // Optimistically reflect the new status so the row updates without a full refetch.

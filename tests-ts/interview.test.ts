@@ -550,3 +550,19 @@ describe('job preparation saved lifecycle', () => {
     h.sessions.close(); h.states.close()
   })
 })
+
+test('retries Copilot snapshots using copilot_review and exposes their history and task type', async () => {
+  const path = await databasePath()
+  const sessions = new BunInterviewSessionRepository(path); sessions.initialize()
+  const states = new BunResumeInterviewStateRepository(path); states.initialize()
+  const dispatched: TaskRecord[] = []
+  const service = new InterviewService(interviewDependencies({ sessions, states, ai: new FakeAi([]), tasks: taskDispatcher(dispatched) }))
+  try {
+    await sessions.create({ sessionId: 'copilot-retry', userId: 'user-a', mode: 'copilot', meta: { source_transcript: '面试官: 问题\n候选人: 回答', recording_mode: 'dual' } })
+    await sessions.updateStatus('copilot-retry', 'user-a', 'review_failed')
+    await service.generateReview(context, 'copilot-retry')
+    expect(dispatched).toMatchObject([{ type: 'copilot_review', task_id: 'copilot-retry' }])
+    expect(await service.task(context, 'copilot-retry')).toMatchObject({ type: 'copilot_review', status: 'pending' })
+    expect(await service.history(context, { mode: 'copilot' })).toMatchObject({ total: 1, items: [{ mode: 'copilot' }] })
+  } finally { sessions.close(); states.close() }
+})
