@@ -1,7 +1,5 @@
 # 保留并重建会话记忆
 
-PR 标题：`fix(memory): preserve session memories across embedding changes and index rebuilds`
-
 ## 问题
 
 保存新的 Embedding 模型或手动重建索引时，`KnowledgeIndexService.invalidateUser`
@@ -64,10 +62,10 @@ bun run check
 
 ## 边界
 
-- 只修复 Embedding 设置变化与手动索引重建；个人归档导入仍由后续 PR 处理。
+- 本文说明 Embedding 设置变化与手动索引重建，不涵盖个人归档导入流程。
 - 继续沿用现有模型变化判定；完整模型签名、同名模型更换 API 地址和维度身份
-  属于 PR-2，本改动的失效标记不能检测未经过失效流程的向量空间变化。
-- 保留摘要/洞察正文；`weak_point` 仍由画像重建，三种写入路径的统一不在此 PR。
+  未引入新的检测机制。失效标记不能检测未经过失效流程的向量空间变化。
+- 保留摘要/洞察正文；`weak_point` 继续从画像重建。
 - 保持逐步骤、逐会话提交语义。失败前已完成的会话可以检索，失败会话保持失效；
   再次重建会重新处理保留的全部正文。
 - 完成事件的 `last_rebuild_at` 延续已有的尝试结束时间语义，不代表所有步骤成功；
