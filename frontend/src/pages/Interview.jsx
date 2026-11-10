@@ -340,6 +340,7 @@ export default function Interview() {
       )}
       onClick={voice.toggle}
       disabled={voice.isTranscribing}
+      aria-label={voice.isListening ? "停止录音并转成文字" : voice.isTranscribing ? "正在识别语音" : "语音输入"}
       title={voice.isListening ? "停止录音" : voice.isTranscribing ? "正在识别..." : "语音输入"}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -533,6 +534,8 @@ export default function Interview() {
                     </div>
                   )}
                 </div>
+                {drillVoice.error && <p role="alert" className="text-sm text-red">{drillVoice.error}</p>}
+                {drillVoice.isListening && <p role="status" className="text-xs text-dim">正在录音，再次点击麦克风停止并转成文字。</p>}
                 <div className="flex items-center justify-end gap-3">
                   {isDrill && (selfAssess ? (
                     <div className="mr-auto flex items-center gap-2">
@@ -676,7 +679,7 @@ export default function Interview() {
         <div ref={chatEndRef} />
       </div>
 
-        <div className="px-4 pt-4 pb-5 md:px-6 md:pb-6 flex justify-center">
+        <div className="px-4 pt-4 pb-5 md:px-6 md:pb-6 flex flex-col items-center gap-2">
           <div className="relative w-full max-w-3xl">
             <textarea
               ref={textareaRef}
@@ -694,6 +697,8 @@ export default function Interview() {
               </div>
             )}
           </div>
+          {chatVoice.error && <p role="alert" className="w-full max-w-3xl text-sm text-red">{chatVoice.error}</p>}
+          {chatVoice.isListening && <p role="status" className="w-full max-w-3xl text-xs text-dim">正在录音，再次点击麦克风停止并转成文字。</p>}
         </div>
     </div>
   );
