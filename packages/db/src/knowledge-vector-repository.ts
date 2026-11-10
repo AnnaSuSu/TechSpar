@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite'
-import type { DrillSessionProjection, KnowledgeVectorRepository, ProfileMemoryEntry, ProfileVectorMemoryPort, VectorChunk } from '@techspar/core'
+import type { DrillSessionProjection, KnowledgeVectorRepository, ProfileMemoryEntry, ProfileVectorMemoryPort, SessionMemoryChunk, VectorChunk } from '@techspar/core'
 
 function toBlob(vector: Float32Array): Uint8Array {
   const bytes = new Uint8Array(vector.length * 4)
@@ -140,16 +140,51 @@ export class BunKnowledgeVectorRepository implements KnowledgeVectorRepository, 
     const allowed = input.chunkTypes?.length ? new Set(input.chunkTypes) : undefined
     return rows.flatMap((row) => {
       if (allowed && !allowed.has(row.chunk_type)) return []
+      const details = metadata(row.metadata)
+      if (details.embedding_stale) return []
       return [{
         chunkType: row.chunk_type,
         content: row.content,
         ...(row.topic ? { topic: row.topic } : {}),
         ...(row.session_id ? { sessionId: row.session_id } : {}),
-        metadata: metadata(row.metadata),
+        metadata: details,
         embedding: fromBlob(row.embedding),
         createdAt: row.created_at || new Date(0).toISOString(),
       }]
     })
+  }
+
+  async invalidateUserVectors(userId: string): Promise<void> {
+    this.sqlite.transaction(() => {
+      // Session text is source data, not a disposable index. Keep its original
+      // attribution and timestamps, but prevent stale embeddings from being read.
+      this.sqlite.query(`UPDATE memory_vectors
+        SET metadata = json_set(CASE WHEN json_valid(metadata) AND json_type(metadata) = 'object' THEN metadata ELSE '{}' END, '$.embedding_stale', $generation)
+        WHERE user_id = $userId AND chunk_type IN ('session_summary', 'insight')`).run({ $userId: userId, $generation: crypto.randomUUID() })
+      this.sqlite.query("DELETE FROM memory_vectors WHERE user_id = $userId AND chunk_type NOT IN ('session_summary', 'insight')").run({ $userId: userId })
+      this.sqlite.query('DELETE FROM question_embeddings WHERE user_id = $userId').run({ $userId: userId })
+      const hasDocuments = this.sqlite.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'personal_documents'").get()
+      if (hasDocuments) this.sqlite.query("UPDATE personal_documents SET status = 'needs_reindex', chunk_count = 0, error = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_id = $userId").run({ $userId: userId })
+    })()
+  }
+
+  async listSessionMemoryChunks(userId: string): Promise<SessionMemoryChunk[]> {
+    return this.sqlite.query<SessionMemoryChunk, { $userId: string }>(`
+      SELECT id, session_id AS sessionId, content, metadata AS version FROM memory_vectors
+      WHERE user_id = $userId AND chunk_type IN ('session_summary', 'insight') ORDER BY id
+    `).all({ $userId: userId })
+  }
+
+  async updateSessionMemoryEmbeddings(userId: string, chunks: readonly { id: number; version: string | null; embedding: Float32Array }[]): Promise<void> {
+    this.sqlite.transaction(() => {
+      const statement = this.sqlite.query(`UPDATE memory_vectors
+        SET embedding = $embedding, metadata = json_remove(CASE WHEN json_valid(metadata) AND json_type(metadata) = 'object' THEN metadata ELSE '{}' END, '$.embedding_stale')
+        WHERE id = $id AND user_id = $userId AND metadata IS $version AND chunk_type IN ('session_summary', 'insight')`)
+      for (const chunk of chunks) {
+        const result = statement.run({ $id: chunk.id, $userId: userId, $version: chunk.version, $embedding: toBlob(chunk.embedding) })
+        if (result.changes !== 1) throw new Error('Session memory changed during index rebuild; retry the rebuild')
+      }
+    })()
   }
 
   async deleteChunks(userId: string, chunkType?: string, topic?: string): Promise<void> {

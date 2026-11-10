@@ -106,6 +106,7 @@ describe('HTTP response fixtures from real services', () => {
       embeddings: { async embed(_context, texts) { return texts.map(() => Float32Array.from([1, 0])) } },
       index: { async invalidateUser() {}, resetEmbeddingClient() {}, async rebuildTopic() {} },
       vectors: dependencyStub<KnowledgeVectorRepository>({
+        async listSessionMemoryChunks() { return [] },
         async replaceChunks(input) { chunks.set(`${input.userId}:${input.chunkType}`, input.chunks) },
       }),
       knowledge: dependencyStub<KnowledgeStore>({

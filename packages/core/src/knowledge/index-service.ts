@@ -68,7 +68,7 @@ export class KnowledgeIndexService implements KnowledgeIndex, KnowledgeQuery, Ve
   }
 
   async invalidateUser(userId: string): Promise<void> {
-    await Promise.all([this.vectors.deleteChunks(userId), this.vectors.clearQuestionEmbeddings(userId)])
+    await this.vectors.invalidateUserVectors(userId)
   }
 
   invalidateTopic(userId: string, topic: string): Promise<void> {

@@ -4763,6 +4763,7 @@ export interface components {
             /** @constant */
             done: true;
             rebuilt: {
+                session_memories: boolean;
                 weak_points: boolean;
                 personal_documents: boolean;
                 topics: string[];
