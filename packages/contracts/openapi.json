@@ -2494,6 +2494,9 @@
               "rebuilt": {
                 "type": "object",
                 "properties": {
+                  "session_memories": {
+                    "type": "boolean"
+                  },
                   "weak_points": {
                     "type": "boolean"
                   },
@@ -2508,6 +2511,7 @@
                   }
                 },
                 "required": [
+                  "session_memories",
                   "weak_points",
                   "personal_documents",
                   "topics"

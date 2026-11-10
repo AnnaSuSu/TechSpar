@@ -61,7 +61,7 @@ describe('phase three event contracts', () => {
     const core: IndexRebuildEvent[] = [
       { completed: 0, total: 1, label: '', status: 'running' }, { completed: 1, total: 1, label: '', status: 'done' },
       { completed: 1, total: 1, label: '', status: 'error', error: 'step failed' },
-      { done: true, rebuilt: { weak_points: false, personal_documents: false, topics: [] }, last_rebuild_at: '2026-01-01T00:00:00' },
+      { done: true, rebuilt: { session_memories: true, weak_points: false, personal_documents: false, topics: [] }, last_rebuild_at: '2026-01-01T00:00:00' },
       { fatal: true, error: 'failed' },
     ]
     expect<unknown>(core.map((event) => IndexRebuildEventSchema.parse(event))).toEqual(core)

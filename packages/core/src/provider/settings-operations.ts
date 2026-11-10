@@ -1,9 +1,10 @@
 import type { IndexRebuildEvent } from './events.ts'
 import { AuthenticationError } from '../kernel/errors.ts'
+import { assertContextActive } from '../kernel/context.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
 import { finiteNumber, identifier, record, requiredText, uniqueIds, StructuredOutputError } from '../kernel/structured-output.ts'
 import type { RequestContext } from '../kernel/context.ts'
-import type { KnowledgeVectorRepository, KnowledgeStore } from '../knowledge/ports.ts'
+import type { KnowledgeVectorRepository, KnowledgeStore, SessionMemoryChunk } from '../knowledge/ports.ts'
 import type { PersonalAgentUseCases } from '../personal-agent/ports.ts'
 import type { ProfileUseCases } from '../profile/ports.ts'
 import { embeddingModeOf, normalizeEmbeddingSettings } from './config.ts'
@@ -92,15 +93,32 @@ export class SettingsOperationsService implements SettingsOperationsUseCases {
     const id = userId(context)
     try {
       const topics = await this.deps.knowledge.loadTopics(id)
-      const plan: Array<[string, string]> = [['cleanup', '清理旧向量'], ['weak_points', '记忆 / 薄弱点']]
+      const plan: Array<[string, string]> = [['cleanup', '清理旧向量'], ['session_memories', '历史会话记忆'], ['weak_points', '记忆 / 薄弱点']]
       if (await this.deps.personal.hasDocuments(context)) plan.push(['personal_documents', '个人资料库'])
       for (const [key, topic] of Object.entries(topics)) plan.push([`topic:${key}`, `知识库 · ${topic.name || key}`])
-      const result: { weak_points: boolean; personal_documents: boolean; topics: string[] } = { weak_points: false, personal_documents: false, topics: [] }
+      const result = { session_memories: false, weak_points: false, personal_documents: false, topics: [] as string[] }
       let completed = 0
       for (const [key, label] of plan) {
         yield { completed, total: plan.length, label, status: 'running' }
         try {
+          await assertContextActive(context)
           if (key === 'cleanup') await this.deps.index.invalidateUser(id)
+          else if (key === 'session_memories') {
+            const sessions = new Map<string, SessionMemoryChunk[]>()
+            for (const chunk of await this.deps.vectors.listSessionMemoryChunks(id)) {
+              const key = chunk.sessionId === null ? `row:${chunk.id}` : `session:${chunk.sessionId}`
+              const entries = sessions.get(key) || []
+              entries.push(chunk); sessions.set(key, entries)
+            }
+            for (const chunks of sessions.values()) {
+              const vectors = await this.deps.embeddings.embed(context, chunks.map(chunk => chunk.content))
+              const dimension = vectors[0]?.length || 0
+              if (vectors.length !== chunks.length || !dimension || vectors.some(vector => vector.length !== dimension || !vector.every(Number.isFinite))) throw new Error('Invalid memory embeddings')
+              await assertContextActive(context)
+              await this.deps.vectors.updateSessionMemoryEmbeddings(id, chunks.map((chunk, index) => ({ id: chunk.id, version: chunk.version, embedding: vectors[index]! })))
+            }
+            result.session_memories = true
+          }
           else if (key === 'weak_points') {
             const profile = await this.deps.profile.get(context)
             const points = profile.weak_points.filter((point) => !point.improved && !point.archived).map((point) => `${point.topic || '综合'}: ${point.point}`)
@@ -110,7 +128,12 @@ export class SettingsOperationsService implements SettingsOperationsUseCases {
           } else if (key === 'personal_documents') { await this.deps.personal.reindexAll(context); result.personal_documents = true }
           else if (key.startsWith('topic:')) { const topic = key.slice(6); await this.deps.index.rebuildTopic(context, topic); result.topics.push(topic) }
           completed += 1; yield { completed, total: plan.length, label, status: 'done' }
-        } catch (error) { completed += 1; yield { completed, total: plan.length, label, status: 'error', error: error instanceof Error ? error.message : String(error) } }
+        } catch (error) {
+          await assertContextActive(context)
+          completed += 1; yield { completed, total: plan.length, label, status: 'error', error: error instanceof Error ? error.message : String(error) }
+          // No step may make retained vectors readable if invalidation failed.
+          if (key === 'cleanup') throw error
+        }
       }
       const now = new Date().toISOString().slice(0, 19)
       await this.deps.settings.saveLastReindexAt(id, now)

@@ -208,7 +208,7 @@ describe('settings operations', () => {
     const service = new SettingsOperationsService({
       chats: {}, embeddingDrivers: {}, embeddings: { async embed(_context: unknown, texts: string[]) { return texts.map(() => Float32Array.from([1])) } },
       index: { async invalidateUser(id: string) { calls.push(`invalidate:${id}`) }, async rebuildTopic(_context: unknown, topic: string) { calls.push(`topic:${topic}`) }, resetEmbeddingClient() {} },
-      vectors: { async replaceChunks(input: { chunkType: string }) { calls.push(`vectors:${input.chunkType}`) } },
+      vectors: { async listSessionMemoryChunks() { return [] }, async replaceChunks(input: { chunkType: string }) { calls.push(`vectors:${input.chunkType}`) } },
       knowledge: { async loadTopics() { return { typescript: { name: 'TypeScript' } } } },
       personal: { async hasDocuments() { return false } },
       profile: { async get() { return { weak_points: [{ point: '事件循环', topic: 'runtime', improved: false, archived: false }] } } },
@@ -216,7 +216,7 @@ describe('settings operations', () => {
     } as never)
     const events: Array<Record<string, unknown>> = []
     for await (const event of service.rebuildIndex({ requestId: 'test', userId: 'user', signal: new AbortController().signal })) events.push(event)
-    expect(events.at(-1)).toMatchObject({ done: true, rebuilt: { weak_points: true, personal_documents: false, topics: ['typescript'] } })
+    expect(events.at(-1)).toMatchObject({ done: true, rebuilt: { session_memories: true, weak_points: true, personal_documents: false, topics: ['typescript'] } })
     expect(calls).toContain('invalidate:user')
     expect(calls).toContain('vectors:weak_point')
     expect(calls).toContain('topic:typescript')

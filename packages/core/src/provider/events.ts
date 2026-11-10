@@ -6,5 +6,5 @@ export type IndexRebuildProgress = {
 
 export type IndexRebuildEvent =
   | IndexRebuildProgress
-  | { done: true; rebuilt: { weak_points: boolean; personal_documents: boolean; topics: string[] }; last_rebuild_at: string }
+  | { done: true; rebuilt: { session_memories: boolean; weak_points: boolean; personal_documents: boolean; topics: string[] }; last_rebuild_at: string }
   | { fatal: true; error: string }

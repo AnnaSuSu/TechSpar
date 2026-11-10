@@ -29,7 +29,7 @@ describe('phase three real SSE transport boundaries', () => {
   for (const path of [chatPath, indexPath]) {
     const progress = path === chatPath ? { token: '你好' } : { completed: 0, total: 1, label: '合成步骤', status: 'running' }
     const failure = (message: string) => path === chatPath ? { error: message } : { fatal: true, error: message }
-    const completion = path === chatPath ? { done: true, is_finished: false } : { done: true, rebuilt: { weak_points: true, personal_documents: false, topics: [] }, last_rebuild_at: '' }
+    const completion = path === chatPath ? { done: true, is_finished: false } : { done: true, rebuilt: { session_memories: true, weak_points: true, personal_documents: false, topics: [] }, last_rebuild_at: '' }
 
     test(`${path} rejects invalid service output before it reaches the wire`, async () => {
       const logger = spyOn(console, 'error').mockImplementation(() => {})
@@ -147,7 +147,7 @@ describe('phase three real SSE transport boundaries', () => {
       chats: unavailable as never, embeddingDrivers: unavailable as never,
       embeddings: { async embed() { return [] } },
       index: { async invalidateUser() {}, resetEmbeddingClient() {}, async rebuildTopic() { throw new Error('主题失败') } },
-      vectors: dependencyStub<SettingsDeps['vectors']>({ async replaceChunks() {} }),
+      vectors: dependencyStub<SettingsDeps['vectors']>({ async listSessionMemoryChunks() { return [] }, async replaceChunks() {} }),
       knowledge: dependencyStub<SettingsDeps['knowledge']>({ async loadTopics() { if (fatal) throw new Error('目录失败'); return { typescript: { name: 'TypeScript', icon: '', dir: '' } } } }),
       personal: dependencyStub<SettingsDeps['personal']>({ async hasDocuments() { return false } }),
       profile: dependencyStub<SettingsDeps['profile']>({ async get() { return defaultProfile() } }),
@@ -155,8 +155,8 @@ describe('phase three real SSE transport boundaries', () => {
     })
     const app = boundaryApp({ settingsOperations: service })
     const events = parseFrames(await (await app.request(indexPath, post)).text())
-    expect<unknown>(events).toContainEqual({ completed: 3, total: 3, label: '知识库 · TypeScript', status: 'error', error: '主题失败' })
-    expect<unknown>(events.at(-1)).toEqual({ done: true, rebuilt: { weak_points: true, personal_documents: false, topics: [] }, last_rebuild_at: saved })
+    expect<unknown>(events).toContainEqual({ completed: 4, total: 4, label: '知识库 · TypeScript', status: 'error', error: '主题失败' })
+    expect<unknown>(events.at(-1)).toEqual({ done: true, rebuilt: { session_memories: true, weak_points: true, personal_documents: false, topics: [] }, last_rebuild_at: saved })
     expect<unknown>(saved).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
     for (const event of events) expect<unknown>(IndexRebuildEventSchema.parse(event)).toEqual(event)
     fatal = true

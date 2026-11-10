@@ -87,7 +87,7 @@ describe('typed frontend stream consumers', () => {
 
   test('keeps rebuild step errors nonterminal and routes done/fatal to the right callbacks', async () => {
     const step = { completed: 1, total: 2, label: '步骤', status: 'error', error: '局部失败' }
-    const done = { done: true, rebuilt: { weak_points: false, personal_documents: false, topics: [] }, last_rebuild_at: '' }
+    const done = { done: true, rebuilt: { session_memories: true, weak_points: false, personal_documents: false, topics: [] }, last_rebuild_at: '' }
     const h = response([step, done].map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''))
     const progress: unknown[] = []
     const completions: unknown[] = []
