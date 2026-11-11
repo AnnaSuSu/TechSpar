@@ -14,7 +14,7 @@
 </div>
 
 <a href="https://ak47token.com/api-relay">
-  <img src="images/ak47-topup-banner.svg" alt="作者自营 · AK47 AI 会员代充：低价、24 小时全自动、无需联系客服。选择套餐 → 在线支付 → 自动开通。点击查看套餐与价格。" width="100%" />
+  <img src="images/ak47-topup-banner.svg" alt="作者自营 · AK47 AI 会员代充：低价、24 小时全自动、无需联系客服。ChatGPT Plus 菲区代充 ¥115；Plus 四人共享 ¥35 / 30 天，仅支持电脑。价格与库存以商城实时展示为准。选择套餐 → 在线支付 → 自动开通。点击查看套餐与价格。" width="100%" />
 </a>
 
 <p align="center">

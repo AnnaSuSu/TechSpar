@@ -1,14 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="336" viewBox="0 0 1080 336" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="456" viewBox="0 0 1080 456" role="img" aria-labelledby="title desc">
   <title id="title">AK47 · AI 会员代充</title>
-  <desc id="desc">低价，24 小时全自动，无需联系客服。选择套餐、在线支付、自动开通。访问 ak47token.com/api-relay。</desc>
+  <desc id="desc">低价，24 小时全自动，无需联系客服。ChatGPT Plus 菲区代充 ¥115；Plus 四人共享 ¥35 / 30 天，仅支持电脑。价格与库存以商城实时展示为准。选择套餐、在线支付、自动开通。访问 ak47token.com/api-relay。</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop stop-color="#252A33"/>
       <stop offset="1" stop-color="#14171D"/>
     </linearGradient>
   </defs>
-  <rect x="1" y="1" width="1078" height="334" rx="24" fill="url(#background)" stroke="#383D46"/>
-  <path d="M820 1H1056Q1079 1 1079 25V335H970Z" fill="#F59E0B" opacity=".045"/>
+  <rect x="1" y="1" width="1078" height="454" rx="24" fill="url(#background)" stroke="#383D46"/>
+  <path d="M820 1H1056Q1079 1 1079 25V455H970Z" fill="#F59E0B" opacity=".045"/>
   <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
     <rect x="40" y="35" width="54" height="28" rx="7" fill="#F59E0B"/>
     <text x="67" y="55" text-anchor="middle" font-size="15" font-weight="800" fill="#191C22">AK47</text>
@@ -20,15 +20,24 @@
     <rect x="804" y="115" width="236" height="62" rx="12" fill="#FBBF24"/>
     <text x="922" y="154" text-anchor="middle" font-size="24" font-weight="700" fill="#191C22">查看套餐与价格 →</text>
     <text x="922" y="206" text-anchor="middle" font-size="16" fill="#BCC2CC">ak47token.com</text>
-    <path d="M40 245H1040" stroke="#3B4049"/>
+    <rect x="40" y="230" width="480" height="104" rx="12" fill="#FFFFFF" fill-opacity=".045" stroke="#414650"/>
+    <rect x="540" y="230" width="500" height="104" rx="12" fill="#FFFFFF" fill-opacity=".045" stroke="#414650"/>
+    <text x="60" y="261" font-size="20" font-weight="600" fill="#E1E4EA">ChatGPT Plus 代充</text>
+    <text x="60" y="310" font-size="36" font-weight="750" fill="#FBBF24">¥115</text>
+    <text x="180" y="307" font-size="18" fill="#BCC2CC">菲区</text>
+    <text x="560" y="261" font-size="20" font-weight="600" fill="#E1E4EA">Plus 四人共享</text>
+    <text x="560" y="310" font-size="36" font-weight="750" fill="#FBBF24">¥35<tspan font-size="18" font-weight="400" fill="#BCC2CC"> / 30 天</tspan></text>
+    <text x="1020" y="307" text-anchor="end" font-size="18" fill="#BCC2CC">仅支持电脑</text>
+    <path d="M40 355H1040" stroke="#3B4049"/>
     <g font-size="19" fill="#E1E4EA">
-      <text x="40" y="290"><tspan fill="#FBBF24" font-weight="700">01</tspan><tspan dx="12">选择套餐</tspan></text>
-      <text x="238" y="290" fill="#727B89">→</text>
-      <text x="300" y="290"><tspan fill="#FBBF24" font-weight="700">02</tspan><tspan dx="12">在线支付</tspan></text>
-      <text x="498" y="290" fill="#727B89">→</text>
-      <text x="560" y="290"><tspan fill="#FBBF24" font-weight="700">03</tspan><tspan dx="12">自动开通</tspan></text>
+      <text x="40" y="392"><tspan fill="#FBBF24" font-weight="700">01</tspan><tspan dx="12">选择套餐</tspan></text>
+      <text x="238" y="392" fill="#727B89">→</text>
+      <text x="300" y="392"><tspan fill="#FBBF24" font-weight="700">02</tspan><tspan dx="12">在线支付</tspan></text>
+      <text x="498" y="392" fill="#727B89">→</text>
+      <text x="560" y="392"><tspan fill="#FBBF24" font-weight="700">03</tspan><tspan dx="12">自动开通</tspan></text>
     </g>
-    <circle cx="884" cy="283" r="5" fill="#86EFAC"/>
-    <text x="900" y="290" font-size="18" fill="#D3D8E0">24 / 7 自助下单</text>
+    <circle cx="884" cy="385" r="5" fill="#86EFAC"/>
+    <text x="900" y="392" font-size="18" fill="#D3D8E0">24 / 7 自助下单</text>
+    <text x="540" y="432" text-anchor="middle" font-size="15" fill="#A7ADB8">价格与库存以商城实时展示为准</text>
   </g>
 </svg>
