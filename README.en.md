@@ -16,14 +16,11 @@
 
 <table>
   <tr>
-    <td width="20%" align="center" valign="middle">
+    <td width="180" align="center" valign="middle">
       <a href="https://ak47token.com/api-relay"><img src="images/ak47-logo.svg" alt="AK47 AI Subscription Top-ups" width="140" /></a>
     </td>
-    <td width="80%" valign="middle">
-      <strong><a href="https://ak47token.com/api-relay">AK47 AI Subscription Top-ups</a></strong> · Author-run promotion<br>
-      Low prices · Fully automated, 24/7 · No need to contact support<br>
-      Plus top-up (Philippines): <strong>CNY 115</strong> · 4-person shared plan: <strong>CNY 35 / 30 days</strong> (desktop only)<br>
-      <a href="https://ak47token.com/api-relay">View plans →</a> · Prices and availability as listed in the store
+    <td valign="middle">
+      <strong><a href="https://ak47token.com/api-relay">AK47 AI Subscription Top-ups</a></strong>(author-run promotion) offers affordable AI subscriptions with <strong>fully automated service, 24/7</strong>. Order and activate online without contacting support. Plus top-up (Philippines): <strong>CNY 115</strong>; a 4-person shared plan: <strong>CNY 35 / 30 days</strong> (desktop only). <a href="https://ak47token.com/api-relay">View plans &amp; pricing →</a>. Prices and availability follow the live store listings.
     </td>
   </tr>
 </table>

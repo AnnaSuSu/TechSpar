@@ -13,14 +13,11 @@
 
 <table>
   <tr>
-    <td width="20%" align="center" valign="middle">
+    <td width="180" align="center" valign="middle">
       <a href="https://ak47token.com/api-relay"><img src="images/ak47-logo.svg" alt="AK47 AI 会员代充" width="140" /></a>
     </td>
-    <td width="80%" valign="middle">
-      <strong><a href="https://ak47token.com/api-relay">AK47 AI 会员代充</a></strong> · 作者自营推广<br>
-      低价代充 · 24 小时自动开通 · 全程自助，无需联系客服<br>
-      Plus 菲区代充 <strong>¥115</strong> · 四人共享 <strong>¥35 / 30 天</strong>（仅限电脑）<br>
-      <a href="https://ak47token.com/api-relay">查看套餐 →</a> · 价格与库存以商城为准
+    <td valign="middle">
+      <strong><a href="https://ak47token.com/api-relay">AK47 AI 会员代充</a></strong>（作者自营推广）：低价 AI 会员代充，<strong>24 小时全自动</strong>，从下单到开通全程自助，无需联系客服。Plus 菲区代充 <strong>¥115</strong>；四人共享 <strong>¥35 / 30 天</strong>（仅限电脑）。<a href="https://ak47token.com/api-relay">查看套餐与价格 →</a>，价格与库存以商城实时展示为准。
     </td>
   </tr>
 </table>
