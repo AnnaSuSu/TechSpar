@@ -54,3 +54,24 @@ jobs:
         run: test -x apps/desktop/resources/backend/techspar-api && test -f apps/desktop/resources/backend/onnxruntime/onnxruntime_binding.node
       - name: 校验 Electron 打包配置
         run: bun run --cwd apps/desktop pack
+
+  voice-input-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+      - name: 安装锁定依赖和 Electron 运行时
+        run: |
+          bun install --frozen-lockfile
+          node apps/desktop/node_modules/electron/install.js
+      - name: Windows Electron 合成音频验收
+        run: bun run smoke:voice
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-voice-input-smoke
+          path: dist/voice-input-smoke/
+          if-no-files-found: ignore

@@ -6,12 +6,34 @@ import ChatBubble from "../components/ChatBubble";
 import { sendMessage, sendMessageStream, endInterview, retryReview, getResumableSession, saveDraftAnswers } from "../api/interview";
 import useTaskStatus from "../hooks/useTaskStatus";
 import useVoiceInput from "../hooks/useVoiceInput";
+import VoiceInputFeedback from "../components/VoiceInputFeedback";
 import { buildInterviewAnswers } from "../lib/interviewAnswers";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const MicButton = ({ voice }) => (
+  <button
+    type="button"
+    className={cn(
+      "w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0",
+      voice.isListening ? "bg-red text-white animate-pulse-dot" : voice.isTranscribing ? "bg-orange text-white animate-pulse-dot" : "bg-hover text-dim hover:text-text"
+    )}
+    onClick={voice.toggle}
+    disabled={voice.isStarting || voice.isTranscribing}
+    aria-label={voice.isStarting ? "正在请求麦克风权限" : voice.isListening ? "停止录音并转成文字" : voice.isTranscribing ? "正在识别语音" : "语音输入"}
+    title={voice.isStarting ? "正在请求麦克风权限" : voice.isListening ? "停止录音" : voice.isTranscribing ? "正在识别..." : "语音输入"}
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+      <line x1="12" y1="19" x2="12" y2="23"/>
+      <line x1="8" y1="23" x2="16" y2="23"/>
+    </svg>
+  </button>
+);
 
 export default function Interview() {
   const { sessionId } = useParams();
@@ -55,6 +77,16 @@ export default function Interview() {
   const chatVoice = useVoiceInput({
     onResult: useCallback((text) => setInput((prev) => prev + text), []),
   });
+  const cancelDrillVoice = drillVoice.cancel;
+  const cancelChatVoice = chatVoice.cancel;
+
+  useEffect(() => {
+    return () => { cancelDrillVoice(); cancelChatVoice(); };
+  }, [sessionId, currentIndex, cancelDrillVoice, cancelChatVoice]);
+
+  useEffect(() => {
+    if (finished) { cancelDrillVoice(); cancelChatVoice(); }
+  }, [finished, cancelDrillVoice, cancelChatVoice]);
 
   useEffect(() => {
     // Fresh start from a landing page → location.state carries everything.
@@ -331,27 +363,6 @@ export default function Interview() {
       ? { text: "专项训练", variant: "success" }
       : { text: "简历面试", variant: "default" };
 
-  const MicButton = ({ voice }) => (
-    <button
-      type="button"
-      className={cn(
-        "w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0",
-        voice.isListening ? "bg-red text-white animate-pulse-dot" : voice.isTranscribing ? "bg-orange text-white animate-pulse-dot" : "bg-hover text-dim hover:text-text"
-      )}
-      onClick={voice.toggle}
-      disabled={voice.isTranscribing}
-      aria-label={voice.isListening ? "停止录音并转成文字" : voice.isTranscribing ? "正在识别语音" : "语音输入"}
-      title={voice.isListening ? "停止录音" : voice.isTranscribing ? "正在识别..." : "语音输入"}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-        <line x1="12" y1="19" x2="12" y2="23"/>
-        <line x1="8" y1="23" x2="16" y2="23"/>
-      </svg>
-    </button>
-  );
-
   // Bootstrap gate: show a skeleton while the resume payload is in flight, or
   // an error view if the session doesn't exist / can't be loaded.
   if (!initData) {
@@ -534,8 +545,7 @@ export default function Interview() {
                     </div>
                   )}
                 </div>
-                {drillVoice.error && <p role="alert" className="text-sm text-red">{drillVoice.error}</p>}
-                {drillVoice.isListening && <p role="status" className="text-xs text-dim">正在录音，再次点击麦克风停止并转成文字。</p>}
+                <VoiceInputFeedback voice={drillVoice} />
                 <div className="flex items-center justify-end gap-3">
                   {isDrill && (selfAssess ? (
                     <div className="mr-auto flex items-center gap-2">
@@ -697,8 +707,7 @@ export default function Interview() {
               </div>
             )}
           </div>
-          {chatVoice.error && <p role="alert" className="w-full max-w-3xl text-sm text-red">{chatVoice.error}</p>}
-          {chatVoice.isListening && <p role="status" className="w-full max-w-3xl text-xs text-dim">正在录音，再次点击麦克风停止并转成文字。</p>}
+          {!finished && <VoiceInputFeedback voice={chatVoice} />}
         </div>
     </div>
   );
