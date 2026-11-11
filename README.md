@@ -11,10 +11,19 @@
 
 </div>
 
-> **作者自营 · [AK47 AI 会员代充](https://ak47token.com/api-relay)**<br>
-> 低价 · 24 小时全自动 · 无需联系客服<br>
-> **Plus 菲区代充 ¥115** ｜ **四人共享 ¥35 / 30 天**（仅限电脑）<br>
-> [查看套餐 →](https://ak47token.com/api-relay) · 价格与库存以商城为准
+<table>
+  <tr>
+    <td width="200" align="center" valign="middle">
+      <a href="https://ak47token.com/api-relay"><img src="images/ak47-logo.svg" alt="AK47 AI 会员代充" width="180" /></a>
+    </td>
+    <td>
+      <strong><a href="https://ak47token.com/api-relay">AK47 AI 会员代充</a> · 作者自营推广</strong><br>
+      低价 · 24 小时全自动 · 无需联系客服<br>
+      <strong>Plus 菲区代充 ¥115</strong> ｜ <strong>四人共享 ¥35 / 30 天</strong>（仅限电脑）<br>
+      <a href="https://ak47token.com/api-relay">查看套餐 →</a> · 价格与库存以商城为准
+    </td>
+  </tr>
+</table>
 
 ![TechSpar 产品总览](images/techspar-overview.png)
 
