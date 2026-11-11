@@ -25,6 +25,7 @@
     "build:desktop:backend": "bun scripts/build-desktop-backend.ts",
     "build:desktop": "bun run build:web && bun run build:desktop:main && bun run build:desktop:backend",
     "smoke:desktop": "bun run build:desktop:main && bun scripts/smoke-desktop.ts",
+    "smoke:voice": "bun run build:web && bun scripts/smoke-voice-input.ts",
     "smoke:local-embedding": "bun run build:desktop:backend && bun scripts/smoke-local-embedding.ts",
     "pack:desktop": "bun run build:desktop && bun run --cwd apps/desktop pack",
     "dist:desktop": "bun run build:desktop && bun run --cwd apps/desktop dist",

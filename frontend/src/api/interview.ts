@@ -12,13 +12,17 @@ export { authFetch } from "./client";
 // ── Speech-to-text ──
 
 export async function transcribeAudio(
-  audioBlob: Blob
+  audioBlob: Blob,
+  signal?: AbortSignal,
 ): Promise<ApiResponse<"/api/transcribe", "post">> {
   const form = new FormData();
-  form.append("file", audioBlob, "recording.webm");
+  const extension = audioBlob.type.startsWith("audio/ogg") ? "ogg"
+    : audioBlob.type.startsWith("audio/mp4") ? "m4a" : "webm";
+  form.append("file", audioBlob, `recording.${extension}`);
   const res = await authFetch(`${API_BASE}/transcribe`, {
     method: "POST",
     body: form,
+    signal,
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
