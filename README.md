@@ -9,17 +9,14 @@
 [![Release](https://img.shields.io/github/v/release/AnnaSuSu/TechSpar?color=6E56CF)](https://github.com/AnnaSuSu/TechSpar/releases)
 [![Status](https://img.shields.io/badge/状态-持续开发中-2EA043.svg)](https://github.com/AnnaSuSu/TechSpar/commits/main)
 
-![TechSpar 产品总览](images/techspar-overview.png)
-
 </div>
 
-<a href="https://ak47token.com/api-relay">
-  <img src="images/ak47-topup-banner.svg" alt="作者自营 · AK47 AI 会员代充：低价、24 小时全自动、无需联系客服。ChatGPT Plus 菲区代充 ¥115；Plus 四人共享 ¥35 / 30 天，仅支持电脑。价格与库存以商城实时展示为准。选择套餐 → 在线支付 → 自动开通。点击查看套餐与价格。" width="100%" />
-</a>
+> **作者自营 · [AK47 AI 会员代充](https://ak47token.com/api-relay)**<br>
+> 低价 · 24 小时全自动 · 无需联系客服<br>
+> **Plus 菲区代充 ¥115** ｜ **四人共享 ¥35 / 30 天**（仅限电脑）<br>
+> [查看套餐 →](https://ak47token.com/api-relay) · 价格与库存以商城为准
 
-<p align="center">
-  <a href="https://ak47token.com/api-relay"><strong>查看套餐与价格 →</strong></a> · ChatGPT / Claude / Grok 会员代充与共享套餐
-</p>
+![TechSpar 产品总览](images/techspar-overview.png)
 
 ## 这是什么
 

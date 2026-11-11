@@ -12,14 +12,14 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 
-![TechSpar product overview](images/techspar-overview.png)
 </div>
 
 > **Author-run promotion · [AK47 AI Subscription Top-ups](https://ak47token.com/api-relay)**<br>
-> Low prices · Fully automated, 24/7 · No need to contact support.<br>
-> **ChatGPT Plus top-up (Philippines): CNY 115 · Plus shared plan (4 users): CNY 35 / 30 days, desktop only.**<br>
-> Prices and availability are subject to the live store listings.<br>
-> Choose a plan → Pay online → Automatic activation. Explore ChatGPT, Claude, and Grok top-ups and shared plans. **[View plans & pricing →](https://ak47token.com/api-relay)**
+> Low prices · Fully automated, 24/7 · No need to contact support<br>
+> **Plus top-up (Philippines): CNY 115** · **4-person shared plan: CNY 35 / 30 days** (desktop only)<br>
+> [View plans →](https://ak47token.com/api-relay) · Prices and availability as listed in the store
+
+![TechSpar product overview](images/techspar-overview.png)
 
 TechSpar is more than a question generator. Focused drills, resume interviews, JD prep, realtime Copilot, and recording review share the same long-term profile, knowledge base, weak points, and review schedule. Every result changes what the next round focuses on.
 
