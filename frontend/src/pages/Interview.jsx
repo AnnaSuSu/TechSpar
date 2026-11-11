@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const MicButton = ({ voice }) => (
+const MicButton = ({ voice, disabled = false }) => (
   <button
     type="button"
     className={cn(
@@ -22,7 +22,7 @@ const MicButton = ({ voice }) => (
       voice.isListening ? "bg-red text-white animate-pulse-dot" : voice.isTranscribing ? "bg-orange text-white animate-pulse-dot" : "bg-hover text-dim hover:text-text"
     )}
     onClick={voice.toggle}
-    disabled={voice.isStarting || voice.isTranscribing}
+    disabled={disabled || voice.isStarting || voice.isTranscribing}
     aria-label={voice.isStarting ? "正在请求麦克风权限" : voice.isListening ? "停止录音并转成文字" : voice.isTranscribing ? "正在识别语音" : "语音输入"}
     title={voice.isStarting ? "正在请求麦克风权限" : voice.isListening ? "停止录音" : voice.isTranscribing ? "正在识别..." : "语音输入"}
   >
@@ -230,6 +230,7 @@ export default function Interview() {
     const priorTask = tasks.find((t) => t.id === sessionId);
     const isRetry = (submitted && priorTask?.status === "error") || sessionStatus === "review_failed";
     if (submitted && !isRetry) return;
+    cancelDrillVoice();
     setSubmitting(true);
     try {
       const answerList = buildInterviewAnswers(questions, answers, confidences);
@@ -304,6 +305,7 @@ export default function Interview() {
   };
 
   const startResumeReview = async () => {
+    cancelChatVoice();
     await endInterview(sessionId);
     setFinished(true);
     setSessionStatus("reviewing");
@@ -703,7 +705,7 @@ export default function Interview() {
             />
             {chatVoice.isSupported && !finished && (
               <div className="absolute bottom-4 right-3">
-                <MicButton voice={chatVoice} />
+                <MicButton voice={chatVoice} disabled={reviewing} />
               </div>
             )}
           </div>

@@ -6,6 +6,9 @@ import { VoiceInputSession, type VoiceInputState } from "../src/lib/voice-input"
 import useVoiceInput from "../src/hooks/useVoiceInput";
 import VoiceInputFeedback from "../src/components/VoiceInputFeedback";
 import { setApiErrorHandler } from "../src/api/client";
+import { MemoryRouter, Routes, Route, useNavigate } from "react-router-dom";
+import TaskStatusContext from "../src/contexts/TaskStatusContextBase";
+import Interview from "../src/pages/Interview";
 
 const browser = new GlobalWindow({ url: "http://localhost" });
 const originals = new Map<string, PropertyDescriptor | undefined>();
@@ -22,6 +25,7 @@ let requests: RequestInit[];
 let respond: (options: RequestInit) => Promise<Response>;
 let latest: ReturnType<typeof useVoiceInput>;
 let result: string[];
+let endResponse: () => Promise<Response>;
 
 class Track extends EventTarget {
   kind = "audio";
@@ -96,6 +100,28 @@ async function mount() {
   await act(async () => { root!.render(<Probe />); });
 }
 
+async function mountInterview(mode = "topic_drill") {
+  const host = document.createElement("main"); document.body.append(host);
+  root = createRoot(host);
+  function LeaveButton() {
+    const navigate = useNavigate();
+    return <button onClick={() => navigate("/left")}>离开测试页面</button>;
+  }
+  await act(async () => {
+    root!.render(<MemoryRouter initialEntries={[{ pathname: "/interview/test", state: {
+      mode, status: "ongoing", message: "测试面试问题",
+      questions: [{ id: "1", question: "第一题" }, { id: "2", question: "第二题" }],
+    } }]}><TaskStatusContext.Provider value={{ tasks: [], startTask() {}, dismissTask() {}, creatingSessionMode: null, setCreatingSessionMode() {} }}>
+      <LeaveButton /><Routes><Route path="/interview/:sessionId" element={<Interview />} /><Route path="/left" element={<p>已离开</p>} /></Routes>
+    </TaskStatusContext.Provider></MemoryRouter>);
+  });
+}
+async function clickLabel(label: string) {
+  const button = Array.from(document.querySelectorAll("button")).find((item) => item.getAttribute("aria-label") === label || item.textContent?.trim() === label);
+  if (!button) throw new Error(`Missing button: ${label}`);
+  await act(async () => { button.click(); await flush(); });
+}
+
 beforeEach(() => {
   stream = new Stream(); signalLevel = 0; constraints = []; requests = []; result = [];
   Recorder.instances = []; Recorder.supported = "audio/webm;codecs=opus"; Recorder.failure = ""; Recorder.bytes = 2000;
@@ -107,11 +133,13 @@ beforeEach(() => {
     async enumerateDevices() { return devices; },
   });
   for (const [key, value] of Object.entries({
-    window: browser, document: browser.document, navigator: { mediaDevices: media },
+    window: browser, document: browser.document, localStorage: browser.localStorage, navigator: { mediaDevices: media },
     MediaRecorder: Recorder, AudioContext: Context, IS_REACT_ACT_ENVIRONMENT: true,
   })) globalValue(key, value);
   respond = async () => json({ text: "识别到的回答" });
+  endResponse = async () => json({ status: "reviewing" });
   globalThis.fetch = (async (url, options) => {
+    if (String(url).startsWith("/api/interview/end/")) return endResponse();
     expect(String(url)).toBe("/api/transcribe");
     requests.push(options!);
     return respond(options!);
@@ -378,4 +406,55 @@ test("unmount aborts transcription and a late result never updates the answer", 
   expect(requests[0]!.signal!.aborted).toBeTrue();
   pending.resolve(json({ text: "late" })); await flush();
   expect(result).toHaveLength(0);
+});
+
+for (const phase of ["recording", "transcribing"]) test(`actual Interview page releases ${phase} when skipping to another question`, async () => {
+  const pending = Promise.withResolvers<Response>(); respond = () => pending.promise;
+  await mountInterview(); await clickLabel("语音输入");
+  if (phase === "transcribing") await clickLabel("停止录音并转成文字");
+  await clickLabel("跳过");
+  expect(document.body.textContent).toContain("第二题");
+  expect(stream.tracks[0]!.stops).toBe(1);
+  if (phase === "transcribing") expect(requests[0]!.signal!.aborted).toBeTrue();
+  pending.resolve(json({ text: "上一题的迟到转写" })); await act(async () => { await flush(); });
+  expect(document.querySelector("textarea")!.value).toBe("");
+  expect(document.querySelector('[aria-label="语音输入"]')).not.toBeNull();
+});
+
+test("actual Interview page releases pending permission after navigation", async () => {
+  const pending = Promise.withResolvers<Stream>(); permissions = () => pending.promise;
+  await mountInterview(); await clickLabel("语音输入");
+  await clickLabel("离开测试页面");
+  await act(async () => { pending.resolve(stream); });
+  expect(document.body.textContent).toContain("已离开");
+  expect(stream.tracks[0]!.stops).toBe(1);
+  expect(Recorder.instances).toHaveLength(0);
+});
+
+for (const mode of ["resume", "topic_drill"]) test(`ending ${mode} immediately releases capture while the end request is pending`, async () => {
+  const pending = Promise.withResolvers<Response>(); endResponse = () => pending.promise;
+  await mountInterview(mode); await clickLabel("语音输入");
+  await clickLabel(mode === "resume" ? "结束面试" : "结束训练");
+  expect(stream.tracks[0]!.stops).toBe(1);
+  expect(Context.instances[0]!.state).toBe("closed");
+  const mic = document.querySelector<HTMLButtonElement>('[aria-label="语音输入"]');
+  expect(mic === null || mic.disabled).toBeTrue();
+  await act(async () => { pending.resolve(json({ status: "reviewing" })); await flush(); });
+});
+
+for (const mode of ["resume", "topic_drill"]) test(`ending ${mode} aborts ASR immediately and allows recording again after a failed end request`, async () => {
+  const pendingEnd = Promise.withResolvers<Response>(); endResponse = () => pendingEnd.promise;
+  const pendingAsr = Promise.withResolvers<Response>(); respond = () => pendingAsr.promise;
+  await mountInterview(mode); await clickLabel("语音输入"); await clickLabel("停止录音并转成文字");
+  await clickLabel(mode === "resume" ? "结束面试" : "结束训练");
+  expect(requests[0]!.signal!.aborted).toBeTrue();
+  await act(async () => {
+    pendingAsr.resolve(json({ text: "结束后迟到的结果" }));
+    pendingEnd.resolve(json({ detail: "synthetic end error" }, 500)); await flush();
+  });
+  expect(document.querySelector("textarea")!.value).toBe("");
+  stream = new Stream();
+  await clickLabel("语音输入");
+  expect(document.querySelector('[aria-label="停止录音并转成文字"]')).not.toBeNull();
+  expect(stream.tracks[0]!.stops).toBe(0);
 });

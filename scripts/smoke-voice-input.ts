@@ -38,6 +38,7 @@ const server = Bun.serve({
     const url = new URL(request.url)
     if (url.pathname === '/smoke.css') return new Response(cssContent, { headers: { 'Content-Type': 'text/css' } })
     if (url.pathname === '/mode') { responseMode = url.searchParams.get('name') || 'success'; return new Response('ok') }
+    if (url.pathname.startsWith('/api/interview/end/')) return Response.json({ status: 'reviewing' })
     if (url.pathname === '/api/transcribe') {
       const file = (await request.formData()).get('file') as File
       if (!file || !file.size || file.name !== 'recording.webm') return Response.json({ detail: 'Invalid recording' }, { status: 400 })
@@ -131,7 +132,7 @@ try {
       await until('document.querySelector("textarea")?.value.includes("合成音频转写成功")', 'retry');
       checks.push(outcome + ':feedback-and-retry');
     }
-    await load(); await begin();
+    await fetch(origin + '/mode?name=success'); await load(); await begin();
     await js('window.smokeStreams.forEach(s => s.getTracks().forEach(t => t.stop()))');
     await until('!!document.querySelector(\'[role="alert"]\') && !document.querySelector(\'[aria-label="停止录音并转成文字"]\')', 'automatic stop');
     checks.push('native-track-stop:feedback-and-idle');
@@ -141,6 +142,14 @@ try {
     await pause(1800);
     assert.equal(await js('document.querySelector("textarea").value'), '');
     checks.push('cancel-transcription:no-late-backfill');
+    await load('topic_drill'); await begin();
+    await js('[...document.querySelectorAll("button")].find(b => b.textContent.includes("结束训练")).click()');
+    assert.equal(await js('window.smokeStreams.every(s => s.getTracks().every(t => t.readyState === "ended"))'), true, 'end training releases the microphone before the end request');
+    checks.push('end-training:release-before-request');
+    await fetch(origin + '/mode?name=success'); await load(); await begin();
+    await js('[...document.querySelectorAll("button")].find(b => b.textContent.includes("结束面试")).click()');
+    assert.equal(await js('window.smokeStreams.every(s => s.getTracks().every(t => t.readyState === "ended"))'), true, 'end interview releases the microphone before the end request');
+    checks.push('end-interview:release-before-request');
   }
   console.log(JSON.stringify({ source: silent ? 'silence' : 'tone', checks, electron: process.versions.electron, chrome: process.versions.chrome }));
   window.destroy(); app.exit(0);
