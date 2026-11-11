@@ -13,6 +13,14 @@
 
 </div>
 
+<a href="https://ak47token.com/api-relay">
+  <img src="images/ak47-topup-banner.svg" alt="作者自营 · AK47 AI 会员代充：低价、24 小时全自动、无需联系客服。选择套餐 → 在线支付 → 自动开通。点击查看套餐与价格。" width="100%" />
+</a>
+
+<p align="center">
+  <a href="https://ak47token.com/api-relay"><strong>查看套餐与价格 →</strong></a> · ChatGPT / Claude / Grok 会员代充与共享套餐
+</p>
+
 ## 这是什么
 
 市面上的面试工具大多做同一件事：给你生成一堆题，你答完，结束。没有人记得你上次哪道题答崩了，也没有人知道你下周要面的那家公司想听什么。

@@ -15,6 +15,10 @@
 ![TechSpar product overview](images/techspar-overview.png)
 </div>
 
+> **Author-run promotion · [AK47 AI Subscription Top-ups](https://ak47token.com/api-relay)**<br>
+> Low prices · Fully automated, 24/7 · No need to contact support.<br>
+> Choose a plan → Pay online → Automatic activation. Explore ChatGPT, Claude, and Grok top-ups and shared plans. **[View plans & pricing →](https://ak47token.com/api-relay)**
+
 TechSpar is more than a question generator. Focused drills, resume interviews, JD prep, realtime Copilot, and recording review share the same long-term profile, knowledge base, weak points, and review schedule. Every result changes what the next round focuses on.
 
 ## Versions and branches
