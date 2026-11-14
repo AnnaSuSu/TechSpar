@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- electron-builder's default for the app bundle; this file replaces it, so keep JIT. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <!-- Hardened runtime blocks microphone input without this entitlement. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+  </dict>
+</plist>
