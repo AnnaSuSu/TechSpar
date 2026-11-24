@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import ChatBubble from "@/components/ChatBubble";
+import VoiceInputFeedback from "@/components/VoiceInputFeedback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import useVoiceInput from "@/hooks/useVoiceInput";
@@ -16,6 +17,20 @@ export default function LiveChatInterviewView({ session }: { session: InterviewS
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const shouldRestoreFocus = useRef(false);
   const chatVoice = useVoiceInput({ onResult: (text) => setInput((previous) => previous + text) });
+  const cancelChatVoice = chatVoice.cancel;
+
+  useEffect(() => {
+    return () => { cancelChatVoice(); };
+  }, [sessionId, cancelChatVoice]);
+
+  useEffect(() => {
+    if (finished) cancelChatVoice();
+  }, [finished, cancelChatVoice]);
+
+  const onEndResume = () => {
+    cancelChatVoice();
+    void handleEndResume();
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -43,7 +58,7 @@ export default function LiveChatInterviewView({ session }: { session: InterviewS
   } else if (reviewInFlight) {
     label = "复盘生成中...";
   } else {
-    handler = handleEndResume;
+    handler = onEndResume;
     label = reviewing ? "生成复盘中..." : finished ? "生成复盘" : "结束面试";
   }
 
@@ -106,12 +121,11 @@ export default function LiveChatInterviewView({ session }: { session: InterviewS
           />
           {chatVoice.isSupported && !finished && (
             <div className="absolute bottom-4 right-3">
-              <MicButton voice={chatVoice} />
+              <MicButton voice={chatVoice} disabled={reviewing} />
             </div>
           )}
         </div>
-        {chatVoice.error && <p role="alert" className="w-full max-w-3xl text-sm text-red">{chatVoice.error}</p>}
-        {chatVoice.isListening && <p role="status" className="w-full max-w-3xl text-xs text-dim">正在录音，再次点击麦克风停止并转成文字。</p>}
+        {!finished && <VoiceInputFeedback voice={chatVoice} />}
       </div>
     </div>
   );

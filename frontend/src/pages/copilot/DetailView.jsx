@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { HintChip, StepRow } from "@/components/WorkflowPrimitives";
 
+import SessionHistory from "./SessionHistory";
 import PrepResultCards from "./PrepResultCards";
 import { PAGE_CLASS, formatFileSize } from "./shared";
 
@@ -281,6 +282,8 @@ export default function DetailView({ prepId: initialPrepId, onBack, onStartInter
               </CardContent>
             </Card>
           )}
+
+          {prepId && <SessionHistory prepId={prepId} />}
         </div>
 
         <div className="space-y-5 xl:sticky xl:top-6 xl:self-start">

@@ -20,6 +20,7 @@ export type ResponseInventoryEntry = {
  * slots remain explicit in notes even when the root is no longer dynamic.
  */
 export const responseInventory: readonly ResponseInventoryEntry[] = [
+  { operation: 'GET /api/auth/me', routeFile: 'apps/api/src/routes/auth.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'auth-identity.json', dynamic: false, requiredKeys: ['id'] },
   { operation: 'GET /api/', routeFile: 'apps/api/src/routes/auth.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'service-info.json', dynamic: false, requiredKeys: ['service', 'version'] },
   { operation: 'POST /api/auth/password', routeFile: 'apps/api/src/routes/auth.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'change-password.json', dynamic: false, requiredKeys: ['status'] },
   { operation: 'GET /api/auth/config', routeFile: 'apps/api/src/routes/auth.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'auth-config.json', dynamic: false, requiredKeys: ['allow_registration'] },
@@ -83,6 +84,10 @@ export const responseInventory: readonly ResponseInventoryEntry[] = [
   { operation: 'GET /api/data/export', routeFile: 'apps/api/src/routes/data-migration.ts', status: 200, contentType: 'application/gzip', transport: 'binary', dynamic: false },
   { operation: 'GET /api/data/export/personal', routeFile: 'apps/api/src/routes/data-migration.ts', status: 200, contentType: 'application/gzip', transport: 'binary', dynamic: false },
   { operation: 'POST /api/data/import', routeFile: 'apps/api/src/routes/data-migration.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'data-import.json', dynamic: true },
+  { operation: 'GET /api/copilot/prep/{prep_id}/sessions', routeFile: 'apps/api/src/routes/copilot.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'copilot-sessions.json', dynamic: false, responseSchema: 'CopilotSessionListSchema' },
+  { operation: 'GET /api/copilot/sessions/{session_id}', routeFile: 'apps/api/src/routes/copilot.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'copilot-session.json', dynamic: false, responseSchema: 'CopilotSessionDetailSchema' },
+  { operation: 'DELETE /api/copilot/sessions/{session_id}', routeFile: 'apps/api/src/routes/copilot.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'ok.json', dynamic: false, responseSchema: 'OkSchema' },
+  { operation: 'POST /api/copilot/sessions/{session_id}/review', routeFile: 'apps/api/src/routes/copilot.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'copilot-review.json', dynamic: false, responseSchema: 'CopilotReviewSubmissionResponseSchema' },
   { operation: 'POST /api/copilot/prep', routeFile: 'apps/api/src/routes/copilot.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'copilot-prep-created.json', dynamic: false },
   { operation: 'GET /api/copilot/preps', routeFile: 'apps/api/src/routes/copilot.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'copilot-preps.json', dynamic: false },
   { operation: 'GET /api/copilot/prep/{prep_id}', routeFile: 'apps/api/src/routes/copilot.ts', status: 200, contentType: 'application/json', transport: 'json', fixture: 'copilot-prep-status.json', dynamic: true },

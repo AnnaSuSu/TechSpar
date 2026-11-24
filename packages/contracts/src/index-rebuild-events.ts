@@ -8,7 +8,7 @@ export const IndexRebuildProgressSchema = z.discriminatedUnion('status', [
 ])
 export const IndexRebuildDoneSchema = z.object({
   done: z.literal(true),
-  rebuilt: z.object({ weak_points: z.boolean(), personal_documents: z.boolean(), topics: z.array(z.string()) }).strict(),
+  rebuilt: z.object({ session_memories: z.boolean(), weak_points: z.boolean(), personal_documents: z.boolean(), topics: z.array(z.string()) }).strict(),
   // Preserve the current second-precision timestamp without adding a timezone.
   last_rebuild_at: z.string(),
 }).strict()

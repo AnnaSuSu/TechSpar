@@ -17,14 +17,15 @@ export const JOB_PREP_DIMENSION_LABELS = {
 };
 
 export function getReviewPresentation(data: ReviewPayload) {
+  const isCopilot = data.mode === "copilot";
   const isRecording = data.mode === "recording";
   const isJobPrep = data.mode === "jd_prep";
   const isRecordingDual = isRecording && (
     data.recording_mode === "dual" || data.meta?.recording_mode === "dual" || Boolean(data.questions?.length)
   );
-  const showDrill = data.mode === "topic_drill" || isRecordingDual;
-  const title = isRecording ? "录音复盘" : isJobPrep ? "JD 备面复盘" : showDrill ? "训练复盘" : "面试复盘";
-  return { title, isRecording, isJobPrep, showDrill };
+  const showDrill = data.mode === "topic_drill" || isRecordingDual || isCopilot;
+  const title = isCopilot ? "Copilot 实战复盘" : isRecording ? "录音复盘" : isJobPrep ? "JD 备面复盘" : showDrill ? "训练复盘" : "面试复盘";
+  return { title, isCopilot, isRecording, isJobPrep, showDrill };
 }
 
 export function inferAnswers(

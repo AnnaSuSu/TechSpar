@@ -18,6 +18,9 @@ function profileFrom(bytes: Uint8Array): CandidateProfile {
   return { ...defaultProfile(), ...value as CandidateProfile }
 }
 function record(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {} }
+function nonCopilotSessions(profile?: CandidateProfile): number {
+  return Math.max(0, Number(profile?.stats?.total_sessions || 0) - Number(profile?.stats?.copilot_sessions || 0))
+}
 
 export class DataMigrationService implements DataMigrationUseCases {
   constructor(private readonly deps: DataMigrationDependencies) {}
@@ -48,25 +51,35 @@ export class DataMigrationService implements DataMigrationUseCases {
     let archive
     try { archive = await this.deps.codec.unpack(bytes) } catch (error) { throw new AppError(`归档解析失败: ${error instanceof Error ? error.message : String(error)}`, 400) }
     if (!archive.manifest?.user_id?.trim()) throw new AppError('归档解析失败: 仅支持带 user_id 的单账户备份，不能导入整站全量归档', 400)
-    const db = archive.database ? await this.deps.database.importPersonal(archive.database, userId, options.dbStrategy) : { inserted: 0, skipped: 0 }
-    let copied = 0; let skipped = 0; let importedProfile: CandidateProfile | undefined
+    let importedProfile: CandidateProfile | undefined
+    const filesToCopy: Array<{ relative: string; content: Uint8Array }> = []
     for (const [path, content] of archive.files) {
       const parts = path.split('/').filter(Boolean)
       if (parts.length < 4 || parts[0] !== 'data' || parts[1] !== 'users') continue
       const relative = parts.slice(3).join('/')
       if (!relative || relative.split('/').some((part) => part === '..' || part === '.index_cache' || part === '__pycache__')) continue
-      if (relative === 'profile/profile.json') { importedProfile = profileFrom(content); copied += 1; continue }
+      if (relative === 'profile/profile.json') { importedProfile = profileFrom(content); continue }
+      filesToCopy.push({ relative, content })
+    }
+
+    const db = archive.database ? await this.deps.database.importPersonal(archive.database, userId, options.dbStrategy) : { inserted: 0, skipped: 0 }
+    let copied = importedProfile ? 1 : 0; let skipped = 0
+    for (const { relative, content } of filesToCopy) {
       if (!options.overwriteFiles && await this.deps.files.exists(userId, relative)) { skipped += 1; continue }
       await this.deps.files.write(userId, relative, content); copied += 1
     }
-    await this.deps.profiles.update(userId, (local) => {
-      const merged = importedProfile ? mergeProfiles(local, importedProfile) : local
-      Object.assign(local, merged)
-    })
     const rebuilt = await this.deps.database.rebuiltStats(userId)
     await this.deps.profiles.update(userId, (profile) => {
+      // Normalize the two histories separately before their counters are merged.
+      const otherSessions = Math.max(nonCopilotSessions(profile), nonCopilotSessions(importedProfile))
+      const merged = importedProfile ? mergeProfiles(profile, importedProfile) : profile
+      Object.assign(profile, merged)
       const stats = record(rebuilt.stats)
       for (const key of ['total_sessions', 'total_answers', 'resume_sessions', 'drill_sessions', 'job_prep_sessions', 'recording_sessions', 'copilot_sessions']) profile.stats[key] = Math.max(Number(profile.stats[key] || 0), Number(stats[key] || 0))
+      if (typeof stats.copilot_sessions === 'number') {
+        profile.stats.copilot_sessions = stats.copilot_sessions
+        profile.stats.total_sessions = Math.max(Number(stats.total_sessions || 0), otherSessions + stats.copilot_sessions)
+      }
       if (Array.isArray(stats.score_history) && stats.score_history.length) profile.stats.score_history = stats.score_history as Array<Record<string, unknown>>
       if (typeof stats.avg_score === 'number') profile.stats.avg_score = stats.avg_score
       for (const key of ['resume_avg_score', 'drill_avg_score', 'job_prep_avg_score', 'recording_avg_score', 'copilot_avg_score', 'dimension_scores']) if (stats[key] !== undefined) profile.stats[key] = stats[key]

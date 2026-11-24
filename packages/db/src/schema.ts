@@ -5,6 +5,7 @@ export const users = sqliteTable('users', {
   email: text('email').notNull().unique(),
   password: text('password').notNull(),
   name: text('name').default(''),
+  tokenVersion: integer('token_version').notNull().default(0),
   createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
 })
 
@@ -49,6 +50,7 @@ export const copilotPreps = sqliteTable('copilot_preps', {
 
 export const copilotRealtimeSessions = sqliteTable('copilot_realtime_sessions', {
   sessionId: text('session_id').primaryKey(), userId: text('user_id').notNull(), prepId: text('prep_id').notNull(), conversation: text('conversation').notNull().default('[]'),
+  reviewSessionId: text('review_session_id'), reviewClaimedAt: text('review_claimed_at'),
   lastNodeId: text('last_node_id'), turnCount: integer('turn_count').notNull().default(0), status: text('status').notNull().default('active'), createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'), updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
 })
 

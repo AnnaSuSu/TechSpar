@@ -5,9 +5,11 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { gunzipSync, gzipSync } from 'fflate'
-import { DataMigrationService, defaultProfile, mergeProfiles, type RequestContext, type UserRepository } from '@techspar/core'
+import { DataMigrationService, defaultProfile, mergeProfiles, ProfileService, type ProfileDependencies, type RequestContext, type UserRepository } from '@techspar/core'
 import { BunDataMigrationRepository, BunInterviewSessionRepository, BunPersonalAgentRepository } from '@techspar/db'
 import { FileCandidateProfileRepository, FileMigrationStore, TarGzipArchiveCodec, atomicWriteJson } from '@techspar/platform'
+
+import { boundaryApp, jsonHeaders } from './contracts/test-app.ts'
 
 const TAR_BLOCK = 512
 const encoder = new TextEncoder()
@@ -16,7 +18,7 @@ async function root(): Promise<string> { const value = await mkdtemp(join(tmpdir
 afterEach(async () => { while (roots.length) await rm(roots.pop()!, { recursive: true, force: true }) })
 const context = (userId: string): RequestContext => ({ requestId: 'test', userId, signal: new AbortController().signal })
 const users: UserRepository = {
-  async findByEmail() { return undefined }, async findById(id) { return { id, email: 'user@example.com', name: '', is_admin: id === 'admin' } }, async create() { throw new Error() }, async updatePassword() {},
+  async findByEmail() { return undefined }, async findById(id) { return { id, email: 'user@example.com', name: '', is_admin: id === 'admin' } }, async tokenVersion() { return 0 }, async create() { throw new Error() }, async updatePassword() {},
 }
 function service(base: string) {
   const data = join(base, 'data'); mkdirSync(data, { recursive: true }); const db = join(data, 'interviews.db'); const profiles = new FileCandidateProfileRepository(data)
@@ -138,6 +140,76 @@ describe('tar.gz archive safety', () => {
 })
 
 describe('personal archive migration', () => {
+  test.each([
+    { name: 'unreviewed legacy sessions', reviewed: false, localOther: 0, archiveOther: 0, localLegacy: false, expectedTotal: 0 },
+    { name: 'a reviewed session among legacy sessions', reviewed: true, localOther: 0, archiveOther: 0, localLegacy: false, expectedTotal: 1 },
+    { name: 'independent non-Copilot history', reviewed: false, localOther: 9, archiveOther: 4, localLegacy: false, expectedTotal: 9 },
+    { name: 'legacy counters already stored locally', reviewed: false, localOther: 0, archiveOther: 0, localLegacy: true, expectedTotal: 0 },
+  ])('rebuilds the final profile after importing $name', async ({ reviewed, localOther, archiveOther, localLegacy, expectedTotal }) => {
+    const { BunCopilotRepository } = await import('@techspar/db')
+    const source = service(await root()); const target = service(await root())
+    const sourceSessions = new BunInterviewSessionRepository(source.db); sourceSessions.initialize()
+    const targetSessions = new BunInterviewSessionRepository(target.db); targetSessions.initialize()
+    const copilot = new BunCopilotRepository(source.db); copilot.initialize()
+    try {
+      await copilot.createPrep({ prepId: 'prep', userId: 'source', company: '', position: '', jdText: '' })
+      for (const sessionId of ['live-1', 'live-2']) await copilot.saveSession({ session_id: sessionId, user_id: 'source', prep_id: 'prep', conversation: [], turn_count: 0, status: 'stopped', created_at: '', updated_at: '' })
+      if (reviewed) {
+        await sourceSessions.create({ sessionId: 'review', userId: 'source', mode: 'copilot' })
+        await sourceSessions.saveReview({ sessionId: 'review', userId: 'source', review: '合成复盘', scores: [{ question_id: 1, score: 8 }], overall: { avg_score: 8 } })
+      }
+      // Legacy imports counted realtime rows even when they had no review.
+      const archived = defaultProfile()
+      archived.stats.copilot_sessions = 2; archived.stats.total_sessions = archiveOther + 2; archived.stats.resume_sessions = archiveOther
+      archived.weak_points.push({ point: '保留的知识点', topic: 'python' })
+      if (!localLegacy) await source.profiles.save('source', archived)
+      const local = defaultProfile()
+      local.stats.copilot_sessions = localLegacy ? 2 : 0; local.stats.total_sessions = localOther + (localLegacy ? 2 : 0); local.stats.resume_sessions = localOther
+      await target.profiles.save('target', local)
+      const legacy = new Database(source.db)
+      legacy.exec('ALTER TABLE copilot_realtime_sessions DROP COLUMN review_session_id; ALTER TABLE copilot_realtime_sessions DROP COLUMN review_claimed_at')
+      legacy.close()
+      const archive = await source.value.exportPersonal(context('source'), false)
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await target.value.importPersonal(context('target'), archive.filename, archive.bytes, { dbStrategy: 'skip', overwriteFiles: false })
+        const imported = await target.profiles.load('target')
+        expect(imported.stats).toMatchObject({ copilot_sessions: reviewed ? 1 : 0, total_sessions: expectedTotal, resume_sessions: Math.max(localOther, archiveOther) })
+        if (reviewed) expect(imported.stats.copilot_avg_score).toBe(8)
+        if (!localLegacy) expect(imported.weak_points).toContainEqual(expect.objectContaining({ point: '保留的知识点' }))
+      }
+    } finally { sourceSessions.close(); targetSessions.close(); copilot.close() }
+  })
+
+  test('keeps profile-only counters when no session database can be rebuilt', async () => {
+    const target = service(await root()); const archived = defaultProfile()
+    archived.stats.copilot_sessions = 2; archived.stats.total_sessions = 5
+    const bytes = await new TarGzipArchiveCodec().pack({
+      manifest: { schema_version: 2, exported_at: '', user_id: 'source', backup_kind: 'personal', includes_sensitive_credentials: false },
+      files: new Map([['data/users/source/profile/profile.json', encoder.encode(JSON.stringify(archived))]]),
+    })
+    await target.value.importPersonal(context('target'), 'profile-only.tar.gz', bytes, { dbStrategy: 'skip', overwriteFiles: false })
+    expect((await target.profiles.load('target')).stats).toMatchObject({ copilot_sessions: 2, total_sessions: 5 })
+  })
+
+  test('keeps legacy unscored weak points readable after importing a personal backup', async () => {
+    const base = await root(); const target = service(base)
+    const profile = defaultProfile()
+    profile.weak_points = [{ point: '合成待复习知识点', topic: 'python', sr: { last_score: null, next_review: '2026-10-01', interval_days: 0 }, legacy_extension: { kept: true } }]
+    const bytes = await new TarGzipArchiveCodec().pack({
+      manifest: { schema_version: 2, exported_at: '', user_id: 'legacy-user', backup_kind: 'personal', includes_sensitive_credentials: false },
+      files: new Map([['data/users/legacy-user/profile/profile.json', encoder.encode(JSON.stringify(profile))]]),
+    })
+    await target.value.importPersonal(context('user-a'), 'legacy.tar.gz', bytes, { dbStrategy: 'skip', overwriteFiles: false })
+    const profilePath = join(base, 'data/users/user-a/profile/profile.json')
+    const before = await readFile(profilePath)
+    const app = boundaryApp({ profile: new ProfileService({ repository: target.profiles } as unknown as ProfileDependencies) })
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await app.request('/api/profile', { headers: jsonHeaders })
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({ weak_points: [{ sr: { last_score: null, interval_days: 0 }, legacy_extension: { kept: true } }] })
+    }
+    expect(await readFile(profilePath)).toEqual(before)
+  })
   test('merges behavior and mastery state by evidence recency', () => {
     const local = defaultProfile(); const archive = defaultProfile()
     local.behavior_signals.reasoning = { description: '旧描述', last_seen: '2026-08-01T00:00:00Z', times_seen: 2, improved: false, history: [{ event: 'seen', date: '2026-08-01' }] }
@@ -200,4 +272,54 @@ describe('personal archive migration', () => {
     const bytes = await new TarGzipArchiveCodec().pack({ manifest: { schema_version: 2, exported_at: '', user_id: null, backup_kind: 'system', includes_sensitive_credentials: true }, files: new Map() })
     await expect(target.value.importPersonal(context('target-user'), 'full.tar.gz', bytes, { dbStrategy: 'skip', overwriteFiles: false })).rejects.toThrow('单账户备份')
   })
+
+  test('validates profile files before importing any database rows', async () => {
+    const sourceRoot = await root(); const source = service(sourceRoot)
+    const sourceSessions = new BunInterviewSessionRepository(source.db); sourceSessions.initialize()
+    await sourceSessions.create({ sessionId: 'must-not-import', userId: 'source-user', mode: 'resume' })
+    const database = await new BunDataMigrationRepository(source.db).exportPersonal('source-user')
+    const codec = new TarGzipArchiveCodec()
+    const bytes = await codec.pack({
+      manifest: { schema_version: 2, exported_at: '', user_id: 'source-user', backup_kind: 'personal', includes_sensitive_credentials: false },
+      database,
+      files: new Map([['data/users/source-user/profile/profile.json', encoder.encode('[]')]]),
+    })
+    const targetRoot = await root(); const target = service(targetRoot)
+    const targetSessions = new BunInterviewSessionRepository(target.db); targetSessions.initialize()
+    await expect(target.value.importPersonal(context('target-user'), 'invalid-profile.tar.gz', bytes, { dbStrategy: 'skip', overwriteFiles: false })).rejects.toThrow('画像文件必须是 JSON 对象')
+    expect(await targetSessions.get('must-not-import', 'target-user')).toBeUndefined()
+    sourceSessions.close(); targetSessions.close()
+  })
+})
+
+test('old and new Copilot archives import with review links and reviewed-only statistics', async () => {
+  const { BunCopilotRepository } = await import('@techspar/db')
+  const sourcePath = join(await root(), 'source.db'); const targetPath = join(await root(), 'target.db')
+  const source = new BunCopilotRepository(sourcePath); source.initialize()
+  const sessions = new BunInterviewSessionRepository(sourcePath); sessions.initialize()
+  const target = new BunCopilotRepository(targetPath); target.initialize()
+  try {
+    await source.createPrep({ prepId: 'prep', userId: 'source', company: '', position: '', jdText: '' })
+    const state = { session_id: 'live', user_id: 'source', prep_id: 'prep', conversation: [], turn_count: 0, status: 'stopped' as const, created_at: '', updated_at: '' }
+    await source.saveSession(state)
+    await source.saveSession({ ...state, session_id: 'unreviewed' })
+    await sessions.create({ sessionId: 'review', userId: 'source', mode: 'copilot' })
+    await sessions.saveReview({ sessionId: 'review', userId: 'source', review: '复盘', scores: [{ question_id: 1, score: 8 }], overall: { avg_score: 8 } })
+    await source.linkReview('live', 'source', 'review', null, '2026-10-19T00:00:00Z')
+    await source.completeReviewLink('live', 'source', 'review')
+    const migration = new BunDataMigrationRepository(targetPath)
+    await migration.importPersonal((await new BunDataMigrationRepository(sourcePath).exportPersonal('source'))!, 'target', 'skip')
+    expect(await target.loadSession('live', 'target')).toMatchObject({ review_session_id: 'review', review_claimed_at: null })
+    expect(await migration.rebuiltStats('target')).toMatchObject({ stats: { copilot_sessions: 1, copilot_avg_score: 8, total_sessions: 1 } })
+    const sqlite = new Database(sourcePath)
+    sqlite.exec('ALTER TABLE copilot_realtime_sessions DROP COLUMN review_session_id; ALTER TABLE copilot_realtime_sessions DROP COLUMN review_claimed_at')
+    const legacyArchivePath = join(await root(), 'legacy.db')
+    sqlite.exec(`VACUUM INTO '${legacyArchivePath}'`)
+    sqlite.close()
+    const legacyTargetPath = join(await root(), 'legacy-target.db')
+    await new BunDataMigrationRepository(legacyTargetPath).importPersonal(await readFile(legacyArchivePath), 'legacy-target', 'skip')
+    const legacy = new BunCopilotRepository(legacyTargetPath); legacy.initialize()
+    try { expect(await legacy.loadSession('live', 'legacy-target')).toMatchObject({ review_session_id: null, conversation: [] }) }
+    finally { legacy.close() }
+  } finally { source.close(); sessions.close(); target.close() }
 })

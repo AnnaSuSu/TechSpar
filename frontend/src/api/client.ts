@@ -1,6 +1,8 @@
 // 带鉴权的 fetch 封装 + openapi 类型接线,供 api/ 各模块共用
 import type { paths } from "./schema";
 import { parseApiErrorText } from "../lib/errorMessage.ts";
+import { clearSession, getAuthToken } from "../lib/authSession.ts";
+import { setResumeAccount } from "../resume/store/resumeAccount.ts";
 
 export const API_BASE = "/api";
 
@@ -78,7 +80,7 @@ export class HandledApiError extends Error {
 }
 
 function authHeaders(extra: HeadersInit = {}): Record<string, string> {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   const headers: Record<string, string> = { ...(extra as Record<string, string>) };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   return headers;
@@ -91,9 +93,11 @@ export async function authFetch(
   const headers = authHeaders(options.headers);
   const res = await fetch(url, { ...options, headers });
   if (res.status === 401) {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/login";
+    if (headers.Authorization === `Bearer ${getAuthToken()}`) {
+      setResumeAccount(null);
+      clearSession();
+      window.location.href = "/login";
+    }
     throw new Error("Session expired");
   }
   if (!res.ok && apiErrorHandler) {

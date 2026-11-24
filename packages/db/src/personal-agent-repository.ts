@@ -95,6 +95,19 @@ export class BunPersonalAgentRepository implements PersonalAgentRepository {
     return (await this.getConversation(input.conversationId, input.userId))!
   }
   async saveConversation(conversationId: string, userId: string, messages: AgentMessage[]): Promise<void> { this.sqlite.query('UPDATE personal_conversations SET messages = $messages, updated_at = CURRENT_TIMESTAMP WHERE conversation_id = $id AND user_id = $userId').run({ $messages: JSON.stringify(messages), $id: conversationId, $userId: userId }) }
+  async appendConversationMessages(conversationId: string, userId: string, messages: readonly AgentMessage[]): Promise<boolean> {
+    const append = this.sqlite.transaction(() => {
+      const row = this.sqlite.query<{ messages: string }, { $id: string; $userId: string }>(
+        'SELECT messages FROM personal_conversations WHERE conversation_id = $id AND user_id = $userId',
+      ).get({ $id: conversationId, $userId: userId })
+      if (!row) return false
+      const current = parse<AgentMessage[]>(row.messages, [])
+      return this.sqlite.query('UPDATE personal_conversations SET messages = $messages, updated_at = CURRENT_TIMESTAMP WHERE conversation_id = $id AND user_id = $userId')
+        .run({ $messages: JSON.stringify([...current, ...messages]), $id: conversationId, $userId: userId }).changes > 0
+    })
+    // Acquire the write lock before reading history, including across connections.
+    return append.immediate()
+  }
   async deleteConversation(conversationId: string, userId: string): Promise<boolean> { return this.sqlite.query('DELETE FROM personal_conversations WHERE conversation_id = $id AND user_id = $userId').run({ $id: conversationId, $userId: userId }).changes > 0 }
   async recentConversationMemory(userId: string, excludeConversationId: string, limit: number): Promise<Array<Record<string, unknown>>> {
     const rows = this.sqlite.query<ConversationRow, { $userId: string }>('SELECT * FROM personal_conversations WHERE user_id = $userId ORDER BY updated_at DESC, rowid DESC LIMIT 8').all({ $userId: userId })

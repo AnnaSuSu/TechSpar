@@ -1,4 +1,4 @@
-import type { RequestContext } from '../kernel/context.ts'
+import { assertContextActive, type RequestContext } from '../kernel/context.ts'
 import { AppError, AuthenticationError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
 import { enumValue, finiteNumber, objectArray, record, requiredText, textValue, StructuredOutputError } from '../kernel/structured-output.ts'
@@ -362,7 +362,7 @@ function roundedAverage(values: number[]): number | undefined {
 function updateStats(profile: CandidateProfile, session: InterviewSession, extraction: Record<string, unknown>, now: string): void {
   const stats = profile.stats
   stats.total_sessions = Number(stats.total_sessions || 0) + 1
-  const countKey = ({ resume: 'resume_sessions', topic_drill: 'drill_sessions', jd_prep: 'job_prep_sessions', recording: 'recording_sessions' } as const)[session.mode]
+  const countKey = ({ resume: 'resume_sessions', topic_drill: 'drill_sessions', jd_prep: 'job_prep_sessions', recording: 'recording_sessions', copilot: 'copilot_sessions' } as const)[session.mode]
   stats[countKey] = Number(stats[countKey] || 0) + 1
   const scoredAnswers = session.scores.filter((raw) => number(raw.score) !== undefined).length
   const answerCount = scoredAnswers || session.transcript.filter((message) => message.role === 'user' && message.content.trim()).length
@@ -377,7 +377,7 @@ function updateStats(profile: CandidateProfile, session: InterviewSession, extra
   const entry = { date: now.slice(0, 10), mode: session.mode, topic: session.topic, avg_score: avg, session_id: session.session_id, ...(Object.keys(dimensions).length ? { dimension_scores: dimensions } : {}) }
   stats.score_history.push(entry)
 
-  const windows: Record<string, [string, number]> = { topic_drill: ['drill_avg_score', 20], resume: ['resume_avg_score', 10], jd_prep: ['job_prep_avg_score', 10], recording: ['recording_avg_score', 20] }
+  const windows: Record<string, [string, number]> = { topic_drill: ['drill_avg_score', 20], resume: ['resume_avg_score', 10], jd_prep: ['job_prep_avg_score', 10], recording: ['recording_avg_score', 20], copilot: ['copilot_avg_score', 10] }
   for (const [mode, [key, window]] of Object.entries(windows)) {
     const value = roundedAverage(stats.score_history.filter((item) => item.mode === mode).map((item) => number(item.avg_score)).filter((item): item is number => item !== undefined).slice(-window))
     if (value !== undefined) stats[key] = value
@@ -398,17 +398,17 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
 
   private async profile(userId: string): Promise<CandidateProfile> { return hydrate(await this.deps.repository.load(userId)) }
 
-  private context(userId: string, operation: string): RequestContext {
-    return { requestId: `profile:${operation}:${userId}`, userId, signal: new AbortController().signal }
+  private context(userId: string, operation: string, parent?: RequestContext): RequestContext {
+    return { ...parent, requestId: `profile:${operation}:${userId}`, userId, signal: parent?.signal || new AbortController().signal }
   }
 
-  private async vectorsFor(userId: string, values: readonly string[], operation: string): Promise<Map<string, Float32Array>> {
+  private async vectorsFor(userId: string, values: readonly string[], operation: string, context = this.context(userId, operation)): Promise<Map<string, Float32Array>> {
     const texts = [...new Set(values.map((value) => value.trim()).filter(Boolean))]
     if (!texts.length) return new Map()
     try {
-      const vectors = await this.deps.embeddings.embed(this.context(userId, operation), texts)
+      const vectors = await this.deps.embeddings.embed(this.context(userId, operation, context), texts)
       return new Map(texts.flatMap((value, index) => vectors[index] ? [[value, vectors[index]!]] : []))
-    } catch { return new Map() }
+    } catch { await assertContextActive(context); return new Map() }
   }
 
   async semanticHistory(userId: string, topic: string, query = `${topic} 面试薄弱点 常见错误`, topK = 3): Promise<ProfileMemorySearchResult[]> {
@@ -450,30 +450,33 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     } catch { return [] }
   }
 
-  private async appendMemories(userId: string, entries: Array<Omit<ProfileMemoryEntry, 'embedding' | 'createdAt'>>, now: string): Promise<void> {
-    const vectors = await this.vectorsFor(userId, entries.map((entry) => entry.content), 'memory-write')
+  private async appendMemories(userId: string, entries: Array<Omit<ProfileMemoryEntry, 'embedding' | 'createdAt'>>, now: string, context: RequestContext): Promise<void> {
+    const vectors = await this.vectorsFor(userId, entries.map((entry) => entry.content), 'memory-write', context)
     const stored = entries.flatMap((entry) => {
       const embedding = vectors.get(entry.content)
       return embedding ? [{ ...entry, embedding, createdAt: now }] : []
     })
     if (!stored.length) return
+    await assertContextActive(context)
     try { await this.deps.vectors.appendProfileMemories({ userId, entries: stored }) } catch { /* profile.json remains the source of truth */ }
   }
 
-  private async projectSessionMemory(userId: string, sessionId: string, pending: PendingProfileMemory | undefined): Promise<void> {
+  private async projectSessionMemory(userId: string, sessionId: string, pending: PendingProfileMemory | undefined, context: RequestContext): Promise<void> {
     if (!pending) return
     // Unlike optional semantic matching, this write must succeed as a whole or remain retryable.
-    const vectors = pending.entries.length ? await this.deps.embeddings.embed(this.context(userId, 'memory-write'), pending.entries.map(entry => entry.content)) : []
+    const vectors = pending.entries.length ? await this.deps.embeddings.embed(this.context(userId, 'memory-write', context), pending.entries.map(entry => entry.content)) : []
     const dimension = vectors[0]?.length || 0
     if (vectors.length !== pending.entries.length || vectors.some(vector => !dimension || vector.length !== dimension || !vector.every(Number.isFinite))) {
       throw new Error('Invalid memory embeddings')
     }
+    await assertContextActive(context)
     await this.deps.vectors.replaceSessionMemories({
       userId, sessionId,
       entries: pending.entries.map((entry, index) => ({ ...entry, sessionId, embedding: vectors[index]!, createdAt: pending.createdAt })),
     })
     // A crash before this acknowledgement is safe: the next attempt replaces the same session.
-    await this.deps.repository.update(userId, profile => {
+    await this.deps.repository.update(userId, async profile => {
+      await assertContextActive(context)
       delete profile._pending_memory?.[sessionId]
       if (!Object.keys(profile._pending_memory || {}).length) delete profile._pending_memory
       // Keep a just-recovered session in the recent completed cache, even if it failed long ago.
@@ -603,14 +606,15 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     const topicName = topics[topic]?.name || topic
     const history = sessions.map((session) => `### ${session.created_at.slice(0, 10)}\n${session.review || ''}\n评分：${JSON.stringify(session.scores)}`).join('\n\n')
     const mastery = profile.topic_mastery[topic] || {}
-    const context: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: new AbortController().signal }
+    const context: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: task.signal || new AbortController().signal }
     const retrospective = (await this.deps.ai.complete(context, [{ role: 'system', content: '你是面试教练。用 Markdown 生成回顾报告。' }, { role: 'user', content: fill(RETROSPECTIVE_PROMPT, { topic_name: topicName, mastery: `${mastery.score ?? Number(mastery.level || 0) * 20}/100 — ${mastery.notes || ''}`, history }) }])).trim()
+    if (context.signal.aborted) throw context.signal.reason || new Error('Task lease was lost')
     const at = new Date().toISOString()
     await this.deps.repository.update(task.user_id, (value) => { (value.topic_mastery[topic] ||= {}).retrospective = retrospective; value.topic_mastery[topic]!.retrospective_at = at })
     return { topic, topic_name: topicName, retrospective, retrospective_at: at, session_count: sessions.length }
   }
 
-  private async consolidate(userId: string, now: string): Promise<void> {
+  private async consolidate(userId: string, now: string, context: RequestContext): Promise<void> {
     const profile = await this.profile(userId)
     const active = profile.weak_points.filter((point) => (point.source || 'observed') === 'observed' && point.axis !== 'performance' && !point.improved && !point.archived)
     if (active.length < CONSOLIDATION_MIN_ACTIVE || new Set(active.map((point) => point.topic).filter(Boolean)).size < 2) return
@@ -619,14 +623,15 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     const formatted = active.map((point, index) => `[${index}] ${point.point} (领域: ${point.topic || '未知'}, 观察 ${point.times_seen || 1} 次)`).join('\n')
     let patterns: Array<Record<string, unknown>>
     try {
-      const parsed = parseJsonResponse(await this.deps.ai.complete(this.context(userId, 'consolidation'), [
+      const parsed = parseJsonResponse(await this.deps.ai.complete(this.context(userId, 'consolidation', context), [
         { role: 'system', content: '你是模式识别引擎。只返回 JSON。' },
         { role: 'user', content: fill(CONSOLIDATION_PROMPT, { weak_points: formatted }) },
       ], STRUCTURED_CHAT_OPTIONS))
       patterns = validateConsolidation(parsed, active)
-    } catch { return }
+    } catch { await assertContextActive(context); return }
 
-    const created = await this.deps.repository.update(userId, (current) => {
+    const created = await this.deps.repository.update(userId, async (current) => {
+      await assertContextActive(context)
       prepare(current)
       const inside = current.weak_points.filter((point) => (point.source || 'observed') === 'observed' && point.axis !== 'performance' && !point.improved && !point.archived)
       const output: WeakPoint[] = []
@@ -653,26 +658,28 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
       current.last_consolidation_at = now
       return output
     })
-    if (created.length) await this.appendMemories(userId, created.map((point) => ({ chunkType: 'weak_point', content: point.point, topic: point.topic, metadata: { source: 'consolidated' } })), now)
+    if (created.length) await this.appendMemories(userId, created.map((point) => ({ chunkType: 'weak_point', content: point.point, topic: point.topic ?? undefined, metadata: { source: 'consolidated' } })), now, context)
   }
 
-  async afterReview(input: { userId: string; session: InterviewSession }): Promise<Record<string, unknown>> {
+  async afterReview(input: { userId: string; session: InterviewSession; context?: RequestContext }): Promise<Record<string, unknown>> {
+    const context = this.context(input.userId, input.session.session_id, input.context)
+    await assertContextActive(context)
     const before = await this.profile(input.userId)
     const cached = object(object(before.session_extractions)[input.session.session_id])
     if (Object.hasOwn(object(before.session_extractions), input.session.session_id)) {
-      await this.projectSessionMemory(input.userId, input.session.session_id, before._pending_memory?.[input.session.session_id])
+      await this.projectSessionMemory(input.userId, input.session.session_id, before._pending_memory?.[input.session.session_id], context)
       return cached
     }
     const transcript = input.session.transcript.map((message) => `${message.role === 'user' ? '候选人' : '面试官'}: ${message.content}`).join('\n')
-    const context = this.context(input.userId, input.session.session_id)
     let extraction: Record<string, unknown> | undefined
     for (let attempt = 0; attempt < 2 && !extraction; attempt += 1) {
       try {
         const parsed = parseJsonResponse(await this.deps.ai.complete(context, [{ role: 'system', content: '你是面试分析引擎。只返回 JSON。' }, { role: 'user', content: fill(EXTRACT_PROMPT, { mode: input.session.mode, topic: input.session.topic || '综合', transcript, scores: JSON.stringify(input.session.scores), existing_behavior_signals: behaviorSummary(before), review: input.session.review || '' }) }], STRUCTURED_CHAT_OPTIONS))
         extraction = validateProfileExtraction(parsed)
       }
-      catch { /* retry once */ }
+      catch { await assertContextActive(context) /* retry once unless cancelled */ }
     }
+    await assertContextActive(context)
     if (!extraction) throw new Error('画像提取失败')
     const now = new Date().toISOString()
     const weak = (Array.isArray(extraction.weak_points) ? extraction.weak_points : []).map(object).filter((item) => text(item.point))
@@ -682,10 +689,11 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
       ...before.weak_points.map((point) => point.point), ...before.strong_points.map((point) => point.point),
       ...weak.map((item) => text(item.point)), ...strong.map((item) => text(item.point)), ...observations.map((item) => item.text),
     ]
-    const vectors = await this.vectorsFor(input.userId, embeddingTexts, 'profile-update')
+    const vectors = await this.vectorsFor(input.userId, embeddingTexts, 'profile-update', context)
     const overallScore = number(object(input.session.overall).avg_score) ?? number(extraction.avg_score) ?? roundedAverage(input.session.scores.map((score) => number(score.score)).filter((score): score is number => score !== undefined)) ?? 5
 
-    const applied = await this.deps.repository.update(input.userId, (profile) => {
+    const applied = await this.deps.repository.update(input.userId, async (profile) => {
+      await assertContextActive(context)
       // The initial load happens before LLM/embedding I/O; recheck under the repository lock.
       const existing = object(object(profile.session_extractions)[input.session.session_id])
       if (Object.hasOwn(object(profile.session_extractions), input.session.session_id)) return { extraction: existing, pending: profile._pending_memory?.[input.session.session_id], fresh: false }
@@ -744,8 +752,8 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
       return { extraction: extraction!, pending, fresh: true }
     })
 
-    await this.projectSessionMemory(input.userId, input.session.session_id, applied.pending)
-    if (applied.fresh) await this.consolidate(input.userId, now)
+    await this.projectSessionMemory(input.userId, input.session.session_id, applied.pending, context)
+    if (applied.fresh) await this.consolidate(input.userId, now, context)
     return applied.extraction
   }
 }

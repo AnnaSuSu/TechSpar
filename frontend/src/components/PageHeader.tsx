@@ -15,6 +15,20 @@ export interface PageHeaderProps {
   className?: string;
 }
 
+function BackButton({ to, label }: { to: string; label: string }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(to)}
+      className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-dim transition-colors hover:text-text"
+    >
+      <ArrowLeft size={14} />
+      {label}
+    </button>
+  );
+}
+
 export default function PageHeader({
   title,
   description,
@@ -26,8 +40,6 @@ export default function PageHeader({
   bordered = false,
   className,
 }: PageHeaderProps) {
-  const navigate = useNavigate();
-
   return (
     <header
       className={cn(
@@ -37,16 +49,7 @@ export default function PageHeader({
       )}
     >
       <div className="min-w-0 flex-1">
-        {backTo && (
-          <button
-            type="button"
-            onClick={() => navigate(backTo)}
-            className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-dim transition-colors hover:text-text"
-          >
-            <ArrowLeft size={14} />
-            {backLabel}
-          </button>
-        )}
+        {backTo && <BackButton to={backTo} label={backLabel} />}
         <div className="flex items-start gap-3.5">
           {icon && (
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-sm shadow-primary/5">

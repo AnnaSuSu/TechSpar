@@ -132,3 +132,51 @@ describe('recording review', () => {
     sessions.close()
   })
 })
+
+test('Copilot conversations use durable dual review tasks and retain their source snapshot', async () => {
+  const sessions = new BunInterviewSessionRepository(await databasePath()); sessions.initialize()
+  const queued: TaskRecord[] = []; const written: string[] = []
+  const tasks: PersistentTaskDispatcher = { async enqueue(input) { const value = { ...task(input.taskId), type: input.type }; queued.push(value); return value }, async get() { return undefined } }
+  const profile: CandidateProfilePort = { async summary() { return '' }, async targetRole() { return '' }, async updateTargetRole() {}, async afterReview({ session }) { written.push(session.mode); return {} } }
+  const ai = new Replies([
+    JSON.stringify({ qa_pairs: [{ id: 1, question: '解释事件循环', answer: '调用栈和任务队列' }] }),
+    JSON.stringify({ scores: [{ question_id: 1, score: 8 }], overall: { avg_score: 8, summary: '回答清晰' } }),
+  ])
+  const service = new RecordingService({ sessions, tasks, ids: { next: () => 'unused' }, ai, profile, transcription: { async transcribe() { throw new Error('Copilot must not transcribe audio') } } })
+  try {
+    const transcript = '面试官: 解释事件循环\n\n候选人: 调用栈和任务队列'
+    expect(await service.analyzeConversation(context, { sessionId: 'copilot-review', transcript, company: '示例', position: '工程师', meta: { copilot_session_id: 'live', prep_id: 'prep' } })).toEqual({ session_id: 'copilot-review', status: 'pending' })
+    expect(queued).toMatchObject([{ type: 'copilot_review', user_id: 'user-a', task_id: 'copilot-review' }])
+    await service.runAnalysisTask(queued[0]!)
+    const result = await sessions.get('copilot-review', 'user-a')
+    expect(result).toMatchObject({ mode: 'copilot', status: 'reviewed', meta: { source_transcript: transcript, recording_mode: 'dual', copilot_session_id: 'live', prep_id: 'prep', company: '示例', position: '工程师' }, scores: [{ score: 8 }] })
+    expect(result?.topic).toBeFalsy()
+    expect(result?.review).toContain('调用栈和任务队列')
+    expect(written).toEqual(['copilot'])
+  } finally { sessions.close() }
+})
+
+test('failed Copilot enqueue removes the incomplete review so a retry leaves no orphan', async () => {
+  const sessions = new BunInterviewSessionRepository(await databasePath()); sessions.initialize()
+  const service = new RecordingService({ sessions, tasks: { async enqueue() { throw new Error('offline') }, async get() { return undefined } }, ids: { next: () => 'unused' }, ai: new Replies([]), profile: { async summary() { return '' }, async targetRole() { return '' }, async updateTargetRole() {} }, transcription: { async transcribe() { return '' } } })
+  try {
+    await expect(service.analyzeConversation(context, { sessionId: 'failed', transcript: '面试官: 问题\n候选人: 回答', meta: { copilot_session_id: 'live', prep_id: 'prep' } })).rejects.toThrow('offline')
+    expect(await sessions.get('failed', 'user-a')).toBeUndefined()
+  } finally { sessions.close() }
+})
+
+test('recovers a crash between saving a Copilot snapshot and queueing without creating a second session', async () => {
+  const sessions = new BunInterviewSessionRepository(await databasePath()); sessions.initialize()
+  const queued: TaskRecord[] = []
+  const tasks: PersistentTaskDispatcher = { async enqueue(input) { const value = { ...task(input.taskId), type: input.type }; queued.push(value); return value }, async get(id) { return queued.find((task) => task.task_id === id) } }
+  const service = new RecordingService({ sessions, tasks, ids: { next: () => 'unused' }, ai: new Replies([]), profile: { async summary() { return '' }, async targetRole() { return '' }, async updateTargetRole() {} }, transcription: { async transcribe() { return '' } } })
+  try {
+    await sessions.create({ sessionId: 'interrupted', userId: 'user-a', mode: 'copilot', meta: { source_transcript: '面试官: 问题\n候选人: 回答', recording_mode: 'dual' } })
+    expect(await service.recoverConversation(context, 'interrupted')).toBeTrue()
+    expect(await service.recoverConversation(context, 'interrupted')).toBeTrue()
+    expect(await service.recoverConversation({ ...context, userId: 'user-b' }, 'interrupted')).toBeFalse()
+    expect(queued).toHaveLength(1)
+    expect(queued[0]?.type).toBe('copilot_review')
+    expect(await sessions.get('interrupted', 'user-a')).toMatchObject({ status: 'reviewing' })
+  } finally { sessions.close() }
+})

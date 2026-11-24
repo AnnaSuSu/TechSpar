@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
+  AiService,
   CopilotPrepService,
   CopilotRealtimeService,
   type CandidateProfilePort,
@@ -15,6 +16,7 @@ import {
   type TextGenerationUseCases,
 } from '@techspar/core'
 import { BunCopilotRepository } from '@techspar/db'
+import { OpenAiChatDriverFactory } from '@techspar/providers'
 import { within } from './helpers/realtime-asr.ts'
 
 const directories: string[] = []
@@ -183,6 +185,44 @@ describe('Copilot realtime', () => {
       expect(events.some(event => event.type === 'error')).toBeFalse()
       if (mode === 'valid') expect(events.find(event => event.type === 'hr_profile_update')).toMatchObject({ extension: { kept: true } })
       expect((await repository.loadSession('live', 'user-a'))?.turn_count).toBe(3)
+    } finally { await connection.close(); repository.close() }
+  })
+
+  test.each(['generic', 'deepseek'] as const)('streams a visible answer with saved %s reasoning through the real provider', async (compatibility) => {
+    const repository = new BunCopilotRepository(await databasePath()); repository.initialize()
+    await repository.createPrep({ prepId: 'ready', userId: 'user-a', company: '', position: '', jdText: 'JD' })
+    await repository.completePrep('ready', 'user-a', { question_strategy_tree: { nodes: {} } })
+    const deps = dependencies(repository, { async enqueue(input) { return queued(input) }, async get() { return undefined } })
+    const stored = await deps.settings.loadProvider('user-a')
+    deps.settings.loadProvider = async () => ({ ...stored, llm: { api_base: 'https://example.test/v1', api_key: 'synthetic', model: 'test-model', compatibility, temperature: 0.7, use_platform: false, reasoning_effort: 'high' } })
+    const requests: Array<Record<string, unknown>> = []
+    const usage: Array<{ completionTokens?: number }> = []
+    const factory = new OpenAiChatDriverFactory({ fetch: (async (_input, init) => {
+      const body = JSON.parse(String(init?.body))
+      if (!body.stream) return Response.json({ choices: [{ message: { content: '{}' } }] })
+      requests.push(body)
+      // The synthetic model needs 1024 thinking tokens before it can produce an answer.
+      const exhausted = Number(body.max_completion_tokens ?? body.max_tokens) <= 1024
+      const chunks = [
+        { choices: [{ index: 0, delta: exhausted ? {} : { content: '先讲结论，再给例子。' }, finish_reason: null }] },
+        { choices: [{ index: 0, delta: {}, finish_reason: exhausted ? 'length' : 'stop' }] },
+        { choices: [], usage: { prompt_tokens: 20, completion_tokens: exhausted ? 600 : 1040 } },
+      ]
+      return new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
+    }) as typeof fetch })
+    deps.ai = new AiService(deps.settings, { llm: { api_base: '', api_key: '', model: '' }, embedding: { api_base: '', api_key: '', api_model: '' }, dailyCallLimit: 0, tokenLimit: 0, tokenWindow: 'day' }, {
+      async check() {}, async status() { return { source: 'user', used: 0, limit: null, unit: 'token', window: 'day' } }, async record(value) { usage.push(value) },
+    }, factory)
+    const events: Array<Record<string, unknown>> = []
+    const connection = new CopilotRealtimeService(deps).connect(context, 'reasoning', async event => { events.push(event) })
+    try {
+      await connection.handle({ type: 'start', prep_id: 'ready' })
+      await connection.handle({ type: 'manual', text: '请解释事件循环' })
+      expect(requests).toHaveLength(1)
+      expect(requests[0]?.reasoning_effort).toBe('high')
+      expect(events.filter(event => event.type === 'answer_chunk').map(event => event.text).join('')).toBe('先讲结论，再给例子。')
+      expect(events.find(event => event.type === 'answer_done')).toMatchObject({ chunk_count: 1 })
+      expect(usage).toContainEqual(expect.objectContaining({ completionTokens: 1040 }))
     } finally { await connection.close(); repository.close() }
   })
 

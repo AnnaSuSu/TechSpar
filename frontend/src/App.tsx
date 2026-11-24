@@ -10,8 +10,7 @@ import useTheme from "./hooks/useTheme";
 import Sidebar from "./components/Sidebar";
 import TaskNotification from "./components/TaskNotification";
 import ErrorBoundary from "./components/ErrorBoundary";
-import ErrorState from "./components/ErrorState";
-import { Button } from "./components/ui/button";
+import SessionRecovery from "./components/SessionRecovery";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
@@ -42,23 +41,9 @@ function RouteLoadingFallback() {
 }
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { token, loading, authError, retryAuth, logout } = useAuth();
+  const { token, loading } = useAuth();
   if (loading) return <RouteLoadingFallback />;
   if (!token) return <Navigate to="/" replace />;
-  if (authError) {
-    return (
-      <div className="grid min-h-screen place-items-center px-4 py-8">
-        <ErrorState
-          title="无法连接账户服务"
-          message={authError}
-          onRetry={retryAuth}
-          retryLabel="重新连接"
-          className="w-full max-w-lg"
-          action={<Button variant="ghost" size="sm" onClick={logout}>退出登录</Button>}
-        />
-      </div>
-    );
-  }
   return children;
 }
 
@@ -132,6 +117,8 @@ function WorkspaceRoutes() {
 }
 
 function AppRoutes() {
+  const { verificationError } = useAuth();
+  if (verificationError) return <SessionRecovery />;
   return (
     <Suspense fallback={<RouteLoadingFallback />}>
       <Routes>

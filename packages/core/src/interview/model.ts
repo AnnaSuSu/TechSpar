@@ -1,7 +1,7 @@
-export const INTERVIEW_MODES = ['resume', 'topic_drill', 'jd_prep', 'recording'] as const
+export const INTERVIEW_MODES = ['resume', 'topic_drill', 'jd_prep', 'recording', 'copilot'] as const
 export type InterviewMode = (typeof INTERVIEW_MODES)[number]
 
-export const SESSION_STATUSES = ['ongoing', 'ended', 'reviewing', 'reviewed', 'review_failed'] as const
+export const SESSION_STATUSES = ['prepared', 'ongoing', 'ended', 'reviewing', 'reviewed', 'review_failed'] as const
 export type SessionStatus = (typeof SESSION_STATUSES)[number]
 
 export const INTERVIEW_PHASES = [
@@ -105,6 +105,8 @@ export type TaskRecord = {
   lease_expires_at?: string | null
   created_at: string
   updated_at: string
+  signal?: AbortSignal
+  assertActive?: () => Promise<void>
 }
 
 export type StartInterviewInput = {
@@ -117,6 +119,8 @@ export type StartInterviewInput = {
 }
 
 export type JobPrepInput = {
+  request_id?: string
+  session_id?: string
   jd_text: string
   company?: string
   position?: string

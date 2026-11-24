@@ -78,6 +78,8 @@ export class PersistentTaskQueue implements PersistentTaskDispatcher {
   private async run(taskId: string, userId: string, key: string): Promise<void> {
     let claimed = false
     let heartbeat: ReturnType<typeof setInterval> | undefined
+    const controller = new AbortController()
+    let renewing: Promise<void> | undefined
     const stopHeartbeat = (): void => {
       if (heartbeat) clearInterval(heartbeat)
       heartbeat = undefined
@@ -87,12 +89,24 @@ export class PersistentTaskQueue implements PersistentTaskDispatcher {
       const task = await this.repository.claim(taskId, userId, lease)
       if (!task) return
       claimed = true
-      heartbeat = setInterval(() => void this.repository.renew(taskId, userId, lease).catch(() => false), this.heartbeatIntervalMs)
+      const assertActive = async (): Promise<void> => {
+        controller.signal.throwIfAborted()
+        if (!renewing) {
+          renewing = this.repository.renew(taskId, userId, lease)
+            .then((renewed) => { if (!renewed) throw new Error('Task lease was lost') })
+            .catch((error) => { controller.abort(error); throw error })
+            .finally(() => { renewing = undefined })
+        }
+        await renewing
+        controller.signal.throwIfAborted()
+      }
+      heartbeat = setInterval(() => { void assertActive().catch(() => undefined) }, this.heartbeatIntervalMs)
       const unref = heartbeat as unknown as { unref?: () => void }
       unref.unref?.()
       const handler = this.handlers.get(task.type)
       if (!handler) throw new Error(`No task handler registered for ${task.type}`)
-      const result = await handler(task)
+      const result = await handler({ ...task, signal: controller.signal, assertActive })
+      await assertActive()
       stopHeartbeat()
       await this.repository.complete(taskId, userId, this.owner, result)
     } catch (error) {

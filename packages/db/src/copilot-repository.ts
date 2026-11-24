@@ -19,11 +19,15 @@ export class BunCopilotRepository implements CopilotRepository {
       CREATE INDEX IF NOT EXISTS idx_copilot_preps_user ON copilot_preps(user_id);
       CREATE TABLE IF NOT EXISTS copilot_realtime_sessions (
         session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, prep_id TEXT NOT NULL, conversation TEXT NOT NULL DEFAULT '[]',
-        last_node_id TEXT, turn_count INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active',
+        last_node_id TEXT, review_session_id TEXT, review_claimed_at TEXT, turn_count INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_copilot_realtime_user ON copilot_realtime_sessions(user_id, updated_at DESC);
     `)
+    const columns = this.sqlite.query<{ name: string }, []>('PRAGMA table_info(copilot_realtime_sessions)').all()
+    for (const column of ['review_session_id', 'review_claimed_at']) {
+      if (!columns.some((item) => item.name === column)) this.sqlite.exec(`ALTER TABLE copilot_realtime_sessions ADD COLUMN ${column} TEXT`)
+    }
   }
   async createPrep(input: { prepId: string; userId: string; company: string; position: string; jdText: string }): Promise<void> {
     this.sqlite.query("INSERT INTO copilot_preps (prep_id, user_id, company, position, jd_text, status, progress, error) VALUES ($id, $userId, $company, $position, $jd, 'running', '初始化中...', '')").run({ $id: input.prepId, $userId: input.userId, $company: input.company, $position: input.position, $jd: input.jdText })
@@ -42,6 +46,25 @@ export class BunCopilotRepository implements CopilotRepository {
       VALUES ($id, $userId, $prepId, $conversation, $lastNodeId, $turnCount, $status, $createdAt, $updatedAt)
       ON CONFLICT(session_id) DO UPDATE SET prep_id = excluded.prep_id, conversation = excluded.conversation, last_node_id = excluded.last_node_id, turn_count = excluded.turn_count, status = excluded.status, updated_at = excluded.updated_at
       WHERE copilot_realtime_sessions.user_id = excluded.user_id`).run({ $id: state.session_id, $userId: state.user_id, $prepId: state.prep_id, $conversation: JSON.stringify(state.conversation), $lastNodeId: state.last_node_id || null, $turnCount: state.turn_count, $status: state.status, $createdAt: state.created_at, $updatedAt: state.updated_at })
+  }
+  async updateSession(state: CopilotSessionState): Promise<boolean> {
+    return this.sqlite.query(`UPDATE copilot_realtime_sessions SET prep_id = $prepId, conversation = $conversation, last_node_id = $lastNodeId, turn_count = $turnCount, status = $status, updated_at = $updatedAt
+      WHERE session_id = $id AND user_id = $userId`).run({ $id: state.session_id, $userId: state.user_id, $prepId: state.prep_id, $conversation: JSON.stringify(state.conversation), $lastNodeId: state.last_node_id || null, $turnCount: state.turn_count, $status: state.status, $updatedAt: state.updated_at }).changes > 0
+  }
+  async listSessions(prepId: string, userId: string): Promise<CopilotSessionState[]> {
+    return this.sqlite.query<SessionRow, [string, string]>('SELECT * FROM copilot_realtime_sessions WHERE prep_id = ? AND user_id = ? ORDER BY updated_at DESC, rowid DESC').all(prepId, userId).map(session)
+  }
+  async deleteSession(sessionId: string, userId: string): Promise<boolean> {
+    return this.sqlite.query('DELETE FROM copilot_realtime_sessions WHERE session_id = ? AND user_id = ?').run(sessionId, userId).changes > 0
+  }
+  async linkReview(sessionId: string, userId: string, reviewId: string, expected: string | null, claimedAt: string): Promise<boolean> {
+    return this.sqlite.query('UPDATE copilot_realtime_sessions SET review_session_id = ?, review_claimed_at = ? WHERE session_id = ? AND user_id = ? AND review_session_id IS ?').run(reviewId, claimedAt, sessionId, userId, expected).changes > 0
+  }
+  async completeReviewLink(sessionId: string, userId: string, reviewId: string): Promise<void> {
+    this.sqlite.query('UPDATE copilot_realtime_sessions SET review_claimed_at = NULL WHERE session_id = ? AND user_id = ? AND review_session_id = ?').run(sessionId, userId, reviewId)
+  }
+  async unlinkReview(sessionId: string, userId: string, reviewId: string): Promise<void> {
+    this.sqlite.query('UPDATE copilot_realtime_sessions SET review_session_id = NULL, review_claimed_at = NULL WHERE session_id = ? AND user_id = ? AND review_session_id = ?').run(sessionId, userId, reviewId)
   }
   close(): void { this.sqlite.close() }
 }

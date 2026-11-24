@@ -2,13 +2,16 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TechSpar",
-    "version": "0.4.1"
+    "version": "0.4.2"
   },
   "components": {
     "schemas": {
       "JobPrepPreviewResponse": {
         "type": "object",
         "properties": {
+          "session_id": {
+            "type": "string"
+          },
           "preview": {
             "type": "object",
             "properties": {
@@ -128,9 +131,7 @@
               },
               "question_blueprint": {
                 "type": "array",
-                "items": {
-                  "nullable": true
-                },
+                "items": {},
                 "description": "New model-produced blueprint items are validated in core; persisted and caller-supplied legacy items remain compatible."
               },
               "jd_excerpt": {
@@ -152,6 +153,7 @@
           }
         },
         "required": [
+          "session_id",
           "preview"
         ],
         "additionalProperties": false
@@ -203,16 +205,12 @@
                 "id",
                 "question"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "preview": {
             "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
+            "additionalProperties": {},
             "description": "Caller-supplied preview_data is echoed unchanged, including legacy partial previews."
           },
           "company": {
@@ -238,9 +236,7 @@
               },
               "preview": {
                 "type": "object",
-                "additionalProperties": {
-                  "nullable": true
-                },
+                "additionalProperties": {},
                 "description": "Caller-supplied preview_data is echoed unchanged, including legacy partial previews."
               }
             },
@@ -317,9 +313,7 @@
                     "id",
                     "question"
                   ],
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             },
@@ -344,8 +338,10 @@
                 ]
               },
               "topic": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "target_role": {
                 "type": "string"
@@ -400,7 +396,8 @@
               "resume",
               "topic_drill",
               "jd_prep",
-              "recording"
+              "recording",
+              "copilot"
             ]
           },
           "status": {
@@ -455,6 +452,7 @@
               "status": {
                 "type": "string",
                 "enum": [
+                  "prepared",
                   "ended",
                   "reviewing",
                   "reviewed",
@@ -489,16 +487,20 @@
               "resume",
               "topic_drill",
               "jd_prep",
-              "recording"
+              "recording",
+              "copilot"
             ]
           },
           "topic": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string",
             "enum": [
+              "prepared",
               "ongoing",
               "ended",
               "reviewing",
@@ -507,8 +509,10 @@
             ]
           },
           "review_error": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "transcript": {
             "type": "array",
@@ -533,9 +537,7 @@
                 "role",
                 "content"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "questions": {
@@ -573,9 +575,7 @@
                 "id",
                 "question"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "target_role": {
@@ -586,9 +586,7 @@
           },
           "meta": {
             "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
+            "additionalProperties": {},
             "description": "Persisted session metadata; legacy/provider extensions are preserved."
           },
           "can_continue": {
@@ -628,18 +626,19 @@
               "resume",
               "topic_drill",
               "jd_prep",
-              "recording"
+              "recording",
+              "copilot"
             ]
           },
           "topic": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "meta": {
             "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
+            "additionalProperties": {},
             "description": "Persisted session metadata; legacy/provider extensions are preserved."
           },
           "questions": {
@@ -677,9 +676,7 @@
                 "id",
                 "question"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "transcript": {
@@ -705,32 +702,24 @@
                 "role",
                 "content"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "scores": {
             "type": "array",
             "items": {
               "type": "object",
-              "additionalProperties": {
-                "nullable": true
-              },
+              "additionalProperties": {},
               "description": "Persisted review content; new LLM output is validated before writes while legacy fields are preserved."
             }
           },
           "weak_points": {
             "type": "array",
-            "items": {
-              "nullable": true
-            }
+            "items": {}
           },
           "overall": {
             "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
+            "additionalProperties": {},
             "description": "Persisted review content; new LLM output is validated before writes while legacy fields are preserved."
           },
           "reference_answers": {
@@ -740,12 +729,15 @@
             }
           },
           "review": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string",
             "enum": [
+              "prepared",
               "ongoing",
               "ended",
               "reviewing",
@@ -754,8 +746,10 @@
             ]
           },
           "review_error": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "user_id": {
             "type": "string"
@@ -799,17 +793,17 @@
                 "type": "string"
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
               "status",
               "type"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           {
             "type": "object",
@@ -824,17 +818,17 @@
                 "type": "string"
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
               "status",
               "type"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           {
             "type": "object",
@@ -852,12 +846,15 @@
                   "drill_review",
                   "jd_review",
                   "recording_review",
+                  "copilot_review",
                   "review"
                 ]
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "session_id": {
                 "type": "string",
@@ -889,8 +886,10 @@
                 "type": "string"
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -916,8 +915,10 @@
                 ]
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "topic": {
                 "type": "string"
@@ -958,21 +959,21 @@
               },
               "type": {
                 "type": "string",
-                "pattern": "^(?!(?:resume_review|drill_review|jd_review|recording_review|review|copilot_prep|retrospective)$)[^]*$",
+                "pattern": "^(?!(?:resume_review|drill_review|jd_review|recording_review|copilot_review|review|copilot_prep|retrospective)$)[^]*$",
                 "description": "Legacy/extension task type, explicitly excluding all known types."
               },
               "error": {
-                "type": "string",
-                "nullable": true
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
               "status",
               "type"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           }
         ]
       },
@@ -993,30 +994,34 @@
                     "resume",
                     "topic_drill",
                     "jd_prep",
-                    "recording"
+                    "recording",
+                    "copilot"
                   ]
                 },
                 "topic": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "meta": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  },
+                  "additionalProperties": {},
                   "description": "Persisted session metadata; legacy/provider extensions are preserved."
                 },
                 "created_at": {
                   "type": "string"
                 },
                 "avg_score": {
-                  "type": "number",
-                  "nullable": true
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 },
                 "status": {
                   "type": "string",
                   "enum": [
+                    "prepared",
                     "ongoing",
                     "ended",
                     "reviewing",
@@ -1025,8 +1030,10 @@
                   ]
                 },
                 "review_error": {
-                  "type": "string",
-                  "nullable": true
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -1093,9 +1100,7 @@
                   "type": "string"
                 }
               },
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "weak_points": {
@@ -1107,7 +1112,10 @@
                   "type": "string"
                 },
                 "topic": {
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "first_seen": {
                   "type": "string"
@@ -1160,9 +1168,7 @@
                         "type": "number"
                       }
                     },
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "additionalProperties": {}
                   }
                 },
                 "sr": {
@@ -1181,12 +1187,13 @@
                       "type": "string"
                     },
                     "last_score": {
-                      "type": "number"
+                      "type": [
+                        "number",
+                        "null"
+                      ]
                     }
                   },
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 },
                 "consolidates": {
                   "type": "array",
@@ -1201,9 +1208,7 @@
               "required": [
                 "point"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "strong_points": {
@@ -1215,7 +1220,10 @@
                   "type": "string"
                 },
                 "topic": {
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "first_seen": {
                   "type": "string"
@@ -1268,18 +1276,14 @@
                         "type": "number"
                       }
                     },
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "additionalProperties": {}
                   }
                 }
               },
               "required": [
                 "point"
               ],
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "behavior_signals": {
@@ -1288,7 +1292,10 @@
               "type": "object",
               "properties": {
                 "topic": {
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "first_seen": {
                   "type": "string"
@@ -1341,9 +1348,7 @@
                         "type": "number"
                       }
                     },
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "additionalProperties": {}
                   }
                 },
                 "namespace": {
@@ -1370,15 +1375,11 @@
                         "type": "string"
                       }
                     },
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "additionalProperties": {}
                   }
                 }
               },
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "communication": {
@@ -1405,9 +1406,7 @@
               "habits",
               "suggestions"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           "thinking_patterns": {
             "type": "object",
@@ -1429,9 +1428,7 @@
               "strengths",
               "gaps"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           "stats": {
             "type": "object",
@@ -1463,8 +1460,10 @@
                       "type": "string"
                     },
                     "topic": {
-                      "type": "string",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     },
                     "avg_score": {
                       "type": "number"
@@ -1479,9 +1478,7 @@
                       }
                     }
                   },
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               },
               "total_answers": {
@@ -1520,9 +1517,7 @@
               "avg_score",
               "score_history"
             ],
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           "view_marker": {
             "type": "object",
@@ -1540,9 +1535,7 @@
                 }
               }
             },
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           "due_reviews": {
             "type": "array",
@@ -1553,7 +1546,10 @@
                   "type": "string"
                 },
                 "topic": {
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "next_review": {
                   "type": "string"
@@ -1567,9 +1563,7 @@
           },
           "session_extractions": {
             "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
+            "additionalProperties": {},
             "description": "Persisted extraction cache; new LLM extractions are validated before writes."
           }
         },
@@ -1587,9 +1581,7 @@
           "stats",
           "due_reviews"
         ],
-        "additionalProperties": {
-          "nullable": true
-        }
+        "additionalProperties": {}
       },
       "ProfileViewedResponse": {
         "type": "object",
@@ -1621,7 +1613,10 @@
             "type": "string"
           },
           "topic": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "first_seen": {
             "type": "string"
@@ -1674,9 +1669,7 @@
                   "type": "number"
                 }
               },
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             }
           },
           "sr": {
@@ -1695,12 +1688,13 @@
                 "type": "string"
               },
               "last_score": {
-                "type": "number"
+                "type": [
+                  "number",
+                  "null"
+                ]
               }
             },
-            "additionalProperties": {
-              "nullable": true
-            }
+            "additionalProperties": {}
           },
           "consolidates": {
             "type": "array",
@@ -1715,9 +1709,7 @@
         "required": [
           "point"
         ],
-        "additionalProperties": {
-          "nullable": true
-        }
+        "additionalProperties": {}
       },
       "ProfileDueReviewsResponse": {
         "type": "array",
@@ -1728,7 +1720,10 @@
               "type": "string"
             },
             "topic": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "first_seen": {
               "type": "string"
@@ -1781,9 +1776,7 @@
                     "type": "number"
                   }
                 },
-                "additionalProperties": {
-                  "nullable": true
-                }
+                "additionalProperties": {}
               }
             },
             "sr": {
@@ -1802,12 +1795,13 @@
                   "type": "string"
                 },
                 "last_score": {
-                  "type": "number"
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               },
-              "additionalProperties": {
-                "nullable": true
-              }
+              "additionalProperties": {}
             },
             "consolidates": {
               "type": "array",
@@ -1822,9 +1816,7 @@
           "required": [
             "point"
           ],
-          "additionalProperties": {
-            "nullable": true
-          }
+          "additionalProperties": {}
         }
       },
       "ProfileTopicHistoryResponse": {
@@ -1841,18 +1833,19 @@
                 "resume",
                 "topic_drill",
                 "jd_prep",
-                "recording"
+                "recording",
+                "copilot"
               ]
             },
             "topic": {
-              "type": "string",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "meta": {
               "type": "object",
-              "additionalProperties": {
-                "nullable": true
-              },
+              "additionalProperties": {},
               "description": "Persisted session metadata; legacy/provider extensions are preserved."
             },
             "questions": {
@@ -1890,9 +1883,7 @@
                   "id",
                   "question"
                 ],
-                "additionalProperties": {
-                  "nullable": true
-                }
+                "additionalProperties": {}
               }
             },
             "transcript": {
@@ -1918,32 +1909,24 @@
                   "role",
                   "content"
                 ],
-                "additionalProperties": {
-                  "nullable": true
-                }
+                "additionalProperties": {}
               }
             },
             "scores": {
               "type": "array",
               "items": {
                 "type": "object",
-                "additionalProperties": {
-                  "nullable": true
-                },
+                "additionalProperties": {},
                 "description": "Persisted review content; new LLM output is validated before writes while legacy fields are preserved."
               }
             },
             "weak_points": {
               "type": "array",
-              "items": {
-                "nullable": true
-              }
+              "items": {}
             },
             "overall": {
               "type": "object",
-              "additionalProperties": {
-                "nullable": true
-              },
+              "additionalProperties": {},
               "description": "Persisted review content; new LLM output is validated before writes while legacy fields are preserved."
             },
             "reference_answers": {
@@ -1953,12 +1936,15 @@
               }
             },
             "review": {
-              "type": "string",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "status": {
               "type": "string",
               "enum": [
+                "prepared",
                 "ongoing",
                 "ended",
                 "reviewing",
@@ -1967,8 +1953,10 @@
               ]
             },
             "review_error": {
-              "type": "string",
-              "nullable": true
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "user_id": {
               "type": "string"
@@ -2506,6 +2494,9 @@
               "rebuilt": {
                 "type": "object",
                 "properties": {
+                  "session_memories": {
+                    "type": "boolean"
+                  },
                   "weak_points": {
                     "type": "boolean"
                   },
@@ -2520,6 +2511,7 @@
                   }
                 },
                 "required": [
+                  "session_memories",
                   "weak_points",
                   "personal_documents",
                   "topics"
@@ -2619,6 +2611,37 @@
     }
   },
   "paths": {
+    "/api/auth/me": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Verified token identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/": {
       "get": {
         "responses": {
@@ -2943,6 +2966,18 @@
                           ],
                           "default": "generic"
                         },
+                        "reasoning_effort": {
+                          "type": "string",
+                          "enum": [
+                            "",
+                            "none",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max"
+                          ]
+                        },
                         "use_platform": {
                           "type": "boolean",
                           "default": false
@@ -3174,6 +3209,18 @@
                           "deepseek"
                         ],
                         "default": "generic"
+                      },
+                      "reasoning_effort": {
+                        "type": "string",
+                        "enum": [
+                          "",
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max"
+                        ]
                       },
                       "use_platform": {
                         "type": "boolean",
@@ -3431,8 +3478,10 @@
                       "minimum": 0
                     },
                     "limit": {
-                      "type": "integer",
-                      "nullable": true,
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
                       "minimum": 0
                     },
                     "unit": {
@@ -3503,6 +3552,18 @@
                       "deepseek"
                     ],
                     "default": "generic"
+                  },
+                  "reasoning_effort": {
+                    "type": "string",
+                    "enum": [
+                      "",
+                      "none",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
                   },
                   "use_platform": {
                     "type": "boolean",
@@ -4361,18 +4422,14 @@
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "additionalProperties": {
-                          "nullable": true
-                        }
+                        "additionalProperties": {}
                       }
                     },
                     "links": {
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "additionalProperties": {
-                          "nullable": true
-                        }
+                        "additionalProperties": {}
                       }
                     }
                   },
@@ -4468,9 +4525,7 @@
             "description": "Resume PDF",
             "content": {
               "application/pdf": {
-                "schema": {
-                  "nullable": true
-                }
+                "schema": {}
               }
             }
           }
@@ -4532,9 +4587,7 @@
                     },
                     "parsed": {
                       "type": "object",
-                      "additionalProperties": {
-                        "nullable": true
-                      }
+                      "additionalProperties": {}
                     }
                   },
                   "required": [
@@ -4689,16 +4742,24 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
                   "jd_text": {
                     "type": "string"
                   },
                   "company": {
-                    "type": "string",
-                    "nullable": true
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "position": {
-                    "type": "string",
-                    "nullable": true
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "use_resume": {
                     "type": "boolean",
@@ -4748,32 +4809,89 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "jd_text": {
-                    "type": "string"
-                  },
-                  "company": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "position": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "use_resume": {
-                    "type": "boolean",
-                    "default": true
-                  },
-                  "preview_data": {
+                "anyOf": [
+                  {
                     "type": "object",
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "properties": {
+                      "request_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "jd_text": {
+                        "type": "string"
+                      },
+                      "company": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "position": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "use_resume": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "session_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "preview_data": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    },
+                    "required": [
+                      "jd_text",
+                      "session_id"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "request_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "jd_text": {
+                        "type": "string"
+                      },
+                      "company": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "position": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "use_resume": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "session_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "preview_data": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    },
+                    "required": [
+                      "request_id",
+                      "jd_text"
+                    ]
                   }
-                },
-                "required": [
-                  "jd_text"
                 ]
               }
             }
@@ -4823,17 +4941,19 @@
                       "resume",
                       "topic_drill",
                       "jd_prep",
-                      "recording"
+                      "recording",
+                      "copilot"
                     ]
                   },
                   "topic": {
-                    "type": "string",
-                    "nullable": true
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "num_questions": {
                     "type": "integer",
-                    "minimum": 0,
-                    "exclusiveMinimum": true
+                    "exclusiveMinimum": 0
                   },
                   "divergence": {
                     "type": "integer",
@@ -5039,9 +5159,7 @@
                         "question_id",
                         "answer"
                       ],
-                      "additionalProperties": {
-                        "nullable": true
-                      }
+                      "additionalProperties": {}
                     },
                     "default": []
                   }
@@ -5123,9 +5241,7 @@
                         "question_id",
                         "answer"
                       ],
-                      "additionalProperties": {
-                        "nullable": true
-                      }
+                      "additionalProperties": {}
                     },
                     "default": []
                   }
@@ -5406,8 +5522,10 @@
         "parameters": [
           {
             "schema": {
-              "type": "integer",
-              "nullable": true
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "required": false,
             "name": "limit",
@@ -5415,8 +5533,10 @@
           },
           {
             "schema": {
-              "type": "integer",
-              "nullable": true
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "required": false,
             "name": "offset",
@@ -5429,7 +5549,8 @@
                 "resume",
                 "topic_drill",
                 "jd_prep",
-                "recording"
+                "recording",
+                "copilot"
               ]
             },
             "required": false,
@@ -5829,9 +5950,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -5870,9 +5989,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -5956,9 +6073,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -5990,9 +6105,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -6074,8 +6187,10 @@
                 "type": "object",
                 "properties": {
                   "conversation_id": {
-                    "type": "string",
-                    "nullable": true
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "message": {
                     "type": "string",
@@ -6181,9 +6296,7 @@
             "description": "System backup",
             "content": {
               "application/gzip": {
-                "schema": {
-                  "nullable": true
-                }
+                "schema": {}
               }
             }
           }
@@ -6224,9 +6337,7 @@
             "description": "Personal backup",
             "content": {
               "application/gzip": {
-                "schema": {
-                  "nullable": true
-                }
+                "schema": {}
               }
             }
           },
@@ -6299,9 +6410,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -6366,9 +6475,7 @@
                     },
                     "segments": {
                       "type": "array",
-                      "items": {
-                        "nullable": true
-                      }
+                      "items": {}
                     }
                   },
                   "required": [
@@ -6418,13 +6525,17 @@
                     "default": "dual"
                   },
                   "company": {
-                    "type": "string",
-                    "nullable": true,
+                    "type": [
+                      "string",
+                      "null"
+                    ],
                     "maxLength": 200
                   },
                   "position": {
-                    "type": "string",
-                    "nullable": true,
+                    "type": [
+                      "string",
+                      "null"
+                    ],
                     "maxLength": 200
                   }
                 },
@@ -6457,6 +6568,687 @@
                   "required": [
                     "session_id",
                     "status"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/copilot/prep/{prep_id}/sessions": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "prep_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Copilot session list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "session_id": {
+                        "type": "string"
+                      },
+                      "prep_id": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "active",
+                          "stopped"
+                        ]
+                      },
+                      "hr_turns": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "candidate_turns": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "updated_at": {
+                        "type": "string"
+                      },
+                      "in_progress": {
+                        "type": "boolean",
+                        "description": "Still receiving turns; review and deletion return 409 until it ends."
+                      },
+                      "review_session_id": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "review_status": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "done",
+                              "error"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "missing"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "null: never reviewed; missing: the linked review was deleted and can be generated again."
+                      }
+                    },
+                    "required": [
+                      "session_id",
+                      "prep_id",
+                      "status",
+                      "hr_turns",
+                      "candidate_turns",
+                      "created_at",
+                      "updated_at",
+                      "in_progress",
+                      "review_session_id",
+                      "review_status"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/copilot/sessions/{session_id}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "session_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Copilot session get",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session_id": {
+                      "type": "string"
+                    },
+                    "prep_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "stopped"
+                      ]
+                    },
+                    "hr_turns": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "candidate_turns": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "in_progress": {
+                      "type": "boolean",
+                      "description": "Still receiving turns; review and deletion return 409 until it ends."
+                    },
+                    "review_session_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "review_status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "done",
+                            "error"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "missing"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "null: never reviewed; missing: the linked review was deleted and can be generated again."
+                    },
+                    "company": {
+                      "type": "string"
+                    },
+                    "position": {
+                      "type": "string"
+                    },
+                    "conversation": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "hr",
+                              "candidate"
+                            ]
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "role",
+                          "text",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "session_id",
+                    "prep_id",
+                    "status",
+                    "hr_turns",
+                    "candidate_turns",
+                    "created_at",
+                    "updated_at",
+                    "in_progress",
+                    "review_session_id",
+                    "review_status",
+                    "company",
+                    "position",
+                    "conversation"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "session_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Copilot session delete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/copilot/sessions/{session_id}/review": {
+      "post": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "session_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Copilot session review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "copilot_session_id": {
+                      "type": "string"
+                    },
+                    "review_session_id": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "copilot"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "done",
+                        "error"
+                      ]
+                    },
+                    "created": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "copilot_session_id",
+                    "review_session_id",
+                    "mode",
+                    "status",
+                    "created"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request could not be completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "detail"
                   ]
                 }
               }
@@ -6579,9 +7371,7 @@
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "additionalProperties": {
-                      "nullable": true
-                    }
+                    "additionalProperties": {}
                   }
                 }
               }
@@ -6614,9 +7404,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -6708,9 +7496,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "nullable": true
-                  }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -6750,12 +7536,16 @@
                       "type": "boolean"
                     },
                     "enrolled_at": {
-                      "type": "string",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     },
                     "speaker_nick": {
-                      "type": "string",
-                      "nullable": true
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   },
                   "required": [
@@ -6937,5 +7727,6 @@
         ]
       }
     }
-  }
+  },
+  "webhooks": {}
 }

@@ -18,6 +18,7 @@ export interface PersonalAgentRepository {
   getConversation(conversationId: string, userId: string): Promise<PersonalConversation | undefined>
   createConversation(input: { conversationId: string; userId: string; title: string }): Promise<PersonalConversation>
   saveConversation(conversationId: string, userId: string, messages: AgentMessage[]): Promise<void>
+  appendConversationMessages(conversationId: string, userId: string, messages: readonly AgentMessage[]): Promise<boolean>
   deleteConversation(conversationId: string, userId: string): Promise<boolean>
   recentConversationMemory(userId: string, excludeConversationId: string, limit: number): Promise<Array<Record<string, unknown>>>
   recentMistakes(userId: string, limit: number): Promise<Array<Record<string, unknown>>>

@@ -1,10 +1,12 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi'
 import type { UpgradeWebSocket, WSContext, WSMessageReceive } from 'hono/ws'
 import { z } from 'zod'
-import { decodeCopilotAudio, CopilotClientMessageSchema, CopilotPrepCreateSchema, CopilotPrepCreatedSchema, CopilotPrepListSchema, CopilotPrepObjectSchema, OkSchema } from '@techspar/contracts'
-import type { CopilotPrepUseCases, CopilotRealtimeConnection, CopilotRealtimeUseCases, RequestContext, TokenService } from '@techspar/core'
+import { CopilotSessionListSchema, CopilotSessionDetailSchema, CopilotReviewSubmissionResponseSchema, decodeCopilotAudio, CopilotClientMessageSchema, CopilotPrepCreateSchema, CopilotPrepCreatedSchema, CopilotPrepListSchema, CopilotPrepObjectSchema, OkSchema } from '@techspar/contracts'
+import type { CopilotSessionUseCases, CopilotPrepUseCases, CopilotRealtimeConnection, CopilotRealtimeUseCases, RequestContext, TokenService } from '@techspar/core'
 import { copilotSender } from '../http/events.ts'
 import { authenticatedContext } from '../http/context.ts'
+
+import { validateResponse } from '../http/response.ts'
 
 const PrepPath = z.object({ prep_id: z.string() })
 
@@ -19,6 +21,19 @@ export function registerCopilotRoutes(app: OpenAPIHono, deps: { prep: CopilotPre
     async (c) => c.json(await deps.prep.tree(await authenticatedContext(c, deps.tokens), c.req.valid('param').prep_id)))
   app.openapi(createRoute({ method: 'delete', path: '/api/copilot/prep/{prep_id}', request: { params: PrepPath }, responses: { 200: { content: { 'application/json': { schema: OkSchema } }, description: 'Deleted Copilot preparation' } } }),
     async (c) => c.json(await deps.prep.delete(await authenticatedContext(c, deps.tokens), c.req.valid('param').prep_id)))
+}
+
+export function registerCopilotSessionRoutes(app: OpenAPIHono, deps: { sessions: CopilotSessionUseCases; tokens: TokenService }): void {
+  const SessionPath = z.object({ session_id: z.string() })
+  const error = { content: { 'application/json': { schema: z.object({ detail: z.string() }) } }, description: 'Request could not be completed' }
+  app.openapi(createRoute({ method: 'get', path: '/api/copilot/prep/{prep_id}/sessions', request: { params: PrepPath }, responses: { 200: { content: { 'application/json': { schema: CopilotSessionListSchema } }, description: 'Copilot session list' }, 400: error, 401: error, 404: error, 409: error } }),
+    async (c) => c.json(validateResponse(CopilotSessionListSchema, await deps.sessions.list(await authenticatedContext(c, deps.tokens), c.req.valid('param').prep_id), 'GET /api/copilot/prep/{prep_id}/sessions', c.get('requestId')), 200))
+  app.openapi(createRoute({ method: 'get', path: '/api/copilot/sessions/{session_id}', request: { params: SessionPath }, responses: { 200: { content: { 'application/json': { schema: CopilotSessionDetailSchema } }, description: 'Copilot session get' }, 400: error, 401: error, 404: error, 409: error } }),
+    async (c) => c.json(validateResponse(CopilotSessionDetailSchema, await deps.sessions.get(await authenticatedContext(c, deps.tokens), c.req.valid('param').session_id), 'GET /api/copilot/sessions/{session_id}', c.get('requestId')), 200))
+  app.openapi(createRoute({ method: 'delete', path: '/api/copilot/sessions/{session_id}', request: { params: SessionPath }, responses: { 200: { content: { 'application/json': { schema: OkSchema } }, description: 'Copilot session delete' }, 400: error, 401: error, 404: error, 409: error } }),
+    async (c) => c.json(validateResponse(OkSchema, await deps.sessions.delete(await authenticatedContext(c, deps.tokens), c.req.valid('param').session_id), 'DELETE /api/copilot/sessions/{session_id}', c.get('requestId')), 200))
+  app.openapi(createRoute({ method: 'post', path: '/api/copilot/sessions/{session_id}/review', request: { params: SessionPath }, responses: { 200: { content: { 'application/json': { schema: CopilotReviewSubmissionResponseSchema } }, description: 'Copilot session review' }, 400: error, 401: error, 404: error, 409: error } }),
+    async (c) => c.json(validateResponse(CopilotReviewSubmissionResponseSchema, await deps.sessions.review(await authenticatedContext(c, deps.tokens), c.req.valid('param').session_id), 'POST /api/copilot/sessions/{session_id}/review', c.get('requestId')), 200))
 }
 
 function bytes(value: WSMessageReceive): Uint8Array | undefined {

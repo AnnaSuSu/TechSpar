@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import {
+  AppError,
   AuthService,
   ensureDefaultAccount,
   AiService,
@@ -18,6 +19,7 @@ import {
   LongTranscriptionService,
   RecordingService,
   CopilotPrepService,
+  CopilotSessionService,
   CopilotRealtimeService,
   VoiceprintService,
   SettingsService,
@@ -69,7 +71,7 @@ usageRepository.initialize()
 const settingsRepository = new FileProviderSettingsRepository(config.dataDir)
 const persistedSystem = await settingsRepository.loadSystem()
 const registration = { allowRegistration: persistedSystem?.allow_registration ?? config.allowRegistration }
-const tokens = new JoseTokenService(config.jwtSecret)
+const tokens = new JoseTokenService(config.jwtSecret, Date.now, users)
 const auth = new AuthService(
   users,
   passwordHasher,
@@ -136,17 +138,26 @@ const voiceprint = new VoiceprintService(new EncryptedFileVoiceprintRepository(c
 const copilotAi = new AiService(settingsRepository, platform, quota, chatDrivers, config.copilotLlm)
 const copilotDependencies = { repository: copilotRepository, tasks: taskQueue, ids: new ShortUuidGenerator(), ai: copilotAi, embeddings, profile, resume, settings: settingsRepository, search: new TavilyWebSearchDriver(), asr: new QwenStreamingAsrFactory(), asrConfig: config.copilotAsr }
 const copilotPrep = new CopilotPrepService(copilotDependencies)
+const copilotSessions = new CopilotSessionService({ repository: copilotRepository, ids: new ShortUuidGenerator(), reviews: {
+  analyzeConversation: (context, input) => recording.analyzeConversation(context, input),
+  ensureSubmitted: (context, reviewId) => recording.recoverConversation(context, reviewId),
+  async status(context, reviewId) {
+    try { return (await interview.task(context, reviewId)).status }
+    catch (error) { if (error instanceof AppError && error.status === 404) return undefined; throw error }
+  },
+} })
 const copilotRealtime = new CopilotRealtimeService(copilotDependencies)
 const migration = new DataMigrationService({ codec: new TarGzipArchiveCodec(), database: new BunDataMigrationRepository(config.dbPath), files: new FileMigrationStore(config.dataDir, config.voiceprintEncryptionKey), profiles: profileRepository, users })
 taskQueue.register('resume_review', (task) => interview.runReviewTask(task))
 taskQueue.register('drill_review', (task) => interview.runReviewTask(task))
 taskQueue.register('jd_review', (task) => interview.runReviewTask(task))
+taskQueue.register('copilot_review', (task) => recording.runAnalysisTask(task))
 taskQueue.register('recording_review', (task) => recording.runAnalysisTask(task))
 taskQueue.register('copilot_prep', (task) => copilotPrep.runPrepTask(task))
 taskQueue.register('retrospective', (task) => profile.runRetrospectiveTask(task))
 await taskQueue.start()
 const { upgradeWebSocket, websocket } = createBunWebSocket()
-const app = createApp({ auth, registration, registrationRateLimit, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, recording, copilotPrep, copilotRealtime, websocketUpgrade: upgradeWebSocket, voiceprint, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir })
+const app = createApp({ auth, registration, registrationRateLimit, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, recording, copilotPrep, copilotSessions, copilotRealtime, websocketUpgrade: upgradeWebSocket, voiceprint, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir, trustProxy: config.trustProxy })
 
 const server = Bun.serve<BunWebSocketData>(withLongRequestTimeout({ hostname: config.host, port: config.port, fetch: (request, server) => app.fetch(request, server), websocket }))
 console.log(JSON.stringify({ event: 'techspar:ready', host: config.host, port: server.port }))

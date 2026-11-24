@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const ReviewTaskTypeSchema = z.enum(['resume_review', 'drill_review', 'jd_review', 'recording_review', 'review'])
+export const ReviewTaskTypeSchema = z.enum(['resume_review', 'drill_review', 'jd_review', 'recording_review', 'copilot_review', 'review'])
 export const KNOWN_TASK_TYPES = [...ReviewTaskTypeSchema.options, 'copilot_prep', 'retrospective'] as const
 // A pattern (rather than a runtime-only refinement) also expresses the exclusion
 // in OpenAPI. Malformed known tasks cannot escape through the legacy branch.

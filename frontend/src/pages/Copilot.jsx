@@ -53,7 +53,7 @@ export default function Copilot() {
     case "detail":
       return <DetailView prepId={state.prep} onBack={goList} onStartInterview={(id) => goRealtime(id)} />;
     case "realtime":
-      return <RealtimePhase prepId={state.prep} onBack={goList} />;
+      return <RealtimePhase prepId={state.prep} onBack={() => goDetail(state.prep)} />;
     default:
       return <ListView onNew={goNew} onSelect={goDetail} />;
   }

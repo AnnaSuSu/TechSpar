@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Eye, EyeOff, Server } from "lucide-react";
 import { testLLMConnection } from "@/api/settings";
 import { errorMessage } from "@/lib/errorMessage";
@@ -8,29 +8,66 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { inputClass, labelClass, LLM_SOURCE_OPTIONS } from "./constants";
 import ConnectionTestRow from "./ConnectionTestRow";
-import type { ConnectionTestResult, SettingsSectionProps } from "./types";
+import type { ConnectionTestResult, SettingsDraft, SettingsSectionProps } from "./types";
+
+type ReasoningEffort = NonNullable<SettingsDraft["llm"]["reasoning_effort"]>;
 
 interface LlmSectionProps extends SettingsSectionProps<"llm"> {
   platformLlm: boolean;
 }
 
 export default function LlmSection({ value, onChange, platformLlm }: LlmSectionProps) {
-  const { api_base: apiBase, api_key: apiKey, model, compatibility, temperature, use_platform: usePlatform } = value;
+  const {
+    api_base: apiBase,
+    api_key: apiKey,
+    model,
+    compatibility,
+    reasoning_effort: reasoningEffort = "",
+    temperature,
+    use_platform: usePlatform,
+  } = value;
   const [showKey, setShowKey] = useState(false);
   const [llmTest, setLlmTest] = useState<ConnectionTestResult | null>(null);
+  const llmTestVersion = useRef(0);
+
+  useEffect(() => () => {
+    llmTestVersion.current += 1;
+  }, []);
+
   const ownConfigReady = Boolean(apiKey && model);
   const ownLlmDisabled = usePlatform && platformLlm;
   const llmSource = ownLlmDisabled ? "platform" : !ownConfigReady && platformLlm ? "fallback" : "user";
+  const temperatureDisabled = compatibility === "generic" && reasoningEffort !== "" && reasoningEffort !== "none";
   const testHint = ownLlmDisabled
     ? "现在用的是平台的 key，不需要测试"
     : ownConfigReady ? "" : "填上自己的 Model 和 API Key 才能测试";
 
+  // Bump version on any config edit or unmount so stale test responses cannot overwrite current state.
+  function invalidateLlmTest() {
+    llmTestVersion.current += 1;
+    setLlmTest(null);
+  }
+
+  function updateLlm(patch: Partial<SettingsDraft["llm"]>) {
+    invalidateLlmTest();
+    onChange(patch);
+  }
+
   async function handleTestLLM() {
+    const version = ++llmTestVersion.current;
     setLlmTest({ status: "testing" });
     try {
-      const result = await testLLMConnection({ api_base: apiBase, api_key: apiKey, model, compatibility });
+      const result = await testLLMConnection({
+        api_base: apiBase,
+        api_key: apiKey,
+        model,
+        compatibility,
+        reasoning_effort: reasoningEffort,
+      });
+      if (llmTestVersion.current !== version) return;
       setLlmTest(result.ok ? { status: "ok" } : { status: "fail", error: result.error });
     } catch (error) {
+      if (llmTestVersion.current !== version) return;
       setLlmTest({ status: "fail", error: errorMessage(error, "连接失败") });
     }
   }
@@ -57,7 +94,7 @@ export default function LlmSection({ value, onChange, platformLlm }: LlmSectionP
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => onChange({ use_platform: option.platform })}
+                    onClick={() => updateLlm({ use_platform: option.platform })}
                     className={cn(
                       "rounded-2xl border p-3.5 text-left transition-colors",
                       active
@@ -100,7 +137,7 @@ export default function LlmSection({ value, onChange, platformLlm }: LlmSectionP
               disabled={ownLlmDisabled}
               placeholder="例：https://api.openai.com/v1"
               value={apiBase}
-              onChange={(e) => onChange({ api_base: e.target.value })}
+              onChange={(e) => updateLlm({ api_base: e.target.value })}
             />
             <div className="text-[12px] text-dim/70">
               {compatibility === "deepseek" ? "DeepSeek 官方 API 填 https://api.deepseek.com（不要加 /v1）" : "多数 OpenAI 兼容服务填写包含 /v1 的 Base URL。"}
@@ -114,7 +151,7 @@ export default function LlmSection({ value, onChange, platformLlm }: LlmSectionP
               disabled={ownLlmDisabled}
               placeholder="例：gpt-4o"
               value={model}
-              onChange={(e) => onChange({ model: e.target.value })}
+              onChange={(e) => updateLlm({ model: e.target.value })}
             />
           </div>
           <div className="space-y-2">
@@ -125,16 +162,40 @@ export default function LlmSection({ value, onChange, platformLlm }: LlmSectionP
                 className="min-w-0 flex-1 bg-transparent text-right text-text outline-none disabled:cursor-not-allowed"
                 disabled={ownLlmDisabled}
                 value={compatibility}
-                onChange={(e) => onChange({
-                    compatibility: e.target.value === "deepseek" ? "deepseek" : "generic",
-                  })}
+                onChange={(e) => updateLlm({
+                  compatibility: e.target.value === "deepseek" ? "deepseek" : "generic",
+                  reasoning_effort: "",
+                })}
               >
                 <option value="generic">通用 OpenAI 兼容</option>
                 <option value="deepseek">DeepSeek V4</option>
               </select>
             </label>
             <div className="text-[12px] text-dim/70">
-              DeepSeek 模式只对结构化请求发送 JSON 输出和低推理参数，其他平台不会收到这些字段。
+              {compatibility === "deepseek"
+                ? "DeepSeek 模式为结构化请求启用 JSON 输出；默认按场景选择推理强度，显式选择时使用所选档位。"
+                : "通用模式支持 OpenAI 兼容服务；推理模型可单独选择强度。"}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="llm-reasoning-effort" className={labelClass}>推理强度</Label>
+            <select
+              id="llm-reasoning-effort"
+              className={cn(inputClass, "w-full border border-border px-3.5 text-sm text-text outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50")}
+              disabled={ownLlmDisabled}
+              value={reasoningEffort}
+              onChange={(e) => updateLlm({ reasoning_effort: e.target.value as ReasoningEffort })}
+            >
+              <option value="">{compatibility === "deepseek" ? "默认（按场景）" : "跟随上游（默认）"}</option>
+              {compatibility === "deepseek" && <option value="none">关闭推理（none）</option>}
+              <option value="low">轻量（low）</option>
+              {compatibility !== "deepseek" && <option value="medium">标准（medium）</option>}
+              <option value="high">深入（high）</option>
+              {compatibility !== "deepseek" && <option value="xhigh">更深入（xhigh）</option>}
+              <option value="max">最高（max）</option>
+            </select>
+            <div className="text-[12px] text-dim/70">
+              档位需模型和网关支持；强度越高通常响应越慢。选择后用于连接测试，保存后应用于后续请求。
             </div>
           </div>
         </div>
@@ -150,7 +211,7 @@ export default function LlmSection({ value, onChange, platformLlm }: LlmSectionP
                 masked={!showKey}
                 placeholder="sk-...（你自己的 key）"
                 value={apiKey}
-                onChange={(e) => onChange({ api_key: e.target.value })}
+                onChange={(e) => updateLlm({ api_key: e.target.value })}
               />
               <button
                 type="button"
@@ -167,13 +228,14 @@ export default function LlmSection({ value, onChange, platformLlm }: LlmSectionP
             <Input
               className={inputClass}
               type="number"
-              disabled={ownLlmDisabled}
+              disabled={ownLlmDisabled || temperatureDisabled}
               step={0.1}
               min={0}
               max={2}
               value={temperature}
-              onChange={(e) => onChange({ temperature: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => updateLlm({ temperature: parseFloat(e.target.value) || 0 })}
             />
+            {temperatureDisabled && <div className="text-[12px] text-dim/70">已启用推理强度，此模式下不使用 Temperature。</div>}
           </div>
         </div>
 

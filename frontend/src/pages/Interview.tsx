@@ -50,11 +50,16 @@ export default function Interview() {
 
   if (!sessionId) return null;
 
+  const matchedRouteData: InterviewInitData | null =
+    routeData && (routeData.session_id == null || routeData.session_id === sessionId)
+      ? { ...routeData, session_id: sessionId }
+      : null;
+
   return (
     <InterviewRoute
       key={`${sessionId}:${location.key}`}
       sessionId={sessionId}
-      routeData={routeData?.session_id === sessionId ? routeData : null}
+      routeData={matchedRouteData}
     />
   );
 }

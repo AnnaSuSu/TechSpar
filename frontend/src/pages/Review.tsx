@@ -7,7 +7,10 @@ import ErrorState from "@/components/ErrorState";
 import PageContainer from "@/components/PageContainer";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
+import useAuth from "@/hooks/useAuth";
 import { errorMessage } from "@/lib/errorMessage";
+import { jobPrepDraftKey } from "@/lib/jobPrepAccount";
+import { clearJobPrepRestart, jobPrepRestartRequest } from "@/lib/jobPrepRestart";
 import DrillReview from "./review/DrillReview";
 import JobPrepReview from "./review/JobPrepReview";
 import ResumeReview from "./review/ResumeReview";
@@ -18,7 +21,11 @@ import { getReviewPresentation, inferAnswers } from "./review/utils";
 
 function ReviewContent({ data, sessionId }: { data: ReviewPayload; sessionId: string }) {
   const navigate = useNavigate();
+  const { token } = useAuth();
   const [restarting, setRestarting] = useState(false);
+  const restartOperation = useRef<{ key: string; id: string } | null>(null);
+  const restartBusy = useRef(false);
+  const restartKey = `${jobPrepDraftKey(token)}:restart:${sessionId}`;
   const active = useRef(false);
   useEffect(() => {
     active.current = true;
@@ -26,7 +33,7 @@ function ReviewContent({ data, sessionId }: { data: ReviewPayload; sessionId: st
   }, []);
 
   const { mode, topic, scores, meta, questions = [], reference_answers: referenceAnswers } = data;
-  const { title, isJobPrep, isRecording, showDrill } = getReviewPresentation(data);
+  const { title, isCopilot, isJobPrep, isRecording, showDrill } = getReviewPresentation(data);
   const messages = data.messages ?? data.transcript ?? [];
   const answers = data.answers ?? ((isJobPrep || showDrill) ? inferAnswers(questions, messages) : []);
   const overall = data.overall && Object.keys(data.overall).length
@@ -34,22 +41,36 @@ function ReviewContent({ data, sessionId }: { data: ReviewPayload; sessionId: st
     : data.weak_points?.length ? { new_weak_points: data.weak_points } : undefined;
 
   const handleRestart = async () => {
-    if (!mode || mode === "recording" || restarting) return;
+    if (!mode || mode === "recording" || mode === "copilot" || restartBusy.current) return;
+    restartBusy.current = true;
     setRestarting(true);
     try {
-      const next = mode === "jd_prep"
-        ? await startJobPrep({
+      let next;
+      if (mode === "jd_prep") {
+        if (restartOperation.current?.key !== restartKey) {
+          restartOperation.current = { key: restartKey, id: crypto.randomUUID() };
+        }
+        const requestId = jobPrepRestartRequest(window.sessionStorage, restartKey, restartOperation.current.id);
+        restartOperation.current.id = requestId;
+        next = await startJobPrep({
+          request_id: requestId,
           jd_text: meta?.jd_text || meta?.jd_excerpt || "",
           company: meta?.company,
           position: meta?.position,
           use_resume: meta?.use_resume ?? true,
           preview_data: meta?.preview,
-        })
-        : await startInterview(mode, topic);
-      if (active.current) navigate(`/interview/${next.session_id}`, { state: next });
+        });
+        clearJobPrepRestart(window.sessionStorage, restartKey);
+        restartOperation.current = null;
+      } else {
+        next = await startInterview(mode, topic);
+      }
+      const nextMeta = "meta" in next ? next.meta : undefined;
+      if (active.current) navigate(`/interview/${next.session_id}`, { state: { ...next, mode, topic, meta: nextMeta || meta } });
     } catch (error) {
       if (active.current) toast.error("启动失败: " + errorMessage(error));
     } finally {
+      restartBusy.current = false;
       if (active.current) setRestarting(false);
     }
   };
@@ -88,7 +109,7 @@ function ReviewContent({ data, sessionId }: { data: ReviewPayload; sessionId: st
         )}
       </div>
       <div className="flex items-center gap-3 mt-6">
-        {mode && !isRecording && (
+        {mode && !isRecording && !isCopilot && (
           <Button variant="gradient" onClick={handleRestart} disabled={restarting}>
             <RotateCcw size={15} className={restarting ? "animate-spin" : ""} />
             {restarting ? "正在生成题目..." : "再次练习"}

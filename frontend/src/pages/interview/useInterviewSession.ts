@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   endInterview,
@@ -18,6 +19,7 @@ type BootstrapState =
   | { data: null; error: string | null };
 
 export function useInterviewBootstrap(sessionId: string, routeData: InterviewInitData | null) {
+  const navigate = useNavigate();
   const [bootstrap, setBootstrap] = useState<BootstrapState>(() => ({
     data: routeData,
     error: null,
@@ -29,6 +31,10 @@ export function useInterviewBootstrap(sessionId: string, routeData: InterviewIni
     const { signal } = controller;
     getResumableSession(sessionId, { signal }).then((data) => {
       if (signal.aborted) return;
+      if (data.status === "prepared") {
+        navigate(`/mock-interview?mode=targeted&session=${encodeURIComponent(sessionId)}`, { replace: true });
+        return;
+      }
       setBootstrap({
         data: {
           ...data,
@@ -43,7 +49,7 @@ export function useInterviewBootstrap(sessionId: string, routeData: InterviewIni
       }
     });
     return () => controller.abort();
-  }, [routeData, sessionId]);
+  }, [routeData, sessionId, navigate]);
 
   return bootstrap;
 }
@@ -94,7 +100,8 @@ export function useInterviewSession(initData: InterviewInitData) {
     if (initData.status !== "reviewing") return;
     const type = mode === "resume" ? "resume_review"
       : mode === "jd_prep" ? "jd_review"
-        : mode === "recording" ? "recording" : "drill_review";
+        : mode === "copilot" ? "copilot_review"
+          : mode === "recording" ? "recording" : "drill_review";
     startTask(sessionId, type, "复盘生成中");
   }, [initData.status, mode, sessionId, startTask]);
 

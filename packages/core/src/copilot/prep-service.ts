@@ -139,7 +139,7 @@ function validateRiskReport(value: unknown, nodeIds: ReadonlySet<string>): Recor
   return source
 }
 function json(value: unknown): string { return JSON.stringify(value, null, 2) }
-function newContext(task: TaskRecord): RequestContext { return { requestId: `task:${task.task_id}`, userId: task.user_id, signal: new AbortController().signal } }
+function newContext(task: TaskRecord): RequestContext { return { requestId: `task:${task.task_id}`, userId: task.user_id, signal: task.signal || new AbortController().signal } }
 
 export class CopilotPrepService implements CopilotPrepUseCases {
   constructor(private readonly deps: CopilotDependencies) {}
@@ -222,12 +222,13 @@ export class CopilotPrepService implements CopilotPrepUseCases {
       const risk = parseValidated(riskText, (value) => validateRiskReport(value, new Set(Object.keys(nodes))))
       const companyReportText = json(companyReport)
       const result = { user_id: task.user_id, jd_text: prep.jd_text, resume_context: resumeText.slice(0, 2000), profile, company_report: companyReportText, jd_analysis: jdAnalysis, fit_report: fitReport, question_strategy_tree: strategy, risk_map: risk.risk_map, risk_summary: risk.risk_summary, prep_hints: risk.prep_hints, status: 'done', progress: '准备完成', error: '' }
+      if (context.signal.aborted) throw context.signal.reason || new Error('Task lease was lost')
       await this.deps.repository.completePrep(prepId, task.user_id, result)
       const predicted = Array.isArray(fitReport.gaps) ? fitReport.gaps.flatMap((raw) => { const gap = object(raw); return gap.risk === 'high' && typeof gap.point === 'string' ? [gap.point] : [] }) : []
-      if (predicted.length && this.deps.profile.addPredictedWeakPoints) { try { await this.deps.profile.addPredictedWeakPoints({ userId: task.user_id, topic: prep.position || '综合', points: predicted }) } catch { /* prep result remains usable */ } }
+      if (!context.signal.aborted && predicted.length && this.deps.profile.addPredictedWeakPoints) { try { await this.deps.profile.addPredictedWeakPoints({ userId: task.user_id, topic: prep.position || '综合', points: predicted }) } catch { /* prep result remains usable */ } }
       return { prep_id: prepId, status: 'done' }
     } catch (error) {
-      await this.deps.repository.failPrep(prepId, task.user_id, error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500))
+      if (!context.signal.aborted) await this.deps.repository.failPrep(prepId, task.user_id, error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500))
       throw error
     }
   }

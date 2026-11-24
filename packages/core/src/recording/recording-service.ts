@@ -4,10 +4,10 @@ import { AppError, AuthenticationError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
 import { finiteNumber, identifier, record, requiredText, stringArray, StructuredOutputError, uniqueIds } from '../kernel/structured-output.ts'
 import { validateOverall, validateScoreDetails } from '../interview/structured-review.ts'
-import type { RequestContext } from '../kernel/context.ts'
+import { assertContextActive, type RequestContext } from '../kernel/context.ts'
 import { STRUCTURED_CHAT_OPTIONS } from '../provider/ports.ts'
 import { formatDualReview, formatSoloReview } from './formatters.ts'
-import type { RecordingAnalyzeInput } from './model.ts'
+import type { RecordingAnalyzeInput, ConversationAnalyzeInput } from './model.ts'
 import type { RecordingDependencies, RecordingUseCases } from './ports.ts'
 import { RECORDING_DUAL_EVAL_PROMPT, RECORDING_SOLO_EVAL_PROMPT, RECORDING_STRUCTURE_PROMPT } from './prompts.ts'
 
@@ -79,18 +79,38 @@ export class RecordingService implements RecordingUseCases {
   }
 
   async analyze(context: RequestContext, input: RecordingAnalyzeInput): Promise<{ session_id: string; status: 'pending' }> {
+    return this.submit(context, input, this.deps.ids.next(), 'recording')
+  }
+
+  async analyzeConversation(context: RequestContext, input: ConversationAnalyzeInput): Promise<{ session_id: string; status: 'pending' }> {
+    return this.submit(context, { ...input, recording_mode: 'dual' }, input.sessionId, 'copilot', input.meta)
+  }
+
+  /** Finish a submission interrupted between storing its snapshot and enqueueing. */
+  async recoverConversation(context: RequestContext, sessionId: string): Promise<boolean> {
+    const userId = id(context)
+    const session = await this.deps.sessions.get(sessionId, userId)
+    if (!session || session.mode !== 'copilot') return false
+    if ((session.status === 'ongoing' || session.status === 'reviewing') && !await this.deps.tasks.get(sessionId, userId)) {
+      await this.deps.sessions.updateStatus(sessionId, userId, 'reviewing')
+      await this.deps.tasks.enqueue({ taskId: sessionId, userId, type: 'copilot_review', payload: { session_id: sessionId } })
+    }
+    return true
+  }
+
+  private async submit(context: RequestContext, input: RecordingAnalyzeInput, sessionId: string, mode: 'recording' | 'copilot', source: Record<string, unknown> = {}): Promise<{ session_id: string; status: 'pending' }> {
     const userId = id(context)
     const transcript = input.transcript.trim()
     if (!transcript) throw new AppError('Transcript must not be blank.', 400)
-    const sessionId = this.deps.ids.next()
-    const meta = { recording_mode: input.recording_mode || 'dual', company: (input.company || '').trim(), position: (input.position || '').trim(), source_transcript: input.transcript }
-    await this.deps.sessions.create({ sessionId, userId, mode: 'recording', meta })
+    const meta = { ...source, recording_mode: input.recording_mode || 'dual', company: (input.company || '').trim(), position: (input.position || '').trim(), source_transcript: input.transcript }
+    await this.deps.sessions.create({ sessionId, userId, mode, meta })
     try {
       await this.deps.sessions.appendMessage(sessionId, userId, 'user', input.transcript)
       await this.deps.sessions.updateStatus(sessionId, userId, 'reviewing')
-      await this.deps.tasks.enqueue({ taskId: sessionId, userId, type: 'recording_review', payload: { session_id: sessionId } })
+      await this.deps.tasks.enqueue({ taskId: sessionId, userId, type: mode === 'copilot' ? 'copilot_review' : 'recording_review', payload: { session_id: sessionId } })
     } catch (error) {
-      await this.deps.sessions.updateStatus(sessionId, userId, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })
+      if (mode === 'copilot') await this.deps.sessions.delete(sessionId, userId)
+      else await this.deps.sessions.updateStatus(sessionId, userId, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })
       throw error
     }
     return { session_id: sessionId, status: 'pending' }
@@ -99,15 +119,16 @@ export class RecordingService implements RecordingUseCases {
   async runAnalysisTask(task: TaskRecord): Promise<Record<string, unknown>> {
     const session = await this.deps.sessions.get(task.task_id, task.user_id)
     if (!session) throw new Error('Session not found.')
+    const request: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: task.signal || new AbortController().signal, assertActive: task.assertActive }
     if (task.payload.profile_only === true) {
       if (session.review == null) throw new Error('No saved review to synchronize')
+      await assertContextActive(request)
       await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'reviewed', { clearError: true })
-      await this.updateProfile({ ...session, status: 'reviewed' })
+      await this.updateProfile({ ...session, status: 'reviewed' }, request)
       return { session_id: session.session_id, status: 'done' }
     }
     const transcript = String(session.meta.source_transcript || session.transcript[0]?.content || '').trim()
     if (!transcript) throw new Error('Transcript must not be blank.')
-    const request: RequestContext = { requestId: `task:${task.task_id}`, userId: task.user_id, signal: new AbortController().signal }
     try {
       let scores: Array<Record<string, unknown>> = []
       let overall: Record<string, unknown> = {}
@@ -117,6 +138,7 @@ export class RecordingService implements RecordingUseCases {
           { role: 'system', content: '你是面试记录分析引擎。只返回 JSON，不要其他内容。' },
           { role: 'user', content: fill(RECORDING_STRUCTURE_PROMPT, { transcript }) },
         ], STRUCTURED_CHAT_OPTIONS))
+        await assertContextActive(request)
         const pairs = validateRecordingStructure(structured)
         const questions: InterviewQuestion[] = pairs.map((pair) => ({ id: pair.id as string | number, question: String(pair.question), difficulty: 3, focus_area: typeof pair.focus_area === 'string' ? pair.focus_area : '' }))
         const answers: InterviewAnswer[] = pairs.map((pair) => ({ question_id: pair.id as string | number, answer: pair.answer as string }))
@@ -144,21 +166,28 @@ export class RecordingService implements RecordingUseCases {
         scores = topics.map((topic, index) => ({ question_id: topic.id ?? index + 1, score: topic.score, difficulty: 3 }))
         review = formatSoloReview(topics, overall)
       }
+      await assertContextActive(request)
       await this.deps.sessions.saveReview({ sessionId: session.session_id, userId: session.user_id, review, scores, weakPoints: Array.isArray(overall.new_weak_points) ? overall.new_weak_points : [], overall })
       const reviewed = await this.deps.sessions.get(session.session_id, session.user_id)
-      if (reviewed) await this.updateProfile(reviewed)
+      await assertContextActive(request)
+      if (reviewed) await this.updateProfile(reviewed, request)
       return { session_id: session.session_id, status: 'done' }
     } catch (error) {
+      await assertContextActive(request)
       await this.deps.sessions.updateStatus(session.session_id, session.user_id, 'review_failed', { reviewError: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500) })
       throw error
     }
   }
 
-  private async updateProfile(session: InterviewSession): Promise<void> {
+  private async updateProfile(session: InterviewSession, context: RequestContext): Promise<void> {
     if (!this.deps.profile.afterReview) return
     try {
-      await this.deps.profile.afterReview({ userId: session.user_id, session })
+      await this.deps.profile.afterReview({ userId: session.user_id, session, context })
+      await assertContextActive(context)
       await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: false })
-    } catch { await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: true }) }
+    } catch {
+      await assertContextActive(context)
+      await this.deps.sessions.updateMeta(session.session_id, session.user_id, { profile_extract_failed: true })
+    }
   }
 }

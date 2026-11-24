@@ -30,7 +30,7 @@ export class MemoryProfileRepository implements CandidateProfileRepository {
   }
 }
 
-export async function realServiceHarness(replies: string[] = []) {
+export async function realServiceHarness(replies: string[] = [], profileRepository?: CandidateProfileRepository) {
   const directory = await mkdtemp(join(tmpdir(), 'techspar-response-contract-'))
   const path = join(directory, 'contracts.db')
   const sessions = new BunInterviewSessionRepository(path)
@@ -38,7 +38,7 @@ export async function realServiceHarness(replies: string[] = []) {
   const tasks = new BunTaskRepository(path)
   sessions.initialize(); states.initialize(); tasks.initialize()
   const sqlite = new Database(path)
-  const repository = new MemoryProfileRepository()
+  const repository = profileRepository ?? new MemoryProfileRepository()
   const remaining = [...replies]
   const ai: TextGenerationUseCases = {
     async complete() {
@@ -89,6 +89,9 @@ export async function realServiceHarness(replies: string[] = []) {
 
   return {
     app, request, interview, profile, repository, sessions, states, tasks, ai, remaining, seedSession, seedTask,
+    storedQuestions(sessionId: string, userId = 'user-a') {
+      return sqlite.query<{ questions: string }, [string, string]>('SELECT questions FROM sessions WHERE session_id = ? AND user_id = ?').get(sessionId, userId)?.questions
+    },
     async dispose() { sqlite.close(); sessions.close(); states.close(); tasks.close(); await rm(directory, { recursive: true, force: true }) },
   }
 }

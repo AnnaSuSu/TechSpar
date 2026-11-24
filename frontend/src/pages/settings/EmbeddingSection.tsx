@@ -43,9 +43,10 @@ export default function EmbeddingSection({
   const [reindexProgress, setReindexProgress] = useState<IndexRebuildProgress | null>(null);
   const [rebuildResult, setRebuildResult] = useState<RebuildResult | null>(null);
   const [rebuiltRevision, setRebuiltRevision] = useState(0);
+  const [forceNeedsReindex, setForceNeedsReindex] = useState(false);
   const [lastReindexAt, setLastReindexAt] = useState(initialLastReindexAt);
 
-  const needsReindex = indexRevision !== rebuiltRevision;
+  const needsReindex = forceNeedsReindex || indexRevision !== rebuiltRevision;
   const currentResult = rebuildResult?.revision === indexRevision ? rebuildResult : null;
   const reindexDone = currentResult !== null && !currentResult.error;
   const reindexError = currentResult?.error;
@@ -70,10 +71,20 @@ export default function EmbeddingSection({
     setReindexing(true);
     setRebuildResult(null);
     setReindexProgress(null);
+    let rebuildFailed = false;
     try {
       await rebuildEmbeddingIndex({
-        onProgress: setReindexProgress,
+        onProgress: (p) => {
+          setReindexProgress(p);
+          if (p.status === "error") {
+            rebuildFailed = true;
+            setForceNeedsReindex(true);
+            setRebuildResult({ revision: indexRevision, error: `${p.label}重建失败: ${p.error}` });
+          }
+        },
         onDone: (result) => {
+          if (rebuildFailed) return;
+          setForceNeedsReindex(false);
           setRebuiltRevision(indexRevision);
           setLastReindexAt(result.last_rebuild_at || "");
           setRebuildResult({ revision: indexRevision });
@@ -96,7 +107,7 @@ export default function EmbeddingSection({
         </div>
         <div className="text-[13px] text-dim mb-6">
           你自己的 Embedding，仅对你生效；用于题库、知识库、个人资料库和记忆的向量化，必须配置。简历会直接读取全文，不使用 Embedding。
-          <span className="text-amber-500/90">更换模型后请点下方「更新向量索引」重建（会清空并重算向量，历史会话记忆向量无法恢复）。</span>
+          <span className="text-amber-500/90">更换模型后请点下方「更新向量索引」重建。历史会话记忆正文会保留，重建成功后恢复检索。</span>
         </div>
 
         <div className="space-y-2.5 mb-5">

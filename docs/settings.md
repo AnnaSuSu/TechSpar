@@ -4,7 +4,11 @@
 
 ## LLM
 
-填写 OpenAI-compatible API Base、API Key、Model、API 兼容模式和 Temperature。普通平台选择“通用 OpenAI 兼容”；DeepSeek V4 选择“DeepSeek V4”。先点击测试，确认账号确实能调用该模型，再保存。训练、面试、复盘和个人 Agent 使用这套配置。Copilot 优先使用部署方的独立 `COPILOT_LLM_*` 配置，未配置时才沿用这里的设置。DeepSeek 模式对结构化请求附加 JSON 输出和低推理参数，Copilot 实时回答使用非思考流式输出。
+填写 OpenAI-compatible API Base、API Key、Model、API 兼容模式和 Temperature。普通平台选择“通用 OpenAI 兼容”；DeepSeek V4 选择“DeepSeek V4”。先点击测试，确认账号确实能调用该模型，再保存。训练、面试、复盘和个人 Agent 使用这套配置。Copilot 优先使用部署方的独立 `COPILOT_LLM_*` 配置，未配置时才沿用这里的设置。
+
+支持推理的模型可在“推理强度”中选择档位。通用模式提供 `low`、`medium`、`high`、`xhigh`、`max`；默认“跟随上游”不额外发送推理参数。显式选择后，连接测试以及保存后的普通、流式请求使用所选档位，优先于场景默认值。模型与网关必须支持该档位；不支持时测试会显示提供商错误，不会静默换档。通用模式启用推理后不发送 Temperature，输出预算使用包含推理 token 的 `max_completion_tokens`。
+
+DeepSeek 模式提供 `none`、`low`、`high`、`max`，保留 JSON 输出配置。未显式选择时保留场景默认值：结构化请求使用低推理，Copilot 实时回答关闭推理；显式选择后使用用户所选档位。切换 API 兼容模式会清空之前的强度选择，需要重新测试并保存。
 
 ## Embedding
 
@@ -13,7 +17,7 @@
 - **API**：填写 Base、Key、模型和批大小；完整的 `/v1/embeddings` 地址会自动归一化。
 - **本地**：填写 Transformers.js/ONNX 模型 ID 或本地路径；默认 `Xenova/bge-m3`，首次测试自动下载。
 
-更换模型会让已有向量失效。保存后使用“重建索引”，等待知识库、个人资料和记忆向量全部完成；简历面试读取全文，不依赖 Embedding。
+更换模型会让已有向量失效。会话摘要与洞察正文会保留，重建成功前不参与检索；个人文档显示“需要重建”。保存后使用“重建索引”，等待历史会话记忆、薄弱点、个人资料和知识库全部完成。失败步骤会显示错误，可再次重建；简历面试读取全文，不依赖 Embedding。
 
 ## 服务密钥
 

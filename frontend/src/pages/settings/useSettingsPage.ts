@@ -28,6 +28,7 @@ function toDraft(data: SettingsResponse): SettingsDraft {
       api_key: llm.api_key || "",
       model: llm.model || "",
       compatibility: llm.compatibility || "generic",
+      reasoning_effort: llm.reasoning_effort || "",
       temperature: llm.temperature ?? 0.7,
       use_platform: data.source === "platform",
     },

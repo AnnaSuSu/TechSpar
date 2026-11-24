@@ -4,7 +4,7 @@ const unavailable = new Proxy({}, { get() { return () => Promise.reject(new Erro
 const dependencies = {
   auth: unavailable, registration: { allowRegistration: false }, settings: unavailable, settingsOperations: unavailable, quota: unavailable, tokens: unavailable,
   knowledge: unavailable, resume: unavailable, interview: unavailable, profile: unavailable, personalAgent: unavailable, migration: unavailable, recording: unavailable,
-  copilotPrep: unavailable, copilotRealtime: unavailable, voiceprint: unavailable,
+  copilotSessions: unavailable, copilotPrep: unavailable, copilotRealtime: unavailable, voiceprint: unavailable,
 } as unknown as AppDependencies
 
 const response = await createApp(dependencies).request('/openapi.json')

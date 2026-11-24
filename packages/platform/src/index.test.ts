@@ -1,7 +1,12 @@
 import { expect, test } from 'bun:test'
 import { loadConfig } from './index.ts'
 
-const baseEnv = { TECHSPAR_BASE_DIR: '/tmp/techspar-test', JWT_SECRET: 'test-secret' }
+const baseEnv = {
+  TECHSPAR_BASE_DIR: '/tmp/techspar-test',
+  JWT_SECRET: 'test-jwt-secret-with-at-least-32-chars',
+  VOICEPRINT_ENCRYPTION_KEY: 'test-voiceprint-key-with-at-least-32-chars',
+  DEFAULT_PASSWORD: 'test-default-password',
+}
 
 test('Copilot credentials are isolated from general LLM and transcription settings', () => {
   const config = loadConfig({ ...baseEnv, PLATFORM_LLM_MODEL: 'general-model', PLATFORM_LLM_API_KEY: 'general-key', COPILOT_LLM_API_KEY: 'copilot-key', COPILOT_DASHSCOPE_API_KEY: 'asr-key', COPILOT_DASHSCOPE_WORKSPACE_ID: 'workspace' })
@@ -46,4 +51,16 @@ test('负数配额同样拒绝', () => {
 test('PORT 为非法值时抛错', () => {
   expect(() => loadConfig({ ...baseEnv, PORT: 'abc' })).toThrow('PORT')
   expect(() => loadConfig({ ...baseEnv, PORT: '-1' })).toThrow('PORT')
+})
+
+test('拒绝缺失、默认或过短的服务端凭据', () => {
+  expect(() => loadConfig({ ...baseEnv, JWT_SECRET: 'change-me-in-production' })).toThrow('JWT_SECRET')
+  expect(loadConfig({ ...baseEnv, VOICEPRINT_ENCRYPTION_KEY: baseEnv.JWT_SECRET }).voiceprintEncryptionKey).toBe(baseEnv.JWT_SECRET)
+  expect(() => loadConfig({ ...baseEnv, DEFAULT_PASSWORD: 'admin123' })).toThrow('DEFAULT_PASSWORD')
+  expect(() => loadConfig({ ...baseEnv, DEFAULT_PASSWORD: 'short' })).toThrow('DEFAULT_PASSWORD')
+})
+
+test('反向代理信任必须显式启用', () => {
+  expect(loadConfig(baseEnv).trustProxy).toBeFalse()
+  expect(loadConfig({ ...baseEnv, TRUST_PROXY: 'true' }).trustProxy).toBeTrue()
 })

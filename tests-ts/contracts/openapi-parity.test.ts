@@ -31,7 +31,7 @@ async function loadSpecs(): Promise<{ baseline: Spec; current: Spec }> {
   const deps = {
     auth: unavailable, registration: { allowRegistration: false }, settings: unavailable, settingsOperations: unavailable, quota: unavailable, tokens: unavailable,
     knowledge: unavailable, resume: unavailable, interview: unavailable, profile: unavailable, personalAgent: unavailable, migration: unavailable, recording: unavailable,
-    copilotPrep: unavailable, copilotRealtime: unavailable, voiceprint: unavailable,
+    copilotSessions: unavailable, copilotPrep: unavailable, copilotRealtime: unavailable, voiceprint: unavailable,
   } as unknown as AppDependencies
   const response = await createApp(deps).request('/openapi.json')
   expect(response.status).toBe(200)

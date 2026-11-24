@@ -60,7 +60,7 @@ describe('phase four model producers at HTTP and persistence boundaries', () => 
     mutate(fixture.preview)
     const h = await setup([fixture.preview, fixture.preview])
     for (const route of ['/api/job-prep/preview', '/api/job-prep/start']) {
-      const response = await h.request(route, 'POST', { jd_text: jd, company: '客户端公司', position: '客户端岗位' })
+      const response = await h.request(route, 'POST', { request_id: crypto.randomUUID(), jd_text: jd, company: '客户端公司', position: '客户端岗位' })
       expect(response.status).toBe(502)
       expect(await response.json()).toMatchObject({ code: 'provider_response_error' })
     }

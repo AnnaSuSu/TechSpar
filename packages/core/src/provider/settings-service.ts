@@ -65,11 +65,12 @@ export class SettingsService implements SettingsUseCases {
     const userId = this.userId(context)
     const [stored, user] = await Promise.all([this.repository.loadProvider(userId), this.users.findById(userId)])
     const before = embeddingTarget(resolveEmbeddingConfig(stored.embedding, this.platform))
-    await this.repository.saveProvider(userId, { llm: value.llm, embedding: value.embedding, services: value.services })
-    this.indexes.resetEmbeddingClient(userId)
     const after = embeddingTarget(resolveEmbeddingConfig(value.embedding, this.platform))
     const embeddingChanged = before !== after
+    // Keep the old provider active if invalidating its vectors fails.
     if (embeddingChanged) await this.indexes.invalidateUser(userId)
+    await this.repository.saveProvider(userId, { llm: value.llm, embedding: value.embedding, services: value.services })
+    this.indexes.resetEmbeddingClient(userId)
     if (user?.is_admin) {
       await this.repository.saveSystem(value.system)
       this.registration.allowRegistration = value.system.allow_registration

@@ -22,6 +22,10 @@ import type {
 
 export interface InterviewSessionRepository {
   initialize(): void
+  claimJobPrep(input: { userId: string; key: string; fingerprint: string; owner: string }): Promise<{ state: 'claimed' | 'busy' | 'conflict' | 'done'; sessionId?: string }>
+  renewJobPrep(userId: string, key: string, owner: string): Promise<void>
+  releaseJobPrep(userId: string, key: string, owner: string): Promise<void>
+  completeJobPrep(input: { userId: string; key: string; owner: string; sessionId: string; meta: Record<string, unknown>; questions: InterviewQuestion[]; existing: boolean }): Promise<boolean>
   create(input: { sessionId: string; userId: string; mode: InterviewMode; topic?: string; questions?: InterviewQuestion[]; meta?: Record<string, unknown> }): Promise<void>
   get(sessionId: string, userId: string): Promise<InterviewSession | undefined>
   appendMessage(sessionId: string, userId: string, role: 'user' | 'assistant', content: string): Promise<boolean>
@@ -68,12 +72,12 @@ export interface CandidateProfilePort {
   summary(userId: string, topic?: string, memoryQuery?: string): Promise<string>
   targetRole(userId: string): Promise<string>
   updateTargetRole(userId: string, role: string): Promise<void>
-  afterReview?(input: { userId: string; session: InterviewSession }): Promise<Record<string, unknown> | undefined>
+  afterReview?(input: { userId: string; session: InterviewSession; context?: RequestContext }): Promise<Record<string, unknown> | undefined>
   addPredictedWeakPoints?(input: { userId: string; topic: string; points: string[] }): Promise<void>
 }
 
 export interface InterviewUseCases {
-  previewJob(context: RequestContext, input: JobPrepInput): Promise<{ preview: JobPrepPreview }>
+  previewJob(context: RequestContext, input: JobPrepInput): Promise<{ session_id: string; preview: JobPrepPreview }>
   startJob(context: RequestContext, input: JobPrepInput): Promise<JobPrepStartResult>
   start(context: RequestContext, input: StartInterviewInput): Promise<InterviewStartResult>
   chat(context: RequestContext, sessionId: string, message: string): Promise<{ session_id: string; message: string; is_finished: boolean }>

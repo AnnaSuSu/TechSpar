@@ -21,6 +21,7 @@ const MODE_BADGES = {
   resume: { text: "简历面试", variant: "default" },
   topic_drill: { text: "专项训练", variant: "success" },
   jd_prep: { text: "JD 备面", variant: "blue" },
+  copilot: { text: "Copilot 实战", variant: "default" },
   recording: { text: "录音复盘", variant: "blue" },
 };
 
@@ -29,12 +30,14 @@ const FILTER_OPTIONS = [
   { key: "resume", label: "简历面试" },
   { key: "topic_drill", label: "专项训练" },
   { key: "jd_prep", label: "JD 备面" },
+  { key: "copilot", label: "Copilot 实战" },
   { key: "recording", label: "录音复盘" },
 ];
 
 // Session lifecycle → UI affordances. Ongoing sessions with no review yet are
 // shown distinctly from review-failed ones so users can take the right action.
 const STATUS_META = {
+  prepared: { label: "待开始训练", tone: "info", icon: Play },
   reviewed: { label: "已复盘", tone: "success", icon: CircleCheck },
   reviewing: { label: "复盘生成中", tone: "info", icon: LoaderCircle, spin: true },
   review_failed: { label: "总结失败", tone: "danger", icon: CircleAlert },
@@ -123,7 +126,8 @@ export default function History() {
   // Status dictates where a row click goes. Reviewed → /review. Anything else
   // routes back into /interview so the user can continue answering or retry review.
   const openSession = (session) => {
-    if (session.status === "reviewed") navigate(`/review/${session.session_id}`);
+    if (session.status === "prepared") navigate(`/mock-interview?mode=targeted&session=${encodeURIComponent(session.session_id)}`);
+    else if (session.status === "reviewed") navigate(`/review/${session.session_id}`);
     else navigate(`/interview/${session.session_id}`);
   };
 
@@ -136,10 +140,12 @@ export default function History() {
       const label = session.mode === "resume"
         ? "简历面试复盘生成中"
         : session.mode === "jd_prep" ? "JD 备面复盘生成中"
+          : session.mode === "copilot" ? "Copilot 实战复盘生成中"
           : session.mode === "recording" ? "录音复盘生成中" : "专项训练复盘生成中";
       const type = session.mode === "resume"
         ? "resume_review"
         : session.mode === "jd_prep" ? "jd_review"
+          : session.mode === "copilot" ? "copilot_review"
           : session.mode === "recording" ? "recording" : "drill_review";
       startTask(session.session_id, type, label);
       // Optimistically reflect the new status so the row updates without a full refetch.
@@ -210,7 +216,7 @@ export default function History() {
           />
 
           <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[520px]">
-            <HistorySummaryChip label="总记录" value={total} hint="累计完成" />
+            <HistorySummaryChip label="总记录" value={total} hint="已保存记录" />
             <HistorySummaryChip label="当前列表" value={sessions.length} hint="本页已加载" />
             <HistorySummaryChip
               label="筛选状态"
@@ -325,7 +331,7 @@ export default function History() {
           <>
             <div className="mt-3 flex items-center justify-between gap-3 border-b border-border/70 pb-2">
               <div className="flex items-center gap-2">
-                <div className="text-sm font-semibold">复盘列表</div>
+                <div className="text-sm font-semibold">训练与备面记录</div>
                 {hasFilters && (
                   <Badge variant="outline" className="rounded-full px-2.5 py-0.5 text-[11px]">
                     已筛选

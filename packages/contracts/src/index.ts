@@ -42,6 +42,8 @@ export const AuthResponseSchema = z.object({
   user: AuthUserSchema,
 })
 
+export const AuthIdentitySchema = z.strictObject({ id: z.string().min(1) })
+
 export const AuthConfigSchema = z.object({
   allow_registration: z.boolean(),
 })
@@ -57,6 +59,7 @@ export const LlmSettingsSchema = z.object({
   model: z.string().default(''),
   temperature: z.number().min(0).max(2).default(0.7),
   compatibility: z.enum(['generic', 'deepseek']).default('generic'),
+  reasoning_effort: z.enum(['', 'none', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
   /** 显式选用部署方的共享 key,即使自己也填了 key */
   use_platform: z.boolean().default(false),
 })
@@ -164,8 +167,12 @@ export const StartInterviewSchema = z.object({
   target_role: z.string().optional(),
   job_description: z.string().max(12000).optional(),
 })
-export const JobPrepPreviewSchema = z.object({ jd_text: z.string(), company: z.string().nullable().optional(), position: z.string().nullable().optional(), use_resume: z.boolean().default(true) })
-export const JobPrepStartSchema = JobPrepPreviewSchema.extend({ preview_data: z.record(z.string(), z.unknown()).optional() })
+export const JobPrepPreviewSchema = z.object({ request_id: z.uuid().optional(), jd_text: z.string(), company: z.string().nullable().optional(), position: z.string().nullable().optional(), use_resume: z.boolean().default(true) })
+const JobPrepStartFieldsSchema = JobPrepPreviewSchema.extend({ session_id: z.string().min(1).max(200).optional(), preview_data: z.record(z.string(), z.unknown()).optional() })
+export const JobPrepStartSchema = z.union([
+  JobPrepStartFieldsSchema.extend({ session_id: z.string().min(1).max(200) }),
+  JobPrepStartFieldsSchema.extend({ request_id: z.uuid() }),
+])
 export const InterviewChatSchema = z.object({ session_id: z.string(), message: z.string() })
 export const EndInterviewSchema = z.object({ answers: z.array(InterviewAnswerSchema).default([]) })
 export const ReferenceAnswerRequestSchema = z.object({ session_id: z.string(), question_id: z.union([z.string(), z.number()]) })
@@ -219,3 +226,5 @@ export type RegisterRequest = z.infer<typeof RegisterRequestSchema>
 export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>
 export type CopilotClientMessage = z.infer<typeof CopilotClientMessageSchema>
 export type SettingsViewContract = z.infer<typeof SettingsViewSchema>
+
+export * from './copilot-sessions.ts'

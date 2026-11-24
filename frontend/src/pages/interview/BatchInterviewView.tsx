@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Check, Minus, Star } from "lucide-react";
 import useVoiceInput from "@/hooks/useVoiceInput";
+import VoiceInputFeedback from "@/components/VoiceInputFeedback";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ export default function BatchInterviewView({ session }: { session: InterviewSess
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const drillVoice = useVoiceInput({ onResult: (text) => setDrillInput((previous) => previous + text) });
+  const cancelDrillVoice = drillVoice.cancel;
   const [selfAssess, setSelfAssess] = useState(() => localStorage.getItem("drill-self-assess") !== "off");
   const isJobPrep = initData.mode === "jd_prep";
   const isDrill = initData.mode === "topic_drill";
@@ -32,6 +34,19 @@ export default function BatchInterviewView({ session }: { session: InterviewSess
   useEffect(() => {
     textareaRef.current?.focus();
   }, [currentIndex]);
+
+  useEffect(() => {
+    return () => { cancelDrillVoice(); };
+  }, [sessionId, currentIndex, cancelDrillVoice]);
+
+  useEffect(() => {
+    if (finished) cancelDrillVoice();
+  }, [finished, cancelDrillVoice]);
+
+  const onEndBatch = () => {
+    cancelDrillVoice();
+    void handleEndBatch();
+  };
 
   const toggleSelfAssess = () => {
     localStorage.setItem("drill-self-assess", selfAssess ? "off" : "on");
@@ -51,8 +66,17 @@ export default function BatchInterviewView({ session }: { session: InterviewSess
             )
             : initData.topic && <span className="text-sm text-dim">{initData.topic}</span>}
           <span className="text-[13px] text-dim">{answeredCount}/{totalQ} 已答</span>
+          {isJobPrep && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(`/mock-interview?mode=targeted&session=${encodeURIComponent(sessionId)}`)}
+            >
+              查看岗位方案
+            </Button>
+          )}
         </div>
-        <Button variant="destructive" size="sm" onClick={handleEndBatch} disabled={submitting || (submitted && !taskError)}>
+        <Button variant="destructive" size="sm" onClick={onEndBatch} disabled={submitting || (submitted && !taskError)}>
           {submitting ? "评估中..." : taskError ? "重新评估" : finished ? "查看评估" : isJobPrep ? "结束备面" : "结束训练"}
         </Button>
       </div>
@@ -86,7 +110,7 @@ export default function BatchInterviewView({ session }: { session: InterviewSess
                     submitted && taskDone
                       ? () => navigate(`/review/${sessionId}`)
                       : !submitted || canRetry
-                      ? handleEndBatch
+                      ? onEndBatch
                       : undefined
                   }
                   disabled={submitting || (submitted && !taskDone && !taskError)}
@@ -176,12 +200,11 @@ export default function BatchInterviewView({ session }: { session: InterviewSess
                 />
                 {drillVoice.isSupported && (
                   <div className="absolute bottom-3 right-3">
-                    <MicButton voice={drillVoice} />
+                    <MicButton voice={drillVoice} disabled={submitting} />
                   </div>
                 )}
               </div>
-              {drillVoice.error && <p role="alert" className="text-sm text-red">{drillVoice.error}</p>}
-              {drillVoice.isListening && <p role="status" className="text-xs text-dim">正在录音，再次点击麦克风停止并转成文字。</p>}
+              <VoiceInputFeedback voice={drillVoice} />
               <div className="flex items-center justify-end gap-3">
                 {isDrill && (selfAssess ? (
                   <div className="mr-auto flex items-center gap-2">

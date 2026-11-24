@@ -6,10 +6,12 @@ import { InterviewSessionResponseSchema } from './interview-responses.ts'
 export const ProfileHistoryEventSchema = z.object({ date: z.string().optional(), event: z.string().optional(), evidence: z.string().optional(), score: z.number().optional() }).passthrough()
 export const SpacedRepetitionSchema = z.object({
   interval_days: z.number().optional(), ease_factor: z.number().optional(), repetitions: z.number().optional(),
-  next_review: z.string().optional(), last_score: z.number().optional(),
+  // Legacy backups use null until this weak point has been scored.
+  next_review: z.string().optional(), last_score: z.number().nullish(),
 }).passthrough()
 const observation = {
-  topic: z.string().optional(), first_seen: z.string().optional(), last_seen: z.string().optional(), times_seen: z.number().optional(),
+  // The legacy recording fallback saved null for observations without a topic.
+  topic: z.string().nullish(), first_seen: z.string().optional(), last_seen: z.string().optional(), times_seen: z.number().optional(),
   improved: z.boolean().optional(), improved_at: z.string().optional(), archived: z.boolean().optional(),
   archived_at: z.string().optional(), archived_reason: z.string().optional(), source: z.string().optional(), axis: z.string().optional(),
   confidence: z.number().optional(), history: z.array(ProfileHistoryEventSchema).optional(),
@@ -41,7 +43,7 @@ export const ProfileStatsSchema = z.object({
 export const ProfileViewedResponseSchema = z.strictObject({ at: z.string(), total_sessions: z.number(), topic_scores: z.record(z.string(), z.number()) })
 // Historical stored markers may be partial; POST /viewed always returns a full marker.
 export const ProfileStoredViewMarkerSchema = ProfileViewedResponseSchema.partial().passthrough()
-export const DueReviewSummarySchema = z.strictObject({ point: z.string(), topic: z.string().optional(), next_review: z.string().optional() })
+export const DueReviewSummarySchema = z.strictObject({ point: z.string(), topic: z.string().nullish(), next_review: z.string().optional() })
 export const CandidateProfileResponseSchema = z.object({
   name: z.string(), target_role: z.string(), updated_at: z.string(), last_consolidation_at: z.string(),
   topic_mastery: z.record(z.string(), TopicMasterySchema), weak_points: z.array(ProfileWeakPointSchema), strong_points: z.array(ProfileStrongPointSchema),

@@ -17,6 +17,7 @@ import {
   type DataMigrationUseCases,
   type RecordingUseCases,
   type CopilotPrepUseCases,
+  type CopilotSessionUseCases,
   type CopilotRealtimeUseCases,
   type VoiceprintUseCases,
   type SettingsUseCases,
@@ -32,11 +33,14 @@ import { registerProfileRoutes } from './routes/profile.ts'
 import { registerPersonalAgentRoutes } from './routes/personal-agent.ts'
 import { registerDataMigrationRoutes } from './routes/data-migration.ts'
 import { registerRecordingRoutes } from './routes/recording.ts'
-import { registerCopilotRoutes, registerCopilotWebSocket } from './routes/copilot.ts'
+import { registerCopilotRoutes, registerCopilotSessionRoutes, registerCopilotWebSocket } from './routes/copilot.ts'
 import { registerVoiceprintRoutes } from './routes/voiceprint.ts'
 import { registerStaticFrontend } from './http/static-frontend.ts'
 import { createOpenApiDocument } from './http/openapi.ts'
 import { fastApiValidationBody } from './http/validation.ts'
+import { LoginRateLimiter } from './http/login-rate-limiter.ts'
+import type { LoginRateLimiter as LoginRateLimiterType } from './http/login-rate-limiter.ts'
+import { requestBodyLimit } from './http/request-body-limit.ts'
 
 export type AppDependencies = {
   auth: AuthUseCases
@@ -53,6 +57,7 @@ export type AppDependencies = {
   personalAgent?: PersonalAgentUseCases
   migration?: DataMigrationUseCases
   recording?: RecordingUseCases
+  copilotSessions?: CopilotSessionUseCases
   copilotPrep?: CopilotPrepUseCases
   copilotRealtime?: CopilotRealtimeUseCases
   websocketUpgrade?: UpgradeWebSocket
@@ -60,6 +65,8 @@ export type AppDependencies = {
   /** 追加路由。必须在静态前端兜底之前注册,否则会被 app.get('*') 吃掉。 */
   extendRoutes?: (app: OpenAPIHono) => void
   webDir?: string
+  loginLimiter?: LoginRateLimiterType
+  trustProxy?: boolean
 }
 
 export function createApp(deps: AppDependencies): OpenAPIHono {
@@ -72,6 +79,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono {
   app.use('*', requestId())
   app.use('/api/*', logger())
   if (deps.registrationRateLimit) app.use('/api/auth/register', deps.registrationRateLimit)
+  app.use('/api/*', (c, next) => requestBodyLimit(c.req.path)(c, next))
 
   app.onError((error, c) => {
     if (error instanceof HTTPException) {
@@ -86,7 +94,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono {
     return c.json({ detail: 'Internal Server Error' }, 500)
   })
 
-  registerAuthRoutes(app, deps)
+  registerAuthRoutes(app, { ...deps, loginLimiter: deps.loginLimiter || new LoginRateLimiter(), trustProxy: deps.trustProxy })
   registerSettingsRoutes(app, deps)
   registerKnowledgeRoutes(app, deps)
   registerResumeRoutes(app, deps)
@@ -95,6 +103,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono {
   if (deps.personalAgent) registerPersonalAgentRoutes(app, { personalAgent: deps.personalAgent, tokens: deps.tokens })
   if (deps.migration) registerDataMigrationRoutes(app, { migration: deps.migration, tokens: deps.tokens })
   if (deps.recording) registerRecordingRoutes(app, { recording: deps.recording, tokens: deps.tokens })
+  if (deps.copilotSessions) registerCopilotSessionRoutes(app, { sessions: deps.copilotSessions, tokens: deps.tokens })
   if (deps.copilotPrep) registerCopilotRoutes(app, { prep: deps.copilotPrep, tokens: deps.tokens })
   if (deps.copilotRealtime && deps.websocketUpgrade) registerCopilotWebSocket(app, { realtime: deps.copilotRealtime, tokens: deps.tokens, upgrade: deps.websocketUpgrade })
   if (deps.voiceprint) registerVoiceprintRoutes(app, { voiceprint: deps.voiceprint, tokens: deps.tokens })
