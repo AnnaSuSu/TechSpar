@@ -12,8 +12,20 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 
-![TechSpar product overview](images/techspar-overview.png)
 </div>
+
+<table>
+  <tr>
+    <td width="180" align="center" valign="middle">
+      <a href="https://ak47token.com/api-relay"><img src="images/ak47-logo.svg" alt="AK47 AI Subscription Top-ups" width="140" /></a>
+    </td>
+    <td valign="middle">
+      <strong><a href="https://ak47token.com/api-relay">AK47 AI Subscription Top-ups</a></strong>(author-run promotion) offers affordable AI subscriptions with <strong>fully automated service, 24/7</strong>. Order and activate online without contacting support. Plus top-up (Philippines): <strong>CNY 115</strong>; a 4-person shared plan: <strong>CNY 35 / 30 days</strong> (desktop only). <a href="https://ak47token.com/api-relay">View plans &amp; pricing →</a>. Prices and availability follow the live store listings.
+    </td>
+  </tr>
+</table>
+
+![TechSpar product overview](images/techspar-overview.png)
 
 TechSpar is more than a question generator. Focused drills, resume interviews, JD prep, realtime Copilot, and recording review share the same long-term profile, knowledge base, weak points, and review schedule. Every result changes what the next round focuses on.
 

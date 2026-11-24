@@ -102,6 +102,30 @@ describe('chat provider compatibility', () => {
 })
 
 describe('embedding provider compatibility', () => {
+  test.each([false, true])('preserves float vectors through the real SDK (scalar only: %s)', async (scalarOnly) => {
+    const requests: Array<{ input: string | string[]; encoding_format?: string }> = []
+    const vector = Array.from({ length: 2560 }, (_, index) => (index % 17 - 8) / 17)
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(request) {
+        const body = await request.json() as { input: string | string[]; encoding_format?: string }
+        requests.push(body)
+        if (scalarOnly && Array.isArray(body.input)) return Response.json({ error: { message: 'scalar inputs only' } }, { status: 400 })
+        const inputs = Array.isArray(body.input) ? body.input : [body.input]
+        return Response.json({ data: inputs.map((_, index) => ({ index, embedding: vector })) })
+      },
+    })
+    try {
+      const client = new ApiEmbeddingClient({ apiBase: `http://127.0.0.1:${server.port}/v1`, apiKey: 'test', model: 'model' })
+      expect(await client.embed(['first', 'second'])).toEqual([vector, vector])
+      expect(await client.embed(['third'])).toEqual([vector])
+      expect(requests.every(request => request.encoding_format === 'float')).toBeTrue()
+    } finally {
+      await server.stop(true)
+    }
+  })
+
   test('defaults local inference to a Transformers.js ONNX checkpoint', () => {
     expect(DEFAULT_EMBEDDING_MODEL).toBe('Xenova/bge-m3')
   })

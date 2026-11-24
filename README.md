@@ -9,9 +9,20 @@
 [![Release](https://img.shields.io/github/v/release/AnnaSuSu/TechSpar?color=6E56CF)](https://github.com/AnnaSuSu/TechSpar/releases)
 [![Status](https://img.shields.io/badge/状态-持续开发中-2EA043.svg)](https://github.com/AnnaSuSu/TechSpar/commits/main)
 
-![TechSpar 产品总览](images/techspar-overview.png)
-
 </div>
+
+<table>
+  <tr>
+    <td width="180" align="center" valign="middle">
+      <a href="https://ak47token.com/api-relay"><img src="images/ak47-logo.svg" alt="AK47 AI 会员代充" width="140" /></a>
+    </td>
+    <td valign="middle">
+      <strong><a href="https://ak47token.com/api-relay">AK47 AI 会员代充</a></strong>（作者自营推广）：低价 AI 会员代充，<strong>24 小时全自动</strong>，从下单到开通全程自助，无需联系客服。Plus 菲区代充 <strong>¥115</strong>；四人共享 <strong>¥35 / 30 天</strong>（仅限电脑）。<a href="https://ak47token.com/api-relay">查看套餐与价格 →</a>，价格与库存以商城实时展示为准。
+    </td>
+  </tr>
+</table>
+
+![TechSpar 产品总览](images/techspar-overview.png)
 
 ## 这是什么
 

@@ -108,6 +108,10 @@ LLM、Embedding、DashScope、Tavily、OSS 和腾讯 VPR 凭据默认由每个�
 
 首次启动会在用户表中创建 `DEFAULT_EMAIL`；以后修改 `DEFAULT_PASSWORD` 不会重置已经存在的账号密码。生产环境应在首次启动前改好默认值。
 
+注册接口默认限制同一 IP 在滚动 24 小时内成功注册最多 5 个账号，超限返回 HTTP 429 和 `Retry-After`。失败的请求释放名额；并发中的注册会暂占名额。计数保存在 `DB_PATH` 同目录的 `registration-limits.db`，重启后仍有效，应与数据目录一起持久化。启用前的历史注册不计入此限制。
+
+如果使用本机 Nginx 反向代理，后端应只监听 `127.0.0.1`，Nginx 必须设置 `proxy_set_header X-Real-IP $remote_addr;`，然后配置 `REGISTRATION_TRUST_LOOPBACK_PROXY=true`。仅来自回环地址的代理请求会使用该头；其他连接按实际 TCP 来源计数，忽略客户端提交的 IP 头。默认不开启代理头信任。
+
 ## 本地 Embedding
 
 选择“设置 → Embedding → 本地”后，服务通过 Transformers.js + ONNX 自动下载并缓存模型，默认是 `Xenova/bge-m3`。不需要 Python、PyTorch 或 pip。

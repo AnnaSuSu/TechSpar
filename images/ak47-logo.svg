@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="160" viewBox="0 0 360 160" role="img" aria-labelledby="title">
+  <title id="title">AK47 · AI Memberships</title>
+  <rect width="360" height="160" rx="12" fill="#20242C"/>
+  <rect x="32" y="32" width="5" height="96" rx="2.5" fill="#FBBF24"/>
+  <text x="62" y="96" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="800" letter-spacing="-3" fill="#FBBF24">AK47</text>
+  <text x="66" y="125" font-family="Arial, Helvetica, sans-serif" font-size="16" letter-spacing="2.5" fill="#E1E4EA">AI MEMBERSHIPS</text>
+</svg>

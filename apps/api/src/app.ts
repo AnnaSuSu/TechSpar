@@ -2,6 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi'
 import { HTTPException } from 'hono/http-exception'
 import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
+import type { MiddlewareHandler } from 'hono'
 import type { UpgradeWebSocket } from 'hono/ws'
 import {
   AppError,
@@ -40,6 +41,7 @@ import { fastApiValidationBody } from './http/validation.ts'
 export type AppDependencies = {
   auth: AuthUseCases
   registration: AuthPolicy
+  registrationRateLimit?: MiddlewareHandler
   settings: SettingsUseCases
   settingsOperations?: SettingsOperationsUseCases
   quota: QuotaUseCases
@@ -69,6 +71,7 @@ export function createApp(deps: AppDependencies): OpenAPIHono {
 
   app.use('*', requestId())
   app.use('/api/*', logger())
+  if (deps.registrationRateLimit) app.use('/api/auth/register', deps.registrationRateLimit)
 
   app.onError((error, c) => {
     if (error instanceof HTTPException) {

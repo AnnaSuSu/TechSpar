@@ -1,5 +1,5 @@
 import { mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import {
   AuthService,
   ensureDefaultAccount,
@@ -46,9 +46,14 @@ import { createBunWebSocket, type BunWebSocketData } from 'hono/bun'
 import { createApp } from './app.ts'
 import { loadExtensions } from './extensions.ts'
 import { withLongRequestTimeout } from './server-options.ts'
+import { createRegistrationRateLimit, RegistrationRateLimit } from './http/registration-rate-limit.ts'
 
 const config = loadConfig()
 mkdirSync(dirname(config.dbPath), { recursive: true })
+const registrationRateLimit = createRegistrationRateLimit(
+  new RegistrationRateLimit(join(dirname(config.dbPath), 'registration-limits.db')),
+  process.env.REGISTRATION_TRUST_LOOPBACK_PROXY === 'true',
+)
 const users = new BunUserRepository(config.dbPath, config.defaultEmail)
 users.initialize()
 const passwordHasher = new BcryptPasswordHasher()
@@ -141,7 +146,7 @@ taskQueue.register('copilot_prep', (task) => copilotPrep.runPrepTask(task))
 taskQueue.register('retrospective', (task) => profile.runRetrospectiveTask(task))
 await taskQueue.start()
 const { upgradeWebSocket, websocket } = createBunWebSocket()
-const app = createApp({ auth, registration, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, recording, copilotPrep, copilotRealtime, websocketUpgrade: upgradeWebSocket, voiceprint, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir })
+const app = createApp({ auth, registration, registrationRateLimit, settings, settingsOperations, quota, tokens, knowledge, resume, interview, profile, personalAgent, migration, recording, copilotPrep, copilotRealtime, websocketUpgrade: upgradeWebSocket, voiceprint, extendRoutes: (instance) => extensions.routes?.(instance, extensionContext), webDir: config.webDir })
 
 const server = Bun.serve<BunWebSocketData>(withLongRequestTimeout({ hostname: config.host, port: config.port, fetch: (request, server) => app.fetch(request, server), websocket }))
 console.log(JSON.stringify({ event: 'techspar:ready', host: config.host, port: server.port }))

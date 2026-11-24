@@ -136,7 +136,7 @@ export type EmbeddingClientConfig = {
 type EmbeddingApi = {
   embeddings: {
     create(
-      input: { model: string; input: string | string[] },
+      input: { model: string; input: string | string[]; encoding_format: 'float' },
       options?: { signal?: AbortSignal },
     ): Promise<{ data: Array<{ index: number; embedding: number[] }> }>
   }
@@ -161,7 +161,7 @@ export class ApiEmbeddingClient {
         continue
       }
       try {
-        const response = await this.client.embeddings.create({ model: this.config.model, input: [...batch] }, { signal })
+        const response = await this.client.embeddings.create({ model: this.config.model, input: [...batch], encoding_format: 'float' }, { signal })
         const ordered = [...response.data].sort((a, b) => a.index - b.index).map((item) => item.embedding)
         if (ordered.length !== batch.length) throw new Error(`Embedding vector count mismatch: expected ${batch.length}, got ${ordered.length}`)
         output.push(...ordered)
@@ -176,7 +176,7 @@ export class ApiEmbeddingClient {
   }
 
   private async embedOne(text: string, signal?: AbortSignal): Promise<number[]> {
-    const response = await this.client.embeddings.create({ model: this.config.model, input: text }, { signal })
+    const response = await this.client.embeddings.create({ model: this.config.model, input: text, encoding_format: 'float' }, { signal })
     if (response.data.length !== 1) throw new Error(`Embedding vector count mismatch: expected 1, got ${response.data.length}`)
     return response.data[0]!.embedding
   }
