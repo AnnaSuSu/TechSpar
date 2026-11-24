@@ -174,7 +174,8 @@ describe('long-term profile loop', () => {
     expect(profile.topic_mastery.python).toMatchObject({ score: 60, session_count: 2, notes: '需要补底层机制' })
     expect(profile.stats).toMatchObject({ total_sessions: 2, total_answers: 2, drill_sessions: 2, drill_avg_score: 6, avg_score: 6 })
     const memories = await vectors.listProfileMemories({ userId: 'user-a' })
-    expect(memories.map((item) => item.chunkType)).toEqual(expect.arrayContaining(['session_summary', 'insight', 'weak_point']))
+    expect(memories.map((item) => item.chunkType)).toEqual(expect.arrayContaining(['session_summary', 'insight']))
+    expect(memories.some((item) => item.chunkType === 'weak_point')).toBeFalse()
     sessions.close(); vectors.close()
   })
 
@@ -197,8 +198,8 @@ describe('long-term profile loop', () => {
     expect(profile.weak_points.filter((point) => point.archived_reason === 'superseded_by_consolidation')).toHaveLength(3)
     await service.feedback(context, '跨领域机制解释停留在表面', 'accurate')
     profile = await repository.load('user-a')
-    expect(profile.weak_points.find((point) => point.source === 'consolidated')).toMatchObject({ confidence: 0.9, user_acknowledged: true })
-    expect((await vectors.listProfileMemories({ userId: 'user-a', chunkTypes: ['weak_point'] })).some((item) => item.content === '跨领域机制解释停留在表面')).toBeTrue()
+    expect(profile.weak_points.find((point) => point.source === 'consolidated')).toMatchObject({ point: '跨领域机制解释停留在表面', confidence: 0.9, user_acknowledged: true })
+    expect(await vectors.listProfileMemories({ userId: 'user-a', chunkTypes: ['weak_point'] })).toEqual([])
     sessions.close(); vectors.close()
   })
 

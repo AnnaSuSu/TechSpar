@@ -131,9 +131,7 @@ describe('HTTP response fixtures from real services', () => {
     expect(completion.last_rebuild_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
     expect(completion.last_rebuild_at).toBe(new Date(`${completion.last_rebuild_at}Z`).toISOString().slice(0, 19))
     expect(completion.last_rebuild_at).toBe(lastRebuilds.get('user-a'))
-    expect(chunks.get('user-a:weak_point')).toEqual([
-      { content: 'typescript: 事件循环', source: 'profile.json', embedding: Float32Array.from([1, 0]) },
-    ])
+    expect(chunks.has('user-a:weak_point')).toBe(false)
     events[events.length - 1] = { ...completion, last_rebuild_at: normalizedTime.slice(0, 19) }
     expect(events).toEqual(parseSseEvents(await loadTextFixture(fixtureFor('POST /api/settings/rebuild-index'))))
   })

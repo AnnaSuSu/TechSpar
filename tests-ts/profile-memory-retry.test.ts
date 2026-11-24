@@ -82,7 +82,7 @@ describe('retryable profile memory projection', () => {
     await f.service.afterReview({ userId: 'user-a', session: session() })
     expect(calls).toBe(2)
     expect((await f.repository.load('user-a')).stats.total_sessions).toBe(1)
-    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(3)
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(2)
   })
 
   for (const failure of ['embedding', 'storage', 'partial', 'nan', 'dimension'] as const) {
@@ -104,10 +104,10 @@ describe('retryable profile memory projection', () => {
       expect(after.weak_points).toEqual(before.weak_points)
       expect(after._pending_memory?.['session-1']).toBeUndefined()
       const rows = await f.vectors.listProfileMemories({ userId: 'user-a' })
-      expect(rows).toHaveLength(3)
+      expect(rows).toHaveLength(2)
       expect(rows.every(row => row.createdAt === before._pending_memory!['session-1']!.createdAt)).toBeTrue()
       await restarted.afterReview(input)
-      expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(3)
+      expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(2)
       expect(f.calls()).toBe(1)
     })
   }
@@ -127,7 +127,7 @@ describe('retryable profile memory projection', () => {
     }
     await expect(new ProfileService({ ...f.deps, repository }).afterReview({ userId: 'user-a', session: session() })).rejects.toThrow('acknowledgement')
     const first = await f.vectors.listProfileMemories({ userId: 'user-a' })
-    expect(first).toHaveLength(3)
+    expect(first).toHaveLength(2)
     await f.service.afterReview({ userId: 'user-a', session: session() })
     expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toEqual(first)
     expect((await f.repository.load('user-a')).stats.total_sessions).toBe(1)
@@ -234,7 +234,7 @@ describe('retryable profile memory projection', () => {
       const after = await sessions.get(saved.session_id, saved.user_id)
       expect(after).toMatchObject({ status: 'reviewed', review: saved.review, scores: saved.scores, meta: { profile_extract_failed: false } })
       expect((await f.repository.load(saved.user_id)).stats).toEqual(before.stats)
-      expect(await f.vectors.listProfileMemories({ userId: saved.user_id })).toHaveLength(3)
+      expect(await f.vectors.listProfileMemories({ userId: saved.user_id })).toHaveLength(2)
       expect(f.calls()).toBe(1)
       expect(reviewCalls).toBe(0)
       const duplicate = await app.request(url, { method: 'POST', headers: jsonHeaders })
@@ -248,7 +248,7 @@ describe('retryable profile memory projection', () => {
     await Promise.all([f.service.afterReview({ userId: 'user-a', session: session() }), f.service.afterReview({ userId: 'user-a', session: session() })])
     expect((await f.repository.load('user-a')).stats.total_sessions).toBe(1)
     expect((await f.repository.load('user-a')).weak_points[0]?.sr?.repetitions).toBe(1)
-    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(3)
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(2)
   })
 
   test('replaces only the intended session and rolls back the whole replacement on an insert failure', async () => {
@@ -267,6 +267,23 @@ describe('retryable profile memory projection', () => {
       expect((await f.vectors.listProfileMemories({ userId: 'user-b' }))[0]?.content).toBe('old')
       expect(await f.vectors.listChunks('user-a', 'personal_document_chunk')).toHaveLength(1)
     } finally { db.close() }
+  })
+
+  test('batches session_summary and insight without writing weak_point vectors', async () => {
+    const f = await fixture()
+    const embedCalls: Array<{ requestId: string; texts: readonly string[] }> = []
+    const originalEmbed = f.deps.embeddings.embed.bind(f.deps.embeddings)
+    f.deps.embeddings.embed = async (context, texts) => {
+      embedCalls.push({ requestId: context.requestId, texts: [...texts] })
+      return originalEmbed(context, texts)
+    }
+    await f.service.afterReview({ userId: 'user-a', session: session() })
+    const rows = await f.vectors.listProfileMemories({ userId: 'user-a' })
+    expect(rows.map(row => row.chunkType)).toEqual(['session_summary', 'insight'])
+    expect(embedCalls).toHaveLength(2)
+    expect(embedCalls[0]!.requestId).toContain('profile-update')
+    expect(embedCalls[1]!.requestId).toContain('memory-write')
+    expect(embedCalls[1]!.texts).toHaveLength(2)
   })
 })
 

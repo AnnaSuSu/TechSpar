@@ -7,7 +7,7 @@ import type { CandidateProfilePort } from '../interview/ports.ts'
 import type { InterviewSession, TaskRecord } from '../interview/model.ts'
 import { fill } from '../interview/prompts.ts'
 import { defaultProfile, type CandidateProfile, type PendingProfileMemory, type ProfileViewMarker, type RetrospectiveResult, type WeakPoint } from './model.ts'
-import type { ProfileDependencies, ProfileMemoryEntry, ProfileMemorySearchResult, ProfileUseCases } from './ports.ts'
+import type { ProfileDependencies, ProfileMemorySearchResult, ProfileUseCases } from './ports.ts'
 
 const INFER_ROLE_PROMPT = `根据以下简历内容，推断候选人最可能应聘的岗位名称。给出一个具体岗位，12 个汉字以内；学生可带实习生或校招后缀。只返回岗位名称，不要解释。\n\n{resume}`
 const EXTRACT_PROMPT = `你是面试教练分析引擎。根据本次面试记录提取结构化洞察。不要把表达习惯混入知识弱点，不得编造记录中没有的事实。\n\n模式：{mode}\n领域：{topic}\n对话：\n{transcript}\n\n逐题评分：\n{scores}\n\n现有行为信号（尽量复用 ID）：\n{existing_behavior_signals}\n\n复盘：\n{review}\n\n只返回 JSON：{"session_summary":"摘要","weak_points":[{"point":"具体知识薄弱点","topic":"领域"}],"strong_points":[{"point":"具体知识强项","topic":"领域"}],"behavior_signals":[{"action":"ADD|UPDATE|IMPROVE|NOOP","id":"reasoning.example","namespace":"reasoning","polarity":"negative","description":"行为描述","snippet":"本次新证据","evidence_snippet":"改善证据"}],"topic_mastery":{"notes":"掌握情况"},"avg_score":7,"dimension_scores":{"technical_depth":7,"project_articulation":7,"communication":7,"problem_solving":7}}。仅 resume 模式返回四维 dimension_scores，其他模式省略。avg_score 为有效维度的平均分，保留一位小数。行为信号按 action 提供内容：ADD 必须有非空 description 和 snippet；UPDATE 必须有非空 snippet；IMPROVE 必须有非空 evidence_snippet；NOOP 不应用变更。各 action 不适用的文本字段可以省略或填空字符串，但不能使用 null、对象或数组。`
@@ -179,7 +179,6 @@ function sessionMemory(extraction: Record<string, unknown>, session: InterviewSe
   const entries: PendingProfileMemory['entries'] = []
   if (summary) entries.push({ chunkType: 'session_summary', content: summary, topic: session.topic || undefined, metadata: { mode: session.mode } })
   if (insight) entries.push({ chunkType: 'insight', content: insight, topic: session.topic || undefined, metadata: { mode: session.mode } })
-  for (const item of weak) entries.push({ chunkType: 'weak_point', content: text(item.point), topic: text(item.topic) || session.topic || undefined, metadata: { source: text(item.source) || 'observed' } })
   return { createdAt, entries }
 }
 
@@ -450,17 +449,6 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
     } catch { return [] }
   }
 
-  private async appendMemories(userId: string, entries: Array<Omit<ProfileMemoryEntry, 'embedding' | 'createdAt'>>, now: string, context: RequestContext): Promise<void> {
-    const vectors = await this.vectorsFor(userId, entries.map((entry) => entry.content), 'memory-write', context)
-    const stored = entries.flatMap((entry) => {
-      const embedding = vectors.get(entry.content)
-      return embedding ? [{ ...entry, embedding, createdAt: now }] : []
-    })
-    if (!stored.length) return
-    await assertContextActive(context)
-    try { await this.deps.vectors.appendProfileMemories({ userId, entries: stored }) } catch { /* profile.json remains the source of truth */ }
-  }
-
   private async projectSessionMemory(userId: string, sessionId: string, pending: PendingProfileMemory | undefined, context: RequestContext): Promise<void> {
     if (!pending) return
     // Unlike optional semantic matching, this write must succeed as a whole or remain retryable.
@@ -630,11 +618,10 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
       patterns = validateConsolidation(parsed, active)
     } catch { await assertContextActive(context); return }
 
-    const created = await this.deps.repository.update(userId, async (current) => {
+    await this.deps.repository.update(userId, async (current) => {
       await assertContextActive(context)
       prepare(current)
       const inside = current.weak_points.filter((point) => (point.source || 'observed') === 'observed' && point.axis !== 'performance' && !point.improved && !point.archived)
-      const output: WeakPoint[] = []
       for (const raw of patterns) {
         const pattern = object(raw); const statement = text(pattern.statement)
         const indexes = Array.isArray(pattern.supporting_wp_indices) ? [...new Set(pattern.supporting_wp_indices.filter((value): value is number => Number.isInteger(value) && value >= 0))] : []
@@ -649,16 +636,14 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
           times_seen: supporting.reduce((sum, point) => sum + Number(point.times_seen || 1), 0), improved: false, archived: false,
           consolidates: supporting.map((point) => point.point), confidence, user_acknowledged: false,
         }
-        current.weak_points.push(consolidated); output.push(consolidated)
+        current.weak_points.push(consolidated)
         for (const point of supporting) {
           point.archived = true; point.archived_at = now; point.archived_reason = 'superseded_by_consolidation'
           history(point).push({ date: now, event: 'archived', reason: `superseded by consolidation: ${statement}` })
         }
       }
       current.last_consolidation_at = now
-      return output
     })
-    if (created.length) await this.appendMemories(userId, created.map((point) => ({ chunkType: 'weak_point', content: point.point, topic: point.topic ?? undefined, metadata: { source: 'consolidated' } })), now, context)
   }
 
   async afterReview(input: { userId: string; session: InterviewSession; context?: RequestContext }): Promise<Record<string, unknown>> {

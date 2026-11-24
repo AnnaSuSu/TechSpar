@@ -84,7 +84,7 @@ describe('profile review regressions at file, vector and HTTP boundaries', () =>
     const stored = await f.repository.load('user-a')
     expect(stored).toMatchObject({ stats: { total_sessions: 1 }, weak_points: [{ point: 'GIL 机制' }], strong_points: [{ point: 'SQL 索引' }] })
     expect(stored._pending_memory?.[session.session_id]).toBeUndefined()
-    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(3)
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(2)
     const response = await f.request()
     expect(response.status).toBe(200)
     const body = await response.json() as CandidateProfile
@@ -95,7 +95,7 @@ describe('profile review regressions at file, vector and HTTP boundaries', () =>
     await f.service.afterReview({ userId: 'user-a', session })
     expect(f.calls().llmCalls).toBe(1)
     expect((await f.repository.load('user-a')).stats.total_sessions).toBe(1)
-    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(3)
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(2)
   })
 
   const invalidActions = [
@@ -153,6 +153,6 @@ describe('profile review regressions at file, vector and HTTP boundaries', () =>
     expect(body.strong_points[0]).toMatchObject({ ...observation, first_seen: expect.any(String) })
     expect(body.weak_points[0]).toMatchObject({ archived: false, archived_at: '', confidence: 0, consolidates: [''], user_acknowledged: false, provider_observation: { kept: true } })
     expect(body.session_extractions).toMatchObject({ [session.session_id]: output })
-    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(3)
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a' })).toHaveLength(2)
   })
 })

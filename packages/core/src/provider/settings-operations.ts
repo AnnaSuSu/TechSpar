@@ -119,13 +119,9 @@ export class SettingsOperationsService implements SettingsOperationsUseCases {
             }
             result.session_memories = true
           }
-          else if (key === 'weak_points') {
-            const profile = await this.deps.profile.get(context)
-            const points = profile.weak_points.filter((point) => !point.improved && !point.archived).map((point) => `${point.topic || '综合'}: ${point.point}`)
-            const vectors = points.length ? await this.deps.embeddings.embed(context, points) : []
-            await this.deps.vectors.replaceChunks({ userId: id, chunkType: 'weak_point', chunks: points.map((content, index) => ({ content, source: 'profile.json', embedding: vectors[index]! })) })
-            result.weak_points = true
-          } else if (key === 'personal_documents') { await this.deps.personal.reindexAll(context); result.personal_documents = true }
+          // Compatibility placeholder: weak_point vectors are no longer written, and cleanup already removed legacy rows.
+          else if (key === 'weak_points') { result.weak_points = true }
+          else if (key === 'personal_documents') { await this.deps.personal.reindexAll(context); result.personal_documents = true }
           else if (key.startsWith('topic:')) { const topic = key.slice(6); await this.deps.index.rebuildTopic(context, topic); result.topics.push(topic) }
           completed += 1; yield { completed, total: plan.length, label, status: 'done' }
         } catch (error) {
