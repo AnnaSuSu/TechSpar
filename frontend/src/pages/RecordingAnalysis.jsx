@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, FileText, Loader2, Upload, User, Users } from "lucide-react";
+import { FileText, Loader2, Mic, Upload, User, Users } from "lucide-react";
 import { transcribeRecording, analyzeRecording } from "../api/interview";
 import useTaskStatus from "../hooks/useTaskStatus";
 import { cn } from "@/lib/utils";
@@ -10,8 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-
-const PAGE_CLASS = "flex-1 w-full max-w-[1600px] mx-auto px-4 py-6 md:px-7 md:py-8 xl:px-10 2xl:px-12";
+import PageContainer from "@/components/PageContainer";
+import PageHeader from "@/components/PageHeader";
+import { HintChip, StepRow } from "@/components/WorkflowPrimitives";
+import { statusToneClasses } from "@/lib/statusTone";
 
 const RECORDING_MODES = [
   {
@@ -31,13 +33,6 @@ const RECORDING_MODES = [
     note: "适合技术表达、自我介绍或复盘独白，重点看表达质量和内容完整度。",
   },
 ];
-
-function toneClasses(tone) {
-  if (tone === "green") return "border-green/20 bg-green/8 text-green";
-  if (tone === "blue") return "border-blue-500/20 bg-blue-500/8 text-blue-300";
-  if (tone === "amber") return "border-amber-500/20 bg-amber-500/10 text-amber-300";
-  return "border-border/80 bg-card/72 text-text";
-}
 
 function modeClasses(selected, tone) {
   if (!selected) return "border-border/75 bg-card/72 hover:border-border";
@@ -130,19 +125,19 @@ export default function RecordingAnalysis() {
   };
 
   return (
-    <div className={PAGE_CLASS}>
+    <PageContainer size="wide">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_380px] 2xl:grid-cols-[minmax(0,1.65fr)_400px]">
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <Card className="overflow-hidden border-border/80 bg-card/76">
             <CardContent className="p-5 md:p-6 xl:p-7">
               <div className="flex flex-col gap-6">
-                <div className="border-b border-border/70 pb-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-dim/80">录音复盘工作区</div>
-                  <div className="mt-2 text-2xl font-display font-bold tracking-tight md:text-3xl">录音复盘</div>
-                  <div className="mt-1.5 max-w-2xl text-sm leading-6 text-dim">
-                    上传面试录音或直接粘贴文本，先拿到可分析文本，再进入 AI 复盘。
-                  </div>
-                </div>
+                <PageHeader
+                  icon={<Mic size={21} />}
+                  eyebrow="录音复盘工作区"
+                  title="录音复盘"
+                  description="上传面试录音或直接粘贴文本，先拿到可分析文本，再进入 AI 复盘。"
+                  bordered
+                />
 
                 <div className="space-y-3">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-dim/80">录音模式</div>
@@ -210,19 +205,19 @@ export default function RecordingAnalysis() {
 
                 <div className="rounded-[28px] border border-border/80 bg-background/65 p-4 md:p-5">
                   <div className="flex flex-col gap-3 border-b border-border/70 pb-4 md:flex-row md:items-end md:justify-between">
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-dim/80">输入方式</div>
                       <div className="mt-1 text-sm text-dim">
                         上传录音适合完整面试复盘，粘贴文字适合已有转写稿或手动整理后的内容。
                       </div>
                     </div>
-                    <div className="flex gap-1 rounded-xl bg-card/92 p-1">
+                    <div className="inline-flex shrink-0 self-start gap-1 rounded-xl bg-card/92 p-1 md:self-auto">
                       {["upload", "paste"].map((tab) => (
                         <button
                           key={tab}
                           type="button"
                           className={cn(
-                            "rounded-lg px-4 py-2 text-sm transition-colors",
+                            "shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-sm transition-colors",
                             inputTab === tab ? "bg-background text-text shadow-sm font-medium" : "text-dim hover:text-text"
                           )}
                           onClick={() => {
@@ -330,7 +325,7 @@ export default function RecordingAnalysis() {
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-dim/80">决策面板</div>
                   <div className="mt-1 text-lg font-semibold">先拿到可分析文本</div>
                 </div>
-                <div className={cn("rounded-full border px-3 py-1 text-sm", toneClasses(status.tone))}>
+                <div className={cn("shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-sm", statusToneClasses(status.tone))}>
                   {status.label}
                 </div>
               </div>
@@ -428,42 +423,7 @@ export default function RecordingAnalysis() {
           </Card>
         </div>
       </div>
-    </div>
-  );
-}
-
-function HintChip({ title, description }) {
-  return (
-    <div className="rounded-2xl border border-border/70 bg-background/72 px-3.5 py-3">
-      <div className="text-sm font-semibold">{title}</div>
-      <div className="mt-1 text-[13px] leading-6 text-dim">{description}</div>
-    </div>
-  );
-}
-
-function StepRow({ index, title, description, done = false, active = false }) {
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border px-3.5 py-3",
-        done ? "border-green/20 bg-green/8" : active ? "border-primary/25 bg-primary/6" : "border-border/75 bg-card/72"
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            "mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold",
-            done ? "bg-green/15 text-green" : active ? "bg-primary/12 text-primary" : "bg-hover text-dim"
-          )}
-        >
-          {done ? <CheckCircle2 size={14} /> : index}
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold">{title}</div>
-          <div className="mt-1 text-[13px] leading-6 text-dim">{description}</div>
-        </div>
-      </div>
-    </div>
+    </PageContainer>
   );
 }
 

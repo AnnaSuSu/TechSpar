@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
-import { Toaster } from "sonner";
 import { useResumeStore } from "@/resume/store/useResumeStore";
 import ResumeWorkbenchPage from "@/resume/WorkbenchPage";
 import "@/resume/styles/resume.css";
@@ -24,14 +23,5 @@ export default function ResumeEditor() {
   if (!exists) return <Navigate to="/resume-manager" replace />;
   if (activeResumeId !== id) return null;
 
-  return (
-    <>
-      <ResumeWorkbenchPage />
-      <Toaster
-        position="top-center"
-        richColors
-        theme={document.documentElement.classList.contains("dark") ? "dark" : "light"}
-      />
-    </>
-  );
+  return <ResumeWorkbenchPage />;
 }

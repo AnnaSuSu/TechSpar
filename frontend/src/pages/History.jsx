@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
-import { AlertTriangle, CalendarDays, ChevronRight, CircleAlert, CircleCheck, Filter, Hash, LoaderCircle, Play, RotateCw, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { AlertTriangle, CalendarDays, ChevronRight, CircleAlert, CircleCheck, Clock, Filter, Hash, LoaderCircle, Play, RotateCw, Trash2 } from "lucide-react";
 import { getHistory, deleteSession, getInterviewTopics, retryReview } from "../api/interview";
 import useTaskStatus from "../hooks/useTaskStatus";
 import { cn } from "@/lib/utils";
@@ -10,9 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import PageContainer from "@/components/PageContainer";
+import PageHeader from "@/components/PageHeader";
+import ScorePill from "@/components/ScorePill";
 
 const PAGE_SIZE = 15;
-const PAGE_CLASS = "flex-1 w-full max-w-[1600px] mx-auto px-4 py-5 md:px-7 md:py-6 xl:px-10 2xl:px-12";
 
 const MODE_BADGES = {
   resume: { text: "简历面试", variant: "default" },
@@ -146,7 +149,7 @@ export default function History() {
           : s
       ));
     } catch (err) {
-      alert("重新生成失败: " + err.message);
+      toast.error("重新生成失败: " + (err?.message || "未知错误"));
     } finally {
       setRetrying((prev) => {
         const next = { ...prev };
@@ -171,8 +174,9 @@ export default function History() {
       setSessions((prev) => prev.filter((item) => item.session_id !== pendingDelete.session_id));
       setTotal((prev) => Math.max(0, prev - 1));
       setPendingDelete(null);
+      toast.success("已删除记录");
     } catch (error) {
-      alert("删除失败: " + error.message);
+      toast.error("删除失败: " + (error?.message || "未知错误"));
     } finally {
       setIsDeleting(false);
     }
@@ -180,14 +184,14 @@ export default function History() {
 
   if (loading) {
     return (
-      <div className={cn(PAGE_CLASS, "space-y-3")}>
+      <PageContainer size="wide" className="space-y-3">
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-5 w-72" />
         <Skeleton className="h-24 w-full rounded-[24px]" />
         {[...Array(5)].map((_, index) => (
           <Skeleton key={index} className="h-20 w-full rounded-[20px]" />
         ))}
-      </div>
+      </PageContainer>
     );
   }
 
@@ -197,14 +201,13 @@ export default function History() {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className={PAGE_CLASS}>
-        <div className="flex flex-col gap-2.5 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0">
-            <div className="text-3xl font-display font-bold tracking-tight md:text-[38px]">历史记录</div>
-            <div className="mt-1 max-w-2xl text-sm leading-6 text-dim">
-              按模式和领域快速回看训练记录，重点保留时间和评分这两类核心信息。
-            </div>
-          </div>
+      <PageContainer size="wide">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+          <PageHeader
+            icon={<Clock size={21} />}
+            title="历史记录"
+            description="按模式和领域快速回看训练记录，重点保留时间和评分这两类核心信息。"
+          />
 
           <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[520px]">
             <HistorySummaryChip label="总记录" value={total} hint="累计完成" />
@@ -382,7 +385,7 @@ export default function History() {
             if (!open && !isDeleting) setPendingDelete(null);
           }}
         />
-      </div>
+      </PageContainer>
     </TooltipProvider>
   );
 }
@@ -535,43 +538,6 @@ function buildFilterSummary(modeFilter, topicFilter) {
   if (topicFilter !== "all" && modeFilter === "all") return `全部模式 / ${topicFilter}`;
   if (topicFilter !== "all") return `${modeLabel} / ${topicFilter}`;
   return modeLabel;
-}
-
-function ScorePill({ score }) {
-  if (score == null) {
-    return (
-      <Badge variant="secondary" className="min-w-[72px] justify-center rounded-full px-3 py-1 text-[12px]">
-        未评分
-      </Badge>
-    );
-  }
-
-  let bg;
-  let color;
-
-  if (score >= 8) {
-    bg = "rgba(34,197,94,0.15)";
-    color = "var(--success)";
-  } else if (score >= 6) {
-    bg = "rgba(245,158,11,0.15)";
-    color = "var(--ai-glow)";
-  } else if (score >= 4) {
-    bg = "rgba(253,203,110,0.2)";
-    color = "#e2b93b";
-  } else {
-    bg = "rgba(239,68,68,0.15)";
-    color = "var(--destructive)";
-  }
-
-  return (
-    <Badge
-      variant="outline"
-      className="min-w-[72px] justify-center rounded-full px-3 py-1 font-semibold text-[12px] shadow-sm"
-      style={{ background: bg, borderColor: "transparent", color }}
-    >
-      {score}/10
-    </Badge>
-  );
 }
 
 function TopicBadge({ topic, mode }) {

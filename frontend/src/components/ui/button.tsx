@@ -9,9 +9,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-accent text-white shadow-sm hover:bg-accent/90 hover:shadow-[0_0_20px_rgba(245,158,11,0.15)]",
+          "bg-primary text-primary-foreground shadow-sm hover:bg-primary-hover hover:shadow-[0_0_20px_rgba(245,158,11,0.18)]",
         destructive:
-          "bg-red text-white shadow-sm hover:bg-red/90",
+          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:
           "border border-border bg-transparent text-text hover:bg-hover hover:text-text",
         secondary:
@@ -19,9 +19,9 @@ const buttonVariants = cva(
         ghost:
           "text-dim hover:bg-hover hover:text-text",
         link:
-          "text-accent-light underline-offset-4 hover:underline",
+          "text-primary underline-offset-4 hover:underline",
         gradient:
-          "bg-gradient-to-r from-accent to-orange text-white shadow-sm hover:shadow-[0_0_24px_rgba(245,158,11,0.2)]",
+          "bg-gradient-to-r from-primary to-orange text-primary-foreground font-semibold shadow-sm hover:brightness-105 hover:shadow-[0_0_24px_rgba(245,158,11,0.22)]",
       },
       size: {
         default: "h-9 px-4 py-2",
@@ -34,7 +34,7 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  }
+  },
 );
 
 interface ButtonProps
@@ -53,7 +53,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       />
     );
-  }
+  },
 );
 Button.displayName = "Button";
 

@@ -18,7 +18,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/resume/ui/dialog";
+} from "@/components/ui/dialog";
 import ThemeModal from "@/resume/shared/ThemeModal";
 import { useResumeStore } from "@/resume/store/useResumeStore";
 import {
@@ -27,58 +27,51 @@ import {
   getResumeStatus,
   parseUploadedResume,
   uploadResume,
-} from "../../api/interview";
+  type ResumeStatusResponse,
+} from "../../api/resume";
+import { extractErrorMessage } from "@/lib/errorMessage";
 import {
   buildResumeFromParsed,
   type ParsedResumePayload,
 } from "./importParsed";
 
-interface ResumeStatus {
-  has_resume: boolean;
-  filename?: string;
-  size?: number;
-}
-
-function formatFileSize(bytes?: number) {
+function formatFileSize(bytes?: number | null) {
   if (!bytes) return "";
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// 后端错误体是 {"detail": "..."},取出来给 toast 用
-function extractErrorMessage(err: unknown) {
-  const message = err instanceof Error ? err.message : String(err);
-  try {
-    const parsed = JSON.parse(message) as { detail?: string };
-    if (parsed.detail) return parsed.detail;
-  } catch {
-    /* 非 JSON 原样返回 */
-  }
-  return message;
-}
-
 export default function PdfResumeSection() {
   const navigate = useNavigate();
   const addResume = useResumeStore((s) => s.addResume);
-  const [status, setStatus] = useState<ResumeStatus | null>(null);
+  const [status, setStatus] = useState<ResumeStatusResponse | null>(null);
   const [uploading, setUploading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const currentFilename = status?.has_resume ? status.filename : "";
 
-  const refreshStatus = useCallback(async () => {
+  const refreshStatus = useCallback(async (signal?: AbortSignal) => {
     try {
-      const data = (await getResumeStatus()) as ResumeStatus;
-      setStatus(data);
+      const data = await getResumeStatus({ signal });
+      if (!signal?.aborted) setStatus(data);
     } catch {
-      setStatus({ has_resume: false });
+      if (!signal?.aborted) setStatus({ has_resume: false });
     }
   }, []);
 
   useEffect(() => {
-    refreshStatus();
-  }, [refreshStatus]);
+    const controller = new AbortController();
+    void getResumeStatus({ signal: controller.signal })
+      .then((data) => {
+        if (!controller.signal.aborted) setStatus(data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setStatus({ has_resume: false });
+      });
+    return () => controller.abort();
+  }, []);
 
   // 预览用的 objectURL 关闭弹窗时释放
   useEffect(() => {
@@ -95,9 +88,9 @@ export default function PdfResumeSection() {
     try {
       await uploadResume(file);
       toast.success("简历已上传");
-      refreshStatus();
+      void refreshStatus();
     } catch (err) {
-      toast.error(`上传失败:${extractErrorMessage(err)}`);
+      toast.error(`上传失败: ${extractErrorMessage(err)}`);
     } finally {
       setUploading(false);
     }
@@ -108,7 +101,7 @@ export default function PdfResumeSection() {
       const blob = await getResumePdfBlob();
       setPreviewUrl(URL.createObjectURL(blob));
     } catch (err) {
-      toast.error(`预览失败:${extractErrorMessage(err)}`);
+      toast.error(`预览失败: ${extractErrorMessage(err)}`);
     }
   };
 
@@ -118,32 +111,32 @@ export default function PdfResumeSection() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = status?.filename || "resume.pdf";
+      a.download = currentFilename || "resume.pdf";
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      toast.error(`下载失败:${extractErrorMessage(err)}`);
+      toast.error(`下载失败: ${extractErrorMessage(err)}`);
     }
   };
 
   const handleParse = async () => {
     setParsing(true);
-    const toastId = toast.loading("正在用你的 LLM 解析简历,可能需要一分钟…");
+    const toastId = toast.loading("正在用你的 LLM 解析简历，可能需要一分钟…");
     try {
       const result = (await parseUploadedResume()) as {
         parsed?: ParsedResumePayload;
       };
       if (!result.parsed) throw new Error("解析结果为空");
-      const fallbackTitle = (status?.filename || "导入的简历").replace(
+      const fallbackTitle = (currentFilename || "导入的简历").replace(
         /\.pdf$/i,
-        ""
+        "",
       );
       const resume = buildResumeFromParsed(result.parsed, fallbackTitle);
       addResume(resume);
-      toast.success("已解析为模板简历,进入编辑器微调吧", { id: toastId });
+      toast.success("已解析为模板简历，进入编辑器微调吧", { id: toastId });
       navigate(`/resume-manager/${resume.id}`);
     } catch (err) {
-      toast.error(`解析失败:${extractErrorMessage(err)}`, { id: toastId });
+      toast.error(`解析失败: ${extractErrorMessage(err)}`, { id: toastId });
     } finally {
       setParsing(false);
     }
@@ -154,18 +147,18 @@ export default function PdfResumeSection() {
     try {
       await deleteUploadedResume();
       toast.success("已删除");
-      refreshStatus();
+      void refreshStatus();
     } catch (err) {
-      toast.error(`删除失败:${extractErrorMessage(err)}`);
+      toast.error(`删除失败: ${extractErrorMessage(err)}`);
     }
   };
 
   return (
     <section className="mb-8">
-      <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-lg font-semibold text-text">面试简历(PDF)</h2>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h2 className="text-lg font-semibold text-text">面试简历 (PDF)</h2>
         <span className="text-xs text-dim">
-          简历面试 / JD 备面用的原始简历,单份
+          简历面试 / JD 备面用的原始简历，单份
         </span>
       </div>
 
@@ -238,7 +231,7 @@ export default function PdfResumeSection() {
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-border p-4">
           <div className="text-sm text-dim">
-            还没有上传 PDF 简历。上传后可用于简历面试 / JD 备面,也能一键解析成可编辑的模板简历。
+            还没有上传 PDF 简历。上传后可用于简历面试 / JD 备面，也能一键解析成可编辑的模板简历。
           </div>
           <Button
             variant="outline"
@@ -265,10 +258,10 @@ export default function PdfResumeSection() {
           }
         }}
       >
-        <DialogContent className="max-w-4xl p-0 gap-0">
-          <DialogHeader className="px-4 py-3 border-b border-border">
-            <DialogTitle className="text-sm">{status?.filename}</DialogTitle>
-            <DialogDescription />
+        <DialogContent className="max-w-4xl gap-0 overflow-hidden p-0">
+          <DialogHeader className="border-b border-border px-4 py-3 pr-12">
+            <DialogTitle className="text-sm">{currentFilename}</DialogTitle>
+            <DialogDescription className="sr-only">上传的 PDF 简历预览</DialogDescription>
           </DialogHeader>
           {previewUrl && (
             <iframe
@@ -284,7 +277,7 @@ export default function PdfResumeSection() {
         isOpen={confirmDelete}
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
-        title={status?.filename || ""}
+        title={currentFilename}
       />
     </section>
   );

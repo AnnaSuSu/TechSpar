@@ -1,11 +1,20 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { ICON_OPTIONS } from "../utils/topicIcons";
-import { createTopic } from "../api/interview";
+import { createTopic } from "../api/topics";
+import { errorMessage } from "@/lib/errorMessage";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface AddTopicDialogProps {
   open: boolean;
@@ -14,18 +23,13 @@ interface AddTopicDialogProps {
   onCreated: (key: string) => void | Promise<void>;
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export default function AddTopicDialog({ open, onClose, onCreated }: AddTopicDialogProps) {
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("FileText");
   const [creating, setCreating] = useState(false);
 
-  if (!open) return null;
-
   const handleClose = () => {
+    if (creating) return;
     setName("");
     setIcon("FileText");
     onClose();
@@ -36,41 +40,58 @@ export default function AddTopicDialog({ open, onClose, onCreated }: AddTopicDia
     if (!trimmed || creating) return;
     setCreating(true);
     try {
-      const result = (await createTopic(trimmed, icon)) as unknown as { key: string };
-      await onCreated(result.key);
-      handleClose();
+      const result = await createTopic(trimmed, icon);
+      const key = typeof result.key === "string" ? result.key : trimmed;
+      await onCreated(key);
+      setName("");
+      setIcon("FileText");
+      onClose();
     } catch (error) {
-      alert("添加失败: " + errorMessage(error));
+      toast.error("添加失败: " + errorMessage(error));
     } finally {
       setCreating(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in" onClick={handleClose}>
-      <Card className="w-[380px] max-w-[90vw] animate-bounce-in" onClick={(e) => e.stopPropagation()}>
-        <CardContent className="p-6 md:p-8">
-          <div className="text-lg font-semibold mb-5">新增训练领域</div>
-          <div className="mb-3.5 space-y-1.5">
-            <Label>名称</Label>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) handleClose(); }}>
+      <DialogContent className="max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>新增训练领域</DialogTitle>
+          <DialogDescription>
+            创建后先补充核心知识（手写或让 AI 生成基础内容），出题会更贴合你的方向。
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-1">
+          <div className="space-y-1.5">
+            <Label htmlFor="add-topic-name">名称</Label>
             <Input
+              id="add-topic-name"
               placeholder="Docker 容器化"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleAdd();
+              }}
               autoFocus
             />
           </div>
-          <div className="mb-3.5 space-y-1.5">
+
+          <div className="space-y-1.5">
             <Label>图标</Label>
             <div className="grid grid-cols-8 gap-1.5">
               {ICON_OPTIONS.map(({ name: iconName, Icon }) => (
                 <button
                   key={iconName}
                   type="button"
+                  aria-label={`选择图标 ${iconName}`}
+                  aria-pressed={icon === iconName}
                   className={cn(
                     "w-9 h-9 rounded-lg flex items-center justify-center transition-all cursor-pointer border",
-                    icon === iconName ? "bg-primary/20 text-primary border-primary" : "bg-hover text-dim border-transparent hover:text-text"
+                    icon === iconName
+                      ? "bg-primary/20 text-primary border-primary"
+                      : "bg-hover text-dim border-transparent hover:text-text",
                   )}
                   onClick={() => setIcon(iconName)}
                   title={iconName}
@@ -80,17 +101,15 @@ export default function AddTopicDialog({ open, onClose, onCreated }: AddTopicDia
               ))}
             </div>
           </div>
-          <p className="text-[12px] leading-5 text-dim">
-            创建后先补充核心知识（手写或让 AI 生成基础内容），出题会更贴合你的方向。
-          </p>
-          <div className="flex gap-2.5 justify-end mt-6">
-            <Button variant="outline" onClick={handleClose}>取消</Button>
-            <Button variant="gradient" onClick={handleAdd} disabled={!name.trim() || creating}>
-              {creating ? "创建中..." : "添加"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={creating}>取消</Button>
+          <Button variant="gradient" onClick={handleAdd} disabled={!name.trim() || creating}>
+            {creating ? "创建中..." : "添加"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

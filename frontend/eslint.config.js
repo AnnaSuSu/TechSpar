@@ -5,16 +5,37 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
+const unusedVars = ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }]
+
+const typescriptConfig = {
+  extends: [
+    js.configs.recommended,
+    tseslint.configs.recommended,
+    reactHooks.configs.flat.recommended,
+    reactRefresh.configs.vite,
+  ],
+  languageOptions: {
+    ecmaVersion: 2020,
+    globals: globals.browser,
+  },
+  rules: {
+    'no-unused-vars': 'off',
+    '@typescript-eslint/no-unused-vars': unusedVars,
+  },
+}
+
 export default defineConfig([
   globalIgnores(['dist']),
   {
     files: ['**/*.{js,jsx}'],
+    ignores: ['src/resume/**'],
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
     languageOptions: {
+      parser: tseslint.parser,
       ecmaVersion: 2020,
       globals: globals.browser,
       parserOptions: {
@@ -23,25 +44,30 @@ export default defineConfig([
         sourceType: 'module',
       },
     },
+    plugins: { '@typescript-eslint': tseslint.plugin },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
+      // Track identifiers used from JSX as well as from ordinary expressions.
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': unusedVars,
     },
   },
   {
+    ...typescriptConfig,
     files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
-    ],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-    },
+    ignores: ['src/resume/**'],
+  },
+  {
+    // shadcn/ui 原语同时导出组件和 cva variants
+    files: ['src/components/ui/**/*.tsx'],
     rules: {
-      // 与 js 侧同口径:大写开头/下划线开头视为有意保留
-      'no-unused-vars': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
+    ...typescriptConfig,
+    files: ['src/resume/**/*.{ts,tsx}'],
+    rules: {
+      ...typescriptConfig.rules,
       '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
       // 移植代码(magic-resume)存量模式,降为警告逐步清理,不阻塞 lint
       '@typescript-eslint/no-explicit-any': 'warn',

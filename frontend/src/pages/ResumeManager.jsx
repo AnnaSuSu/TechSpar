@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import {
-  Plus, FilePlus2, FileUp, Copy, Trash2, PenLine, FileText,
+  Plus, FilePlus2, FileUp, Copy, Trash2, PenLine, FileText, FileUser,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PageContainer from "@/components/PageContainer";
+import PageHeader from "@/components/PageHeader";
 import { useResumeStore } from "@/resume/store/useResumeStore";
 import { DEFAULT_TEMPLATES } from "@/resume/config";
 import ResumeTemplateComponent from "@/resume/templates";
@@ -13,8 +15,6 @@ import { generateUUID } from "@/resume/utils/uuid";
 import PdfResumeSection from "./resumeManager/PdfResumeSection";
 import "@/resume/styles/resume.css";
 import "@/resume/styles/fonts";
-
-const PAGE_CLASS = "flex-1 w-full max-w-[1600px] mx-auto px-4 py-6 md:px-7 md:py-8 xl:px-10 2xl:px-12";
 
 // A4 宽度按 96dpi 折算的像素值,缩略图按容器宽度等比缩放
 const A4_WIDTH_PX = 794;
@@ -92,20 +92,20 @@ function ResumeCard({ resume, onEdit, onDuplicate, onDelete }) {
           <span>{template?.name || "经典"}</span>
           <span>{formatDate(resume.updatedAt)}</span>
         </div>
-        <div className="mt-2 flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-7 flex-1 gap-1 text-xs" onClick={onEdit}>
-            <PenLine className="h-3.5 w-3.5" /> 编辑
+        <div className="mt-2 grid grid-cols-3 gap-1">
+          <Button variant="ghost" size="sm" className="h-7 min-w-0 gap-1 px-2 text-xs" onClick={onEdit}>
+            <PenLine className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">编辑</span>
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 flex-1 gap-1 text-xs" onClick={onDuplicate}>
-            <Copy className="h-3.5 w-3.5" /> 复制
+          <Button variant="ghost" size="sm" className="h-7 min-w-0 gap-1 px-2 text-xs" onClick={onDuplicate}>
+            <Copy className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">复制</span>
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 flex-1 gap-1 text-xs text-red hover:text-red"
+            className="h-7 min-w-0 gap-1 px-2 text-xs text-red hover:text-red"
             onClick={onDelete}
           >
-            <Trash2 className="h-3.5 w-3.5" /> 删除
+            <Trash2 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">删除</span>
           </Button>
         </div>
       </div>
@@ -167,13 +167,13 @@ export default function ResumeManager() {
   };
 
   return (
-    <div className={PAGE_CLASS}>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-text">简历管理</h1>
-        <p className="mt-1 text-sm text-dim">
-          面试用的原始 PDF 和可编辑的模板简历,都在这里管理
-        </p>
-      </div>
+    <PageContainer size="wide">
+      <PageHeader
+        icon={<FileUser size={21} />}
+        title="简历管理"
+        description="面试用的原始 PDF 和可编辑的模板简历，都在这里管理。"
+        className="mb-6"
+      />
 
       <PdfResumeSection />
 
@@ -216,7 +216,7 @@ export default function ResumeManager() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {resumeList.map((resume) => (
             <ResumeCard
               key={resume.id}
@@ -243,12 +243,6 @@ export default function ResumeManager() {
         }}
         title={pendingDelete?.title || ""}
       />
-
-      <Toaster
-        position="top-center"
-        richColors
-        theme={document.documentElement.classList.contains("dark") ? "dark" : "light"}
-      />
-    </div>
+    </PageContainer>
   );
 }

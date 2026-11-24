@@ -12,11 +12,9 @@ type InputProps = React.InputHTMLAttributes<HTMLInputElement> & { masked?: boole
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, autoComplete, masked, ...props }, ref) => {
-    // 扩展类密码管理器连 autocomplete="off" 都不看,只认各家自己的屏蔽属性。
-    // 显式传了 autoComplete 的(登录/注册/改密码)是真表单,保留填充能力。
     const ignoreManagers =
       autoComplete === undefined
-        ? { "data-1p-ignore": true, "data-lpignore": "true", "data-bwignore": true, "data-form-type": "other" }
+        ? { "data-1p-ignore": true, "data-lpignore": "true", "data-bwignore": "true", "data-form-type": "other" }
         : {};
     return (
       <input
@@ -24,15 +22,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         autoComplete={autoComplete ?? (type === "password" ? "new-password" : "off")}
         {...ignoreManagers}
         className={cn(
-          "flex h-9 w-full rounded-lg border border-border bg-input px-3.5 py-2.5 text-sm text-text shadow-sm transition-colors placeholder:text-dim/50 focus-visible:outline-none focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-9 w-full rounded-lg border border-border bg-input-bg px-3.5 py-2.5 text-sm text-text shadow-sm transition-colors placeholder:text-dim/55 focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50",
           masked && "input-masked",
-          className
+          className,
         )}
         ref={ref}
         {...props}
       />
     );
-  }
+  },
 );
 Input.displayName = "Input";
 

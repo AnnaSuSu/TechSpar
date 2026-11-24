@@ -93,8 +93,8 @@ export default function EvidenceTable({ weakItems, strongItems, improvedItems })
                   className={cn(
                     "px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer",
                     active
-                      ? "bg-accent/15 text-accent border border-accent/30"
-                      : "bg-card border border-border text-dim hover:border-accent/20 hover:text-text"
+                      ? "bg-primary/15 text-primary border border-primary/30"
+                      : "bg-card border border-border text-dim hover:border-primary/20 hover:text-text"
                   )}
                 >
                   {topic}
@@ -120,14 +120,14 @@ export default function EvidenceTable({ weakItems, strongItems, improvedItems })
                   "px-4 py-3 text-sm",
                   index > 0 && "border-t border-border",
                   item._type === "improved" && "opacity-65",
-                  isConsolidated && "bg-accent/5"
+                  isConsolidated && "bg-primary/5"
                 )}
               >
                 <div className="flex items-center gap-3">
                   <span
                     className={cn(
                       "w-2 h-2 rounded-full shrink-0",
-                      isConsolidated ? "bg-accent" : isPredicted(item) ? "bg-info/70" : dotColor[item._type]
+                      isConsolidated ? "bg-primary" : isPredicted(item) ? "bg-info/70" : dotColor[item._type]
                     )}
                   />
                   <span className={cn("flex-1 min-w-0 truncate", item._type === "improved" && "line-through")}>
@@ -145,7 +145,7 @@ export default function EvidenceTable({ weakItems, strongItems, improvedItems })
                   {isConsolidated && (
                     <Badge
                       variant="secondary"
-                      className="shrink-0 text-[10px] bg-accent/15 text-accent border-accent/30"
+                      className="shrink-0 text-[10px] bg-primary/15 text-primary border-primary/30"
                     >
                       ✦ 系统观察
                     </Badge>
@@ -166,7 +166,7 @@ export default function EvidenceTable({ weakItems, strongItems, improvedItems })
                 </div>
 
                 {isConsolidated && sourceList.length > 0 && (
-                  <div className="mt-2 ml-5 pl-3 border-l-2 border-accent/30 space-y-0.5">
+                  <div className="mt-2 ml-5 pl-3 border-l-2 border-primary/30 space-y-0.5">
                     <div className="text-[11px] text-dim/70">
                       基于 {sourceList.length} 条具体观察整合
                     </div>

@@ -2,6 +2,8 @@ import { useRef, type KeyboardEvent } from "react";
 import { ArrowRight, BriefcaseBusiness, FileText, MessageCircle, Sparkles } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import PageContainer from "@/components/PageContainer";
+import PageHeader from "@/components/PageHeader";
 import JobPrep from "./JobPrep";
 import ResumeInterview from "./ResumeInterview";
 
@@ -54,23 +56,13 @@ export default function MockInterview() {
 
   return (
     <div className="flex-1 w-full">
-      <div className="mx-auto w-full max-w-[1180px] px-4 pt-6 md:px-7 md:pt-8 xl:px-8">
-        <header className="flex items-start gap-3.5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-sm shadow-primary/5">
-            <FileText size={21} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-dim/70">
-              面试工作台
-            </div>
-            <h1 className="mt-0.5 text-2xl font-display font-bold tracking-tight text-text md:text-[30px]">
-              面试训练
-            </h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-dim">
-              准备本次面试资料，选择更适合当前目标的训练方式。
-            </p>
-          </div>
-        </header>
+      <PageContainer size="default" className="pb-0">
+        <PageHeader
+          icon={<FileText size={21} />}
+          eyebrow="面试工作台"
+          title="面试训练"
+          description="准备本次面试资料，选择更适合当前目标的训练方式。"
+        />
 
         <div className="mt-5 rounded-2xl border border-border/75 bg-card/65 p-1.5 shadow-sm">
           <div
@@ -130,7 +122,7 @@ export default function MockInterview() {
             <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
-      </div>
+      </PageContainer>
 
       <div
         id="interview-mode-panel"

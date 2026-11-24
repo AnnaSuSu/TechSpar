@@ -1,4 +1,9 @@
-import { API_BASE, authFetch } from "./client";
+import {
+  API_BASE,
+  apiJson,
+  type ApiQueryOptions,
+  type ApiResponse,
+} from "./client";
 
 export interface DocumentItem {
   document_id: string;
@@ -42,59 +47,63 @@ interface ConversationsResponse {
   items: ConversationSummary[];
 }
 
-export interface ConversationDetail extends ConversationSummary {
-  user_id: string;
+export interface ConversationDetail extends Omit<ConversationSummary, "message_count"> {
+  message_count?: number;
+  user_id?: string;
   messages: AgentMessage[];
 }
 
-async function parseResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail || "请求失败");
-  }
-  return response.json() as Promise<T>;
-}
+type SendAgentMessageResponse = ApiResponse<"/api/personal-agent/chat", "post">;
 
-export async function getDocuments(): Promise<DocumentsResponse> {
-  return parseResponse(await authFetch(`${API_BASE}/personal-agent/documents`));
+export async function getDocuments(
+  { signal }: ApiQueryOptions = {},
+): Promise<DocumentsResponse> {
+  return apiJson(`${API_BASE}/personal-agent/documents`, { signal });
 }
 
 export async function uploadDocument(file: File): Promise<DocumentItem> {
   const form = new FormData();
   form.append("file", file);
-  return parseResponse(await authFetch(`${API_BASE}/personal-agent/documents`, {
+  return apiJson(`${API_BASE}/personal-agent/documents`, {
     method: "POST",
     body: form,
-  }));
+  });
 }
 
 export async function deleteDocument(documentId: string): Promise<void> {
-  await parseResponse(await authFetch(`${API_BASE}/personal-agent/documents/${documentId}`, {
-    method: "DELETE",
-  }));
+  await apiJson<ApiResponse<"/api/personal-agent/documents/{document_id}", "delete">>(
+    `${API_BASE}/personal-agent/documents/${documentId}`,
+    { method: "DELETE" },
+  );
 }
 
-export async function getConversations(): Promise<ConversationsResponse> {
-  return parseResponse(await authFetch(`${API_BASE}/personal-agent/conversations`));
+export async function getConversations(
+  { signal }: ApiQueryOptions = {},
+): Promise<ConversationsResponse> {
+  return apiJson(`${API_BASE}/personal-agent/conversations`, { signal });
 }
 
-export async function getConversation(conversationId: string): Promise<ConversationDetail> {
-  return parseResponse(await authFetch(`${API_BASE}/personal-agent/conversations/${conversationId}`));
+export async function getConversation(
+  conversationId: string,
+  { signal }: ApiQueryOptions = {},
+): Promise<ConversationDetail> {
+  return apiJson(`${API_BASE}/personal-agent/conversations/${conversationId}`, { signal });
 }
 
 export async function deleteConversation(conversationId: string): Promise<void> {
-  await parseResponse(await authFetch(`${API_BASE}/personal-agent/conversations/${conversationId}`, {
-    method: "DELETE",
-  }));
+  await apiJson<ApiResponse<"/api/personal-agent/conversations/{conversation_id}", "delete">>(
+    `${API_BASE}/personal-agent/conversations/${conversationId}`,
+    { method: "DELETE" },
+  );
 }
 
 export async function sendAgentMessage(
   message: string,
   conversationId?: string | null,
-): Promise<{ conversation_id: string; title: string; message: AgentMessage }> {
-  return parseResponse(await authFetch(`${API_BASE}/personal-agent/chat`, {
+): Promise<SendAgentMessageResponse> {
+  return apiJson(`${API_BASE}/personal-agent/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, conversation_id: conversationId || null }),
-  }));
+  });
 }

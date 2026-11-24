@@ -1,7 +1,12 @@
 // 带鉴权的 fetch 封装 + openapi 类型接线,供 api/ 各模块共用
 import type { paths } from "./schema";
+import { parseApiErrorText } from "../lib/errorMessage.ts";
 
 export const API_BASE = "/api";
+
+export interface ApiQueryOptions {
+  signal?: AbortSignal;
+}
 
 type JsonBody<T> = T extends { content: { "application/json": infer J } }
   ? J
@@ -63,8 +68,11 @@ export function setApiErrorHandler(handler: ApiErrorHandler | null): void {
 
 /** 处理器接管后抛出的标记异常,调用方可据此跳过自己的错误提示。 */
 export class HandledApiError extends Error {
-  constructor(public code: string) {
+  code: string;
+
+  constructor(code: string) {
     super(code);
+    this.code = code;
     this.name = "HandledApiError";
   }
 }
@@ -102,4 +110,23 @@ export async function authFetch(
   return res;
 }
 
-export { consumeSSE } from './sse';
+export async function readErrorMessage(
+  res: Response,
+  fallback = `HTTP ${res.status}`,
+): Promise<string> {
+  return parseApiErrorText(await res.text(), fallback);
+}
+
+export async function apiJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await authFetch(url, options);
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  return res.json() as Promise<T>;
+}
+
+export async function apiBlob(url: string, options?: RequestInit): Promise<Blob> {
+  const res = await authFetch(url, options);
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  return res.blob();
+}
+
+export { consumeSSE } from "./sse.ts";

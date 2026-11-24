@@ -23,6 +23,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import PageContainer from "@/components/PageContainer";
+import PageHeader from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 import {
   deleteConversation,
@@ -37,7 +40,6 @@ import {
   type DocumentItem,
 } from "@/api/personalAgent";
 
-const PAGE_CLASS = "flex-1 w-full max-w-[1800px] mx-auto px-4 py-5 md:px-7 md:py-6 xl:px-8";
 const ACCEPTED_DOCUMENTS = ".pdf,.docx,.pptx,.xlsx,.txt,.md,.markdown,.csv,.tsv,.json,.yaml,.yml,.xml,.html,.htm,.rtf,.log,.py,.js,.jsx,.ts,.tsx,.java,.go,.rs,.sql,.css,.sh";
 
 const STARTERS = [
@@ -218,6 +220,12 @@ export default function PersonalAgent() {
   const [error, setError] = useState("");
   const [libraryOpen, setLibraryOpen] = useState(true);
   const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<
+    | { kind: "conversation"; id: string }
+    | { kind: "document"; id: string }
+    | null
+  >(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -274,25 +282,8 @@ export default function PersonalAgent() {
     setError("");
   }
 
-  async function removeConversation(conversationId: string) {
-    if (!window.confirm("删除这段对话？此操作不可恢复。")) return;
-    try {
-      await deleteConversation(conversationId);
-      const data = await getConversations();
-      setConversations(data.items);
-      if (activeId === conversationId) {
-        const next = data.items[0];
-        if (next) {
-          setActiveId(next.conversation_id);
-          const detail = await getConversation(next.conversation_id);
-          setMessages(detail.messages);
-        } else {
-          newConversation();
-        }
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "删除失败");
-    }
+  function removeConversation(conversationId: string) {
+    setConfirmTarget({ kind: "conversation", id: conversationId });
   }
 
   async function handleUpload(file?: File) {
@@ -313,13 +304,39 @@ export default function PersonalAgent() {
     }
   }
 
-  async function removeDocument(documentId: string) {
-    if (!window.confirm("删除这个文档及其检索索引？")) return;
+  function removeDocument(documentId: string) {
+    setConfirmTarget({ kind: "document", id: documentId });
+  }
+
+  async function handleConfirmDelete() {
+    if (!confirmTarget || confirmBusy) return;
+    setConfirmBusy(true);
     try {
-      await deleteDocument(documentId);
-      setDocuments((current) => current.filter((document) => document.document_id !== documentId));
+      if (confirmTarget.kind === "conversation") {
+        const conversationId = confirmTarget.id;
+        await deleteConversation(conversationId);
+        const data = await getConversations();
+        setConversations(data.items);
+        if (activeId === conversationId) {
+          const next = data.items[0];
+          if (next) {
+            setActiveId(next.conversation_id);
+            const detail = await getConversation(next.conversation_id);
+            setMessages(detail.messages);
+          } else {
+            newConversation();
+          }
+        }
+      } else {
+        const documentId = confirmTarget.id;
+        await deleteDocument(documentId);
+        setDocuments((current) => current.filter((document) => document.document_id !== documentId));
+      }
+      setConfirmTarget(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "删除失败");
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -350,41 +367,38 @@ export default function PersonalAgent() {
 
   if (loading) {
     return (
-      <div className={cn(PAGE_CLASS, "flex items-center justify-center text-dim")}>
+      <PageContainer size="wide" className="flex items-center justify-center text-dim">
         <Loader2 className="animate-spin" size={22} />
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className={cn(PAGE_CLASS, "flex min-h-0 flex-col")}>
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-3xl font-display font-bold tracking-tight md:text-[38px]">
-            <Sparkles className="text-primary" size={30} />
-            成长 Agent
+    <PageContainer size="wide" className="flex min-h-0 flex-col">
+      <PageHeader
+        icon={<Sparkles size={21} />}
+        title="成长 Agent"
+        description="基于你的画像、错题、训练历史和个人资料，持续认识你的学习搭档。"
+        className="mb-4"
+        actions={(
+          <div className="flex items-center gap-2 text-xs text-dim">
+            <span className="hidden rounded-full border border-border bg-card px-3 py-1.5 xl:inline-flex">
+              {readyCount} 份资料可检索
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="xl:hidden"
+              onClick={() => setMobileLibraryOpen(true)}
+            >
+              <Database size={14} /> 资料库 · {readyCount}
+            </Button>
+            <span className="rounded-full border border-border bg-card px-3 py-1.5">
+              {conversations.length} 段对话
+            </span>
           </div>
-          <div className="mt-1 text-sm leading-6 text-dim">
-            基于你的画像、错题、训练历史和个人资料，持续认识你的学习搭档。
-          </div>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-dim">
-          <span className="hidden rounded-full border border-border bg-card px-3 py-1.5 xl:inline-flex">
-            {readyCount} 份资料可检索
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="xl:hidden"
-            onClick={() => setMobileLibraryOpen(true)}
-          >
-            <Database size={14} /> 资料库 · {readyCount}
-          </Button>
-          <span className="rounded-full border border-border bg-card px-3 py-1.5">
-            {conversations.length} 段对话
-          </span>
-        </div>
-      </div>
+        )}
+      />
 
       {error && (
         <div className="mb-3 rounded-xl border border-red/25 bg-red/8 px-4 py-2.5 text-sm text-red">
@@ -630,6 +644,20 @@ export default function PersonalAgent() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </div>
+      <ConfirmDialog
+        open={Boolean(confirmTarget)}
+        onOpenChange={(next) => { if (!next) setConfirmTarget(null); }}
+        title={confirmTarget?.kind === "conversation" ? "删除这段对话？" : "删除这个文档？"}
+        description={
+          confirmTarget?.kind === "conversation"
+            ? "删除后无法恢复该对话内容。"
+            : "将同时移除文档文件及其检索索引，此操作不可撤销。"
+        }
+        confirmLabel="确认删除"
+        destructive
+        busy={confirmBusy}
+        onConfirm={handleConfirmDelete}
+      />
+    </PageContainer>
   );
 }

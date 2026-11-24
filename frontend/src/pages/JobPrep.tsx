@@ -3,14 +3,17 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BriefcaseBusiness,
-  CheckCircle2,
   FileText,
   Loader2,
   ShieldAlert,
   Sparkles,
   Target,
 } from "lucide-react";
-import { getResumeStatus, previewJobPrep, startJobPrep } from "../api/interview";
+import { getResumeStatus } from "../api/resume";
+import { previewJobPrep, startJobPrep } from "../api/sessions";
+import { errorMessage } from "@/lib/errorMessage";
+import { statusToneClasses, type StatusTone } from "@/lib/statusTone";
+import { HintChip, StepRow } from "@/components/WorkflowPrimitives";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,8 +48,6 @@ interface JobPrepPayload {
   jd_text: string;
   use_resume: boolean;
 }
-
-type StatusTone = "blue" | "amber" | "green" | "neutral";
 
 // Survive leaving the page without starting practice — a JD analysis costs an LLM
 // call, so persist inputs + result locally and restore them on return.
@@ -92,17 +93,6 @@ function buildStatus({
   return { label: "待分析", tone: "neutral", hint: "先生成岗位拆解" };
 }
 
-function toneClasses(tone: StatusTone) {
-  if (tone === "green") return "border-green/20 bg-green/8 text-green";
-  if (tone === "blue") return "border-blue-500/20 bg-blue-500/8 text-blue-300";
-  if (tone === "amber") return "border-amber-500/20 bg-amber-500/10 text-amber-300";
-  return "border-border/80 bg-card/82 text-text";
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export default function JobPrep({ embedded = false }: JobPrepProps) {
   const navigate = useNavigate();
   const initialDraft = useMemo(() => loadDraft(), []);
@@ -119,18 +109,24 @@ export default function JobPrep({ embedded = false }: JobPrepProps) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getResumeStatus()
-      .then((data) => {
-        const status = data as unknown as { has_resume: boolean; filename?: string; size?: number };
+    const controller = new AbortController();
+    getResumeStatus({ signal: controller.signal })
+      .then((status) => {
+        if (controller.signal.aborted) return;
         if (status.has_resume) {
-          setResumeFile({ filename: status.filename || "resume.pdf", size: status.size });
+          setResumeFile({ filename: status.filename || "resume.pdf", size: status.size ?? undefined });
           setUseResume(true);
         } else {
           setUseResume(false);
         }
       })
-      .catch(() => setUseResume(false))
-      .finally(() => setLoadingResume(false));
+      .catch(() => {
+        if (!controller.signal.aborted) setUseResume(false);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingResume(false);
+      });
+    return () => controller.abort();
   }, []);
 
   // Best-effort: keep the workspace mirrored to localStorage so a refresh or
@@ -328,7 +324,7 @@ export default function JobPrep({ embedded = false }: JobPrepProps) {
                   <div className="mt-1 text-lg font-semibold">训练准备</div>
                   <div className="mt-1 text-[11px] text-dim">{status.hint}</div>
                 </div>
-                <div className={cn("rounded-full border px-2.5 py-1 text-[12px]", toneClasses(status.tone))}>
+                <div className={cn("shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[12px]", statusToneClasses(status.tone))}>
                   {status.label}
                 </div>
               </div>
@@ -546,43 +542,6 @@ export default function JobPrep({ embedded = false }: JobPrepProps) {
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-
-function HintChip({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-2xl border border-border/70 bg-background/72 px-3.5 py-3">
-      <div className="text-sm font-semibold">{title}</div>
-      <div className="mt-1 text-[13px] leading-6 text-dim">{description}</div>
-    </div>
-  );
-}
-
-function StepRow({
-  index,
-  title,
-  description,
-  done = false,
-  active = false,
-}: {
-  index: string;
-  title: string;
-  description: string;
-  done?: boolean;
-  active?: boolean;
-}) {
-  return (
-    <div className={cn("rounded-2xl border px-3.5 py-3", done ? "border-green/20 bg-green/8" : active ? "border-primary/25 bg-primary/6" : "border-border/75 bg-card/72")}>
-      <div className="flex items-start gap-3">
-        <div className={cn("mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold", done ? "bg-green/15 text-green" : active ? "bg-primary/12 text-primary" : "bg-hover text-dim")}>
-          {done ? <CheckCircle2 size={14} /> : index}
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold">{title}</div>
-          <div className="mt-1 text-[13px] leading-6 text-dim">{description}</div>
-        </div>
-      </div>
     </div>
   );
 }

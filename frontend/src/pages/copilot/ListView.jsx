@@ -5,8 +5,11 @@ import { deleteCopilotPrep, listCopilotPreps } from "../../api/copilot";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import PageContainer from "@/components/PageContainer";
+import PageHeader from "@/components/PageHeader";
+import EmptyState from "@/components/EmptyState";
 
-import { PAGE_CLASS, formatTime } from "./shared";
+import { formatTime } from "./shared";
 
 export default function ListView({ onNew, onSelect }) {
   const [items, setItems] = useState([]);
@@ -49,21 +52,20 @@ export default function ListView({ onNew, onSelect }) {
   };
 
   return (
-    <div className={PAGE_CLASS}>
+    <PageContainer size="wide">
       <Card className="overflow-hidden border-border/80 bg-card/76 mb-6">
         <CardContent className="p-5 md:p-6 xl:p-7">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-dim/80">面试辅助</div>
-              <div className="mt-2 text-2xl font-display font-bold tracking-tight md:text-3xl">面试 Copilot</div>
-              <div className="mt-1.5 max-w-2xl text-sm leading-6 text-dim">
-                提前准备好面试分析，面试时一键开启实时辅助。多 Agent 预测 HR 提问走向，实时给出回答建议。
-              </div>
-            </div>
-            <Button variant="gradient" size="lg" className="shrink-0" onClick={onNew}>
-              <Plus size={18} /> 新建面试准备
-            </Button>
-          </div>
+          <PageHeader
+            icon={<Brain size={21} />}
+            eyebrow="面试辅助"
+            title="面试 Copilot"
+            description="提前准备好面试分析，面试时一键开启实时辅助。多 Agent 预测 HR 提问走向，实时给出回答建议。"
+            actions={(
+              <Button variant="gradient" size="lg" className="shrink-0" onClick={onNew}>
+                <Plus size={18} /> 新建面试准备
+              </Button>
+            )}
+          />
         </CardContent>
       </Card>
 
@@ -72,20 +74,16 @@ export default function ListView({ onNew, onSelect }) {
           <Loader2 size={20} className="animate-spin mr-2" /> 加载中...
         </div>
       ) : items.length === 0 ? (
-        <Card className="border-dashed border-border/80 bg-card/55">
-          <CardContent className="p-8 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Brain size={20} />
-            </div>
-            <div className="mt-4 text-lg font-semibold">还没有面试准备</div>
-            <div className="mt-2 text-sm leading-6 text-dim">
-              点击「新建面试准备」，填写 JD 和目标公司，Copilot 会为你分析 HR 的提问策略。
-            </div>
-            <Button variant="gradient" className="mt-5" onClick={onNew}>
+        <EmptyState
+          icon={<Brain size={20} />}
+          title="还没有面试准备"
+          description="点击「新建面试准备」，填写 JD 和目标公司，Copilot 会为你分析 HR 的提问策略。"
+          action={(
+            <Button variant="gradient" onClick={onNew}>
               <Plus size={16} /> 新建面试准备
             </Button>
-          </CardContent>
-        </Card>
+          )}
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {items.map((item) => (
@@ -105,7 +103,7 @@ export default function ListView({ onNew, onSelect }) {
                   <Badge
                     variant={
                       item.status === "done"
-                        ? "green"
+                        ? "success"
                         : item.status === "running"
                           ? "blue"
                           : "destructive"
@@ -155,6 +153,6 @@ export default function ListView({ onNew, onSelect }) {
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

@@ -1,0 +1,176 @@
+/* Landing-only visual effects and narrative motion (loaded lazily with Landing). */
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.scroll-reveal[data-revealed] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.scroll-reveal .reveal-item {
+  opacity: 0;
+  transform: translateY(22px) scale(0.985);
+  transition:
+    opacity 0.65s ease-out,
+    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0s);
+  will-change: opacity, transform;
+}
+.scroll-reveal[data-revealed] .reveal-item {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.loop-shell {
+  animation: float-soft 9s ease-in-out infinite;
+  will-change: transform;
+}
+
+.loop-shell::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 36px;
+  border: 1.5px solid rgba(245, 158, 11, 0.12);
+  animation: orbital-ring-pulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.loop-beam {
+  stroke-dasharray: 150 26;
+  stroke-dashoffset: 200;
+  animation: beam 3.6s linear infinite;
+  animation-delay: var(--beam-delay, 0s);
+}
+
+.loop-node-body {
+  animation: float-soft 7.2s ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+  will-change: transform;
+}
+
+.detail-panel-enter {
+  animation: step-enter 0.45s ease-out both;
+}
+
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.story-glow {
+  animation: glow-breathe 5s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+
+.story-word {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  pointer-events: none;
+}
+.story-word.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.story-char {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.35em);
+  transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--char-delay, 0s);
+}
+.story-word.active .story-char {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hero-gradient-text {
+  position: relative;
+  background-size: 200% auto;
+  animation: gradient-shimmer 4s ease-in-out infinite;
+}
+
+.landing-motion button.bg-gradient-to-r,
+.landing-motion button.border {
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s ease,
+    filter 0.28s ease;
+}
+
+.landing-motion button.bg-gradient-to-r:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow:
+    0 14px 40px rgba(245, 158, 11, 0.25),
+    0 0 0 1px rgba(245, 158, 11, 0.15);
+  filter: brightness(1.06);
+}
+
+.landing-motion section button.border:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.1);
+}
+
+@keyframes float-soft {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -8px, 0); }
+}
+
+@keyframes beam {
+  0% { stroke-dashoffset: 200; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes step-enter {
+  from { opacity: 0; transform: translateX(60px) scale(0.96); filter: blur(4px); }
+  to { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); }
+}
+
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.95; transform: translate(-50%, -50%) scale(1.12); }
+}
+
+@keyframes gradient-shimmer {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
+
+@keyframes orbital-ring-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.06); opacity: 0.85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-motion [class*="animate-"],
+  .landing-motion .loop-shell,
+  .landing-motion .loop-beam,
+  .landing-motion .loop-node-body,
+  .landing-motion .detail-panel-enter,
+  .landing-motion .hero-gradient-text,
+  .landing-motion .loop-shell::before,
+  .landing-motion .story-glow {
+    animation: none !important;
+  }
+
+  .landing-motion .scroll-reveal,
+  .landing-motion .scroll-reveal .reveal-item {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .landing-motion .story-word,
+  .landing-motion .story-char {
+    transition: none;
+  }
+}

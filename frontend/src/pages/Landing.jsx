@@ -12,7 +12,9 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import useScrollReveal from "@/hooks/useScrollReveal";
+import useTheme from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
+import "./Landing.css";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Logo from "../components/Logo";
@@ -295,14 +297,16 @@ export default function Landing() {
   );
 
   // 落地页锁深色(视觉世界观基于暗琥珀);离开时恢复用户在应用内的主题偏好
+  const { lockDark } = useTheme();
+  useEffect(() => lockDark(), [lockDark]);
+
+  // 首屏保持通透不割裂全幅插画,滚动离开首屏后再渐显磨砂底色防撞字
+  const [headerScrolled, setHeaderScrolled] = useState(false);
   useEffect(() => {
-    document.documentElement.classList.add("dark");
-    return () => {
-      document.documentElement.classList.toggle(
-        "dark",
-        (localStorage.getItem("theme") || "dark") === "dark"
-      );
-    };
+    const onScroll = () => setHeaderScrolled(window.scrollY > 80);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   const loopRef = useScrollReveal();
@@ -318,17 +322,26 @@ export default function Landing() {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(245,158,11,0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgba(245,158,11,0.035)_1px,transparent_1px)] bg-[size:72px_72px] opacity-60 pointer-events-none" />
       <div className="grain-overlay" aria-hidden="true" />
 
-      <header className="sticky top-0 z-40">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 md:px-10">
-          <div className="flex items-center gap-2.5">
-            <Logo className="h-8 w-8 rounded-lg drop-shadow-sm" />
-            <div>
+      <header
+        className={cn(
+          "sticky top-0 z-40 border-b transition-colors duration-300",
+          headerScrolled
+            ? "border-border/35 bg-bg/75 backdrop-blur-md"
+            : "border-transparent bg-transparent",
+        )}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6 md:px-10">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Logo className="h-8 w-8 shrink-0 rounded-lg drop-shadow-sm" />
+            <div className="min-w-0">
               <div className="text-lg font-display font-bold leading-none">TechSpar</div>
-              <div className="mt-1 text-[11px] uppercase tracking-[0.24em] text-dim">From Practice To Real Interview</div>
+              <div className="mt-1 hidden whitespace-nowrap text-[10px] uppercase tracking-[0.22em] text-dim sm:block">
+                From Practice To Real Interview
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <GitHubStar />
             <a
               href={SPONSOR_URL}
@@ -383,7 +396,7 @@ export default function Landing() {
           <div className="relative z-10 mx-auto flex max-w-4xl flex-1 flex-col items-center justify-end px-6 pt-[72px] pb-12 text-center">
             <h1 className="text-4xl font-serif font-bold leading-tight tracking-normal md:text-5xl lg:text-6xl md:leading-[1.15] animate-fade-in-up">
               把技术面试做成
-              <span className="hero-gradient-text mt-3 block bg-gradient-to-r from-accent-light via-accent to-orange bg-clip-text text-transparent">
+              <span className="hero-gradient-text mt-3 block bg-gradient-to-r from-ai-glow via-primary to-orange bg-clip-text text-transparent">
                 一条持续进化的闭环
               </span>
             </h1>
@@ -500,44 +513,47 @@ export default function Landing() {
 
         <section
           ref={ctaRef}
-          className="scroll-reveal relative flex min-h-screen items-center justify-center overflow-hidden px-6 md:px-10"
+          className="scroll-reveal relative flex min-h-[82vh] items-center overflow-hidden px-6 py-24 md:px-10"
         >
           <div className="pointer-events-none absolute inset-0">
-            <div className="story-glow absolute left-1/2 top-1/2 h-[560px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-[130px]" />
+            <div className="story-glow absolute left-1/3 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-[130px]" />
             <img
               src={ctaFigure}
               alt=""
               loading="lazy"
-              className="absolute bottom-0 right-0 hidden h-[82%] w-auto opacity-90 lg:block [mask-image:radial-gradient(ellipse_62%_78%_at_55%_48%,black_52%,transparent_98%)]"
+              className="absolute bottom-0 right-0 hidden h-[82%] max-w-[46%] object-contain object-bottom opacity-85 lg:block [mask-image:radial-gradient(ellipse_62%_78%_at_60%_50%,black_48%,transparent_98%)]"
             />
+            <div className="absolute inset-0 hidden bg-gradient-to-r from-bg via-bg/85 via-55% to-transparent lg:block" />
           </div>
 
-          <div className="relative mx-auto max-w-4xl text-center">
-            <div className="reveal-item text-sm font-medium text-primary" style={revealStyle(0.04)}>
-              准备、模拟、实战、复盘，全部接进同一条闭环
-            </div>
-            <h2
-              className="reveal-item mt-5 text-4xl font-serif font-bold tracking-normal md:text-6xl md:leading-[1.15]"
-              style={revealStyle(0.1)}
-            >
-              从第一轮刷题开始，到真实面试结束后复盘，系统都不会忘记你
-            </h2>
-            <p
-              className="reveal-item mx-auto mt-6 max-w-xl text-base leading-8 text-dim md:text-lg"
-              style={revealStyle(0.16)}
-            >
-              这不是另一个只会生成题目的 AI 工具，而是一套从刷题到实战的技术面试陪练系统。
-            </p>
-            <div className="reveal-item mt-10 flex justify-center" style={revealStyle(0.22)}>
-              <Button
-                variant="gradient"
-                size="lg"
-                className="shadow-[0_0_40px_rgba(245,158,11,0.25)] transition-shadow hover:shadow-[0_0_72px_rgba(245,158,11,0.45)]"
-                onClick={() => navigate("/login")}
+          <div className="relative z-10 mx-auto w-full max-w-7xl">
+            <div className="mx-auto max-w-2xl text-center lg:mx-0 lg:text-left">
+              <div className="reveal-item text-sm font-medium text-primary" style={revealStyle(0.04)}>
+                准备、模拟、实战、复盘，全部接进同一条闭环
+              </div>
+              <h2
+                className="reveal-item mt-5 text-3xl font-serif font-bold leading-tight tracking-normal sm:text-4xl md:text-5xl md:leading-[1.18]"
+                style={revealStyle(0.1)}
               >
-                进入 Demo
-                <ArrowRight size={16} />
-              </Button>
+                从第一轮刷题开始，到真实面试结束后复盘，系统都不会忘记你
+              </h2>
+              <p
+                className="reveal-item mx-auto mt-6 max-w-xl text-base leading-8 text-dim md:text-lg lg:mx-0"
+                style={revealStyle(0.16)}
+              >
+                这不是另一个只会生成题目的 AI 工具，而是一套从刷题到实战的技术面试陪练系统。
+              </p>
+              <div className="reveal-item mt-10 flex justify-center lg:justify-start" style={revealStyle(0.22)}>
+                <Button
+                  variant="gradient"
+                  size="lg"
+                  className="shadow-[0_0_40px_rgba(245,158,11,0.25)] transition-shadow hover:shadow-[0_0_72px_rgba(245,158,11,0.45)]"
+                  onClick={() => navigate("/login")}
+                >
+                  进入 Demo
+                  <ArrowRight size={16} />
+                </Button>
+              </div>
             </div>
           </div>
         </section>
@@ -883,19 +899,19 @@ function DetailPanel({ module, compact = false }) {
       )}
     >
       <CardContent className={cn("p-5 md:p-6", compact && "p-5")}>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div
             className={cn(
-              "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium",
+              "inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium",
               module.accentBorder,
               module.accentBg,
               module.accentText
             )}
           >
-            {module.step} / 05
+            <span>{module.step} / 05</span>
             <span className="text-dim">当前聚焦模块</span>
           </div>
-          <div className="text-xs text-dim">点击环上节点查看不同阶段</div>
+          <div className="text-xs text-dim whitespace-nowrap">点击环上节点切换阶段</div>
         </div>
 
         <div className="mt-5 flex items-start gap-4">

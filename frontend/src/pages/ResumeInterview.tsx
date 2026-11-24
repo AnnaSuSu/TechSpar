@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ArrowUpRight,
   Briefcase,
@@ -13,7 +14,10 @@ import {
   Play,
   Sparkles,
 } from "lucide-react";
-import { getHistory, getProfile, getResumeStatus, inferTargetRole, startInterview } from "../api/interview";
+import { getHistory, startInterview, type InterviewHistoryItem } from "../api/sessions";
+import { getProfile, inferTargetRole } from "../api/profile";
+import { getResumeStatus } from "../api/resume";
+import { errorMessage } from "@/lib/errorMessage";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +25,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import ScorePill from "@/components/ScorePill";
 import useTaskStatus from "../hooks/useTaskStatus";
 
 const INTERVIEW_STEPS = [
@@ -39,59 +44,7 @@ interface ResumeFile {
   size: number;
 }
 
-interface ResumeStatus {
-  has_resume: boolean;
-  filename?: string;
-  size?: number;
-}
-
-interface ProfileResponse {
-  target_role?: string;
-}
-
-interface HistorySession {
-  session_id: string;
-  status?: string;
-  created_at?: string;
-  avg_score?: number;
-}
-
-interface HistoryResponse {
-  items?: HistorySession[];
-}
-
-interface StartInterviewResponse {
-  session_id: string;
-  [key: string]: unknown;
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function ScorePill({ score }: { score?: number | null }) {
-  if (score == null) {
-    return (
-      <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-[11px]">
-        未评分
-      </Badge>
-    );
-  }
-  const tone = score >= 8
-    ? "border-green/20 bg-green/10 text-green"
-    : score >= 6
-      ? "border-primary/20 bg-primary/10 text-primary"
-      : score >= 4
-        ? "border-amber-500/20 bg-amber-500/10 text-amber-300"
-        : "border-red/20 bg-red/10 text-red";
-  return (
-    <Badge variant="outline" className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold", tone)}>
-      {score}/10
-    </Badge>
-  );
-}
-
-function formatDate(iso?: string) {
+function formatDate(iso?: string | null) {
   if (!iso) return "";
   const date = new Date(iso);
   return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
@@ -102,7 +55,7 @@ export default function ResumeInterview({ embedded = false }: ResumeInterviewPro
   const [resumeFile, setResumeFile] = useState<ResumeFile | null>(null);
   const [resumeSelected, setResumeSelected] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
-  const [history, setHistory] = useState<HistorySession[]>([]);
+  const [history, setHistory] = useState<InterviewHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [targetRole, setTargetRole] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -114,7 +67,7 @@ export default function ResumeInterview({ embedded = false }: ResumeInterviewPro
   const autoInferRole = async () => {
     setTargetRoleInferring(true);
     try {
-      const { target_role } = (await inferTargetRole()) as { target_role?: string };
+      const { target_role } = await inferTargetRole();
       if (target_role) setTargetRole(target_role);
     } catch {
       // 用户仍可手动输入岗位，推断失败不阻断页面。
@@ -124,44 +77,54 @@ export default function ResumeInterview({ embedded = false }: ResumeInterviewPro
   };
 
   useEffect(() => {
+    const controller = new AbortController();
     Promise.all([
-      getResumeStatus().catch(() => ({ has_resume: false })),
-      getProfile().catch(() => ({})),
-    ]).then(([statusResponse, profileResponse]) => {
-      const status = statusResponse as ResumeStatus;
-      const profile = profileResponse as ProfileResponse;
-      if (status.has_resume) {
-        setResumeFile({
-          filename: status.filename || "resume.pdf",
-          size: status.size || 0,
-        });
-        setResumeSelected(true);
-      }
-      const existingRole = (profile.target_role || "").trim();
-      if (existingRole) {
-        setTargetRole(existingRole);
-      } else if (status.has_resume) {
-        void autoInferRole();
-      }
-    }).finally(() => setPageLoading(false));
+      getResumeStatus({ signal: controller.signal }).catch(() => ({ has_resume: false, filename: undefined, size: undefined })),
+      getProfile({ signal: controller.signal }).catch(() => ({ target_role: undefined })),
+    ])
+      .then(([status, profile]) => {
+        if (controller.signal.aborted) return;
+        if (status.has_resume) {
+          setResumeFile({
+            filename: status.filename || "resume.pdf",
+            size: status.size || 0,
+          });
+          setResumeSelected(true);
+        }
+        const existingRole = (profile.target_role || "").trim();
+        if (existingRole) {
+          setTargetRole(existingRole);
+        } else if (status.has_resume) {
+          void autoInferRole();
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPageLoading(false);
+      });
 
-    getHistory(3, 0, "resume")
-      .then((data) => setHistory((data as HistoryResponse).items || []))
+    getHistory(3, 0, "resume", null, { signal: controller.signal })
+      .then((data) => {
+        if (!controller.signal.aborted) setHistory(data.items || []);
+      })
       .catch(() => {})
-      .finally(() => setHistoryLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setHistoryLoading(false);
+      });
+
+    return () => controller.abort();
   }, []);
 
   const handleStart = async () => {
     if (!ready) return;
     setCreatingSessionMode("resume");
     try {
-      const data = (await startInterview("resume", null, {
+      const data = await startInterview("resume", null, {
         targetRole: targetRole.trim(),
         jobDescription: jobDescription.trim() || undefined,
-      })) as StartInterviewResponse;
+      });
       navigate(`/interview/${data.session_id}`, { state: data });
     } catch (error) {
-      alert("启动失败: " + errorMessage(error));
+      toast.error("启动失败: " + errorMessage(error));
     } finally {
       setCreatingSessionMode(null);
     }

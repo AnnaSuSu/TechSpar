@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   CalendarDays,
@@ -12,7 +13,6 @@ import {
   Target,
   TrendingUp,
   Trophy,
-  X,
 } from "lucide-react";
 import { getTopicIcon } from "../utils/topicIcons";
 import { getProfile, getTopicHistory, getTopicRetrospective, getTopics } from "../api/interview";
@@ -23,8 +23,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const PAGE_CLASS = "flex-1 w-full max-w-[1600px] mx-auto px-4 py-6 md:px-7 md:py-8 xl:px-10 2xl:px-12";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import PageContainer from "@/components/PageContainer";
+import ScorePill from "@/components/ScorePill";
 
 const MODE_BADGES = {
   resume: { text: "简历面试", variant: "default" },
@@ -80,7 +87,7 @@ export default function TopicDetail() {
       const res = await getTopicRetrospective(topic);
       startTask(res.task_id, "retrospective", `${topicInfo?.name || topic} 领域回顾生成中`);
     } catch (err) {
-      alert("生成失败: " + err.message);
+      toast.error("生成失败: " + (err?.message || "未知错误"));
     } finally {
       setGenerating(false);
     }
@@ -88,7 +95,7 @@ export default function TopicDetail() {
 
   if (loading) {
     return (
-      <div className={cn(PAGE_CLASS, "space-y-4")}>
+      <PageContainer size="wide" className="space-y-4">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-12 w-72" />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
@@ -104,7 +111,7 @@ export default function TopicDetail() {
             <Skeleton className="h-52 rounded-[28px]" />
           </div>
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -162,8 +169,9 @@ export default function TopicDetail() {
   const recurringStrengths = buildPointFrequency([...profileStrengths, ...sessionStrengths]).slice(0, 6);
 
   return (
-    <div className={PAGE_CLASS}>
+    <PageContainer size="wide">
       <button
+        type="button"
         className="inline-flex items-center gap-1 text-sm text-dim transition-colors hover:text-text"
         onClick={() => navigate("/profile")}
       >
@@ -179,9 +187,9 @@ export default function TopicDetail() {
             </div>
 
             <div className="min-w-0">
-              <div className="text-3xl font-display font-bold tracking-tight md:text-4xl">
+              <h1 className="text-3xl font-display font-bold tracking-tight md:text-4xl">
                 {topicInfo?.name || topic}
-              </div>
+              </h1>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-dim">
                 <span>{sessions.length} 次训练记录</span>
                 {latestSession?.created_at && <span>最后训练 {formatMinute(latestSession.created_at)}</span>}
@@ -385,7 +393,7 @@ export default function TopicDetail() {
         topicName={topicInfo?.name || topic}
         onClose={() => setShowFullRetrospective(false)}
       />
-    </div>
+    </PageContainer>
   );
 }
 
@@ -473,7 +481,7 @@ function SessionTimelineCard({ session, index, onOpen }) {
           </div>
 
           <div className="flex items-center justify-between gap-4 xl:flex-col xl:items-end">
-            <ScorePill score={avg} large />
+            <ScorePill score={avg} size="large" emptyLabel="--" />
             <div className="inline-flex items-center gap-1 text-xs text-dim transition-colors group-hover:text-text">
               查看完整复盘
               <ChevronRight size={15} />
@@ -557,67 +565,25 @@ function DashboardEmpty({ message, action, compact = false }) {
 }
 
 function FullRetrospectiveModal({ open, retrospective, sectionCount, updatedAt, topicName, onClose }) {
-  if (!open || !retrospective) return null;
+  if (!retrospective) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6 backdrop-blur-[2px]"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-border/80 bg-card shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-4 md:px-6">
-          <div className="min-w-0">
-            <div className="text-lg font-semibold text-text">{topicName} 完整回顾原文</div>
-            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-dim">
-              <span>{sectionCount || 1} 个模块</span>
-              {updatedAt && <span>更新于 {formatMinute(updatedAt)}</span>}
-            </div>
-          </div>
-
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="关闭完整回顾">
-            <X size={18} />
-          </Button>
-        </div>
-
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent className="flex max-h-[88vh] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden rounded-[28px] p-0">
+        <DialogHeader className="border-b border-border/70 px-5 py-4 pr-12 md:px-6">
+          <DialogTitle>{topicName} 完整回顾原文</DialogTitle>
+          <DialogDescription className="flex flex-wrap gap-x-4 gap-y-1">
+            <span>{sectionCount || 1} 个模块</span>
+            {updatedAt && <span>更新于 {formatMinute(updatedAt)}</span>}
+          </DialogDescription>
+        </DialogHeader>
         <div className="overflow-y-auto px-5 py-5 md:px-6">
           <div className="md-content text-sm leading-7 text-text">
             <ReactMarkdown>{retrospective}</ReactMarkdown>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ScorePill({ score, large = false }) {
-  if (score == null) {
-    return (
-      <Badge
-        variant="secondary"
-        className={cn("justify-center rounded-full text-[13px]", large ? "min-w-[84px] px-3 py-1" : "min-w-[72px]")}
-      >
-        --
-      </Badge>
-    );
-  }
-
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        "justify-center rounded-full border-transparent font-semibold text-[13px]",
-        large ? "min-w-[92px] px-3 py-1.5 text-[14px]" : "min-w-[72px] px-3 py-1"
-      )}
-      style={{
-        background: getScoreBg(score),
-        color: getScoreColor(score),
-      }}
-    >
-      {score}/10
-    </Badge>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -776,18 +742,4 @@ function toTimestamp(value) {
   if (!value) return 0;
   const timestamp = Date.parse(value);
   return Number.isNaN(timestamp) ? 0 : timestamp;
-}
-
-function getScoreColor(score) {
-  if (score >= 8) return "var(--success)";
-  if (score >= 6) return "var(--ai-glow)";
-  if (score >= 4) return "#e2b93b";
-  return "var(--destructive)";
-}
-
-function getScoreBg(score) {
-  if (score >= 8) return "rgba(34,197,94,0.15)";
-  if (score >= 6) return "rgba(245,158,11,0.15)";
-  if (score >= 4) return "rgba(253,203,110,0.2)";
-  return "rgba(239,68,68,0.15)";
 }

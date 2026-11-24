@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Brain,
-  CheckCircle2,
   ChevronLeft,
   FileText,
   Loader2,
@@ -19,34 +18,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { HintChip, StepRow } from "@/components/WorkflowPrimitives";
 
 import PrepResultCards from "./PrepResultCards";
 import { PAGE_CLASS, formatFileSize } from "./shared";
-
-function HintChip({ title, description }) {
-  return (
-    <div className="rounded-2xl border border-border/70 bg-background/72 px-3.5 py-3">
-      <div className="text-sm font-semibold">{title}</div>
-      <div className="mt-1 text-[13px] leading-6 text-dim">{description}</div>
-    </div>
-  );
-}
-
-function StepRow({ index, title, description, done = false, active = false }) {
-  return (
-    <div className={cn("rounded-2xl border px-3.5 py-3", done ? "border-green/20 bg-green/8" : active ? "border-primary/25 bg-primary/6" : "border-border/75 bg-card/72")}>
-      <div className="flex items-start gap-3">
-        <div className={cn("mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold", done ? "bg-green/15 text-green" : active ? "bg-primary/12 text-primary" : "bg-hover text-dim")}>
-          {done ? <CheckCircle2 size={14} /> : active ? <Loader2 size={14} className="animate-spin" /> : index}
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold">{title}</div>
-          <div className="mt-1 text-[13px] leading-6 text-dim">{description}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function MiniMetric({ label, value }) {
   return (
@@ -339,6 +314,7 @@ export default function DetailView({ prepId: initialPrepId, onBack, onStartInter
                   }
                   done={isDone}
                   active={isRunning}
+                  loading={isRunning}
                 />
                 <StepRow
                   index="03"
