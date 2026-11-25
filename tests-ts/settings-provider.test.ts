@@ -218,7 +218,7 @@ describe('settings operations', () => {
     for await (const event of service.rebuildIndex({ requestId: 'test', userId: 'user', signal: new AbortController().signal })) events.push(event)
     expect(events.at(-1)).toMatchObject({ done: true, rebuilt: { session_memories: true, weak_points: true, personal_documents: false, topics: ['typescript'] } })
     expect(calls).toContain('invalidate:user')
-    expect(calls).toContain('vectors:weak_point')
+    expect(calls).not.toContain('vectors:weak_point')
     expect(calls).toContain('topic:typescript')
     expect(calls.some((value) => value.startsWith('saved:'))).toBe(true)
   })
