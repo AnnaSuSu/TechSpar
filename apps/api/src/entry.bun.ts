@@ -129,7 +129,7 @@ const profile = new ProfileService({ repository: profileRepository, sessions, ta
 const personalAgentRepository = new BunPersonalAgentRepository(config.dbPath)
 personalAgentRepository.initialize()
 const personalAgent = new PersonalAgentService({ repository: personalAgentRepository, files: new FilePersonalDocumentStore(config.dataDir), extractor: new PortablePersonalDocumentExtractor(), embeddings, ai, profile, ids: new ShortUuidGenerator() })
-const settingsOperations = new SettingsOperationsService({ chats: chatDrivers, embeddingDrivers, embeddings, index: knowledgeIndex, vectors: vectorRepository, knowledge: knowledgeStore, personal: personalAgent, profile, settings: settingsRepository })
+const settingsOperations = new SettingsOperationsService({ chats: chatDrivers, embeddingDrivers, embeddings, index: knowledgeIndex, vectors: vectorRepository, knowledge: knowledgeStore, personal: personalAgent, settings: settingsRepository })
 const interview = new InterviewService({ sessions, states: interviewStates, tasks: taskQueue, ids: new ShortUuidGenerator(), ai, resume, knowledge: knowledgeIndex, knowledgeStore, settings: settingsRepository, profile })
 const recording = new RecordingService({ sessions, tasks: taskQueue, ids: new ShortUuidGenerator(), ai, profile, transcription: new LongTranscriptionService(settingsRepository, new DashScopeLongAsrDriver()) })
 const copilotRepository = new BunCopilotRepository(config.dbPath)

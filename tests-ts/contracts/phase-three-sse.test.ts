@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
-import { ProviderResponseError, SettingsOperationsService, defaultProfile, type InterviewUseCases, type RequestContext, type SettingsOperationsUseCases } from '@techspar/core'
+import { ProviderResponseError, SettingsOperationsService, type InterviewUseCases, type RequestContext, type SettingsOperationsUseCases } from '@techspar/core'
 import { InterviewStreamEventSchema, IndexRebuildEventSchema } from '@techspar/contracts/events'
 import { ResponseContractError } from '../../apps/api/src/http/response.ts'
 import { boundaryApp, jsonHeaders, unavailable } from './test-app.ts'
@@ -150,7 +150,6 @@ describe('phase three real SSE transport boundaries', () => {
       vectors: dependencyStub<SettingsDeps['vectors']>({ async listSessionMemoryChunks() { return [] }, async replaceChunks() {} }),
       knowledge: dependencyStub<SettingsDeps['knowledge']>({ async loadTopics() { if (fatal) throw new Error('目录失败'); return { typescript: { name: 'TypeScript', icon: '', dir: '' } } } }),
       personal: dependencyStub<SettingsDeps['personal']>({ async hasDocuments() { return false } }),
-      profile: dependencyStub<SettingsDeps['profile']>({ async get() { return defaultProfile() } }),
       settings: dependencyStub<SettingsDeps['settings']>({ async saveLastReindexAt(_id: string, value: string) { saved = value } }),
     })
     const app = boundaryApp({ settingsOperations: service })

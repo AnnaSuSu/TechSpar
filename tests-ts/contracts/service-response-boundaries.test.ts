@@ -94,10 +94,6 @@ describe('HTTP response fixtures from real services', () => {
   })
 
   test('matches index rebuild SSE progress and completion events from the real service', async () => {
-    const repository = new MemoryProfileRepository()
-    const stored = defaultProfile()
-    stored.weak_points = [{ point: '事件循环', topic: 'typescript' }]
-    await repository.save('user-a', stored)
     const lastRebuilds = new Map<string, string>()
     const chunks = new Map<string, Parameters<KnowledgeVectorRepository['replaceChunks']>[0]['chunks']>()
     const settingsOperations = new SettingsOperationsService({
@@ -113,7 +109,6 @@ describe('HTTP response fixtures from real services', () => {
         async loadTopics() { return { typescript: { name: 'TypeScript', icon: '', dir: 'typescript' } } },
       }),
       personal: dependencyStub<PersonalAgentUseCases>({ async hasDocuments() { return true }, async reindexAll() { return 1 } }),
-      profile: profileService(repository),
       settings: dependencyStub<ProviderSettingsRepository>({
         async saveLastReindexAt(userId, value) { lastRebuilds.set(userId, value) },
       }),

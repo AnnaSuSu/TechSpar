@@ -174,7 +174,7 @@ describe('settings operations', () => {
     const service = new SettingsOperationsService({
       chats: { create(config: Record<string, unknown>) { llmConfig = config; return { async complete(messages: Array<Record<string, unknown>>, _signal: unknown, options: Record<string, unknown>) { llmMessages = messages; llmOptions = options; return { text: JSON.stringify({ questions: [{ id: 1, question: '闭包是什么？', difficulty: 2, focus_area: '闭包' }, { id: 2, question: '事件循环如何工作？', difficulty: 3, focus_area: '事件循环' }] }), promptTokens: 1, completionTokens: 1 } }, async *stream() {} } } },
       embeddingDrivers: { async create(config: Record<string, unknown>) { embeddingConfig = config; return { async embed() { return [Float32Array.from([1])] } } } },
-      embeddings: {}, index: {}, vectors: {}, knowledge: {}, personal: {}, profile: {}, settings: {},
+      embeddings: {}, index: {}, vectors: {}, knowledge: {}, personal: {}, settings: {},
     } as never)
     const context = { requestId: 'test', userId: 'user', signal: new AbortController().signal }
     expect(await service.testLlm(context, { api_base: 'https://submitted.test/v1', api_key: 'submitted-key', model: 'submitted-model', temperature: 0.2, compatibility: 'deepseek', use_platform: false })).toEqual({ ok: true })
@@ -193,7 +193,7 @@ describe('settings operations', () => {
   test('rejects a truncated structured LLM probe even when the request itself succeeds', async () => {
     const service = new SettingsOperationsService({
       chats: { create() { return { async complete() { return { text: '[{"id":1,"question":"未闭合"', promptTokens: 1, completionTokens: 1 } }, async *stream() {} } } },
-      embeddingDrivers: {}, embeddings: {}, index: {}, vectors: {}, knowledge: {}, personal: {}, profile: {}, settings: {},
+      embeddingDrivers: {}, embeddings: {}, index: {}, vectors: {}, knowledge: {}, personal: {}, settings: {},
     } as never)
     const context = { requestId: 'test', userId: 'user', signal: new AbortController().signal }
 
@@ -206,12 +206,11 @@ describe('settings operations', () => {
   test('streams rebuild progress and persists the completion time', async () => {
     const calls: string[] = []
     const service = new SettingsOperationsService({
-      chats: {}, embeddingDrivers: {}, embeddings: { async embed(_context: unknown, texts: string[]) { return texts.map(() => Float32Array.from([1])) } },
+      chats: {}, embeddingDrivers: {}, embeddings: { async embed(_context: unknown, texts: string[]) { calls.push(`embed:${texts.length}`); return texts.map(() => Float32Array.from([1])) } },
       index: { async invalidateUser(id: string) { calls.push(`invalidate:${id}`) }, async rebuildTopic(_context: unknown, topic: string) { calls.push(`topic:${topic}`) }, resetEmbeddingClient() {} },
       vectors: { async listSessionMemoryChunks() { return [] }, async replaceChunks(input: { chunkType: string }) { calls.push(`vectors:${input.chunkType}`) } },
       knowledge: { async loadTopics() { return { typescript: { name: 'TypeScript' } } } },
       personal: { async hasDocuments() { return false } },
-      profile: { async get() { return { weak_points: [{ point: '事件循环', topic: 'runtime', improved: false, archived: false }] } } },
       settings: { async saveLastReindexAt(_id: string, value: string) { calls.push(`saved:${value}`) } },
     } as never)
     const events: Array<Record<string, unknown>> = []
@@ -219,6 +218,7 @@ describe('settings operations', () => {
     expect(events.at(-1)).toMatchObject({ done: true, rebuilt: { session_memories: true, weak_points: true, personal_documents: false, topics: ['typescript'] } })
     expect(calls).toContain('invalidate:user')
     expect(calls).not.toContain('vectors:weak_point')
+    expect(calls.some((value) => value.startsWith('embed:'))).toBe(false)
     expect(calls).toContain('topic:typescript')
     expect(calls.some((value) => value.startsWith('saved:'))).toBe(true)
   })

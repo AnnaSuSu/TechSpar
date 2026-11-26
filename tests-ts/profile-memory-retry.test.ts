@@ -285,6 +285,50 @@ describe('retryable profile memory projection', () => {
     expect(embedCalls[1]!.requestId).toContain('memory-write')
     expect(embedCalls[1]!.texts).toHaveLength(2)
   })
+
+  test('skips weak_point entries when retrying legacy pending snapshots and clears legacy rows', async () => {
+    const f = await fixture()
+    const createdAt = '2026-01-01T00:00:00.000Z'
+    const stored = defaultProfile()
+    stored.session_extractions = { 'session-1': extraction, 'session-2': { weak_points: [{ point: 'legacy only' }] } }
+    stored._pending_memory = {
+      'session-1': {
+        createdAt,
+        entries: [
+          { chunkType: 'session_summary', content: 'Legacy summary', topic: 'python', metadata: { mode: 'topic_drill' } },
+          { chunkType: 'insight', content: 'Legacy insight', topic: 'python', metadata: { mode: 'topic_drill' } },
+          { chunkType: 'weak_point', content: 'Legacy weak point', topic: 'python', metadata: { source: 'observed' } },
+        ],
+      },
+      'session-2': {
+        createdAt,
+        entries: [{ chunkType: 'weak_point', content: 'Only weak point', topic: 'python', metadata: { source: 'observed' } }],
+      },
+    }
+    await f.repository.save('user-a', stored)
+    await f.vectors.appendProfileMemories({ userId: 'user-a', entries: [
+      { chunkType: 'weak_point', content: 'Stale row 1', topic: 'python', sessionId: 'session-1', embedding: Float32Array.from([1, 0]), createdAt },
+      { chunkType: 'weak_point', content: 'Stale row 2', topic: 'python', sessionId: 'session-2', embedding: Float32Array.from([1, 0]), createdAt },
+    ] })
+    const embedCalls: string[][] = []
+    const originalEmbed = f.deps.embeddings.embed.bind(f.deps.embeddings)
+    f.deps.embeddings.embed = async (context, texts) => {
+      embedCalls.push([...texts])
+      return originalEmbed(context, texts)
+    }
+
+    await f.service.afterReview({ userId: 'user-a', session: session('session-1') })
+    await f.service.afterReview({ userId: 'user-a', session: session('session-2') })
+
+    expect(embedCalls).toEqual([['Legacy summary', 'Legacy insight']])
+    const rows = await f.vectors.listProfileMemories({ userId: 'user-a' })
+    expect(rows.map(row => ({ chunkType: row.chunkType, content: row.content }))).toEqual([
+      { chunkType: 'session_summary', content: 'Legacy summary' },
+      { chunkType: 'insight', content: 'Legacy insight' },
+    ])
+    expect(await f.vectors.listProfileMemories({ userId: 'user-a', chunkTypes: ['weak_point'] })).toEqual([])
+    expect((await f.repository.load('user-a'))._pending_memory).toBeUndefined()
+  })
 })
 
 function gate() {

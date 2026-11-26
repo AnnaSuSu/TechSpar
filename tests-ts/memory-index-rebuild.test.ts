@@ -56,7 +56,7 @@ async function fixture() {
   const settings = new SettingsService(settingsRepository, users, index, platform, { allowRegistration: false })
   let nextId = 0
   const personal = new PersonalAgentService({ repository: documents, files: new FilePersonalDocumentStore(root), extractor: { async extract(_filename, bytes) { return new TextDecoder().decode(bytes) } }, embeddings, profile, ai: unavailable as never, ids: { next() { return `document-${++nextId}` } } })
-  const operations = new SettingsOperationsService({ chats: unavailable as never, embeddingDrivers: unavailable as never, embeddings, index, vectors, knowledge, personal, profile, settings: settingsRepository })
+  const operations = new SettingsOperationsService({ chats: unavailable as never, embeddingDrivers: unavailable as never, embeddings, index, vectors, knowledge, personal, settings: settingsRepository })
   const rows = (userId = 'user-a') => sqlite.query<MemoryRow, [string]>("SELECT * FROM memory_vectors WHERE user_id = ? AND chunk_type IN ('session_summary', 'insight') ORDER BY id").all(userId)
   const app = boundaryApp({ settings, settingsOperations: operations })
   async function rebuild() {
@@ -235,4 +235,17 @@ test('failed invalidation does not save a new model alongside readable old-model
   await expect(f.changeModel()).rejects.toThrow('cannot invalidate')
   expect((await f.settings.get(context())).embedding).toEqual(previous.embedding)
   expect(f.rows()).toEqual(before)
+})
+
+test('rebuild removes legacy weak_point vectors during cleanup without rewriting them', async () => {
+  const f = await fixture(); await f.seed(); await f.seed('user-b')
+  const createdAt = '2026-01-01T00:00:00.000Z'
+  await f.vectors.appendProfileMemories({ userId: 'user-a', entries: [{ chunkType: 'weak_point', content: 'legacy user-a weak point', topic: 'python', sessionId: 'session-1', embedding: Float32Array.from([1, 0]), createdAt }] })
+  await f.vectors.appendProfileMemories({ userId: 'user-b', entries: [{ chunkType: 'weak_point', content: 'legacy user-b weak point', topic: 'python', sessionId: 'session-1', embedding: Float32Array.from([1, 0]), createdAt }] })
+  const events = await f.rebuild()
+  expect(events.at(-1)).toMatchObject({ done: true, rebuilt: { session_memories: true, weak_points: true } })
+  expect(await f.vectors.listProfileMemories({ userId: 'user-a', chunkTypes: ['weak_point'] })).toEqual([])
+  expect(f.sqlite.query<{ count: number }, [string]>("SELECT COUNT(*) AS count FROM memory_vectors WHERE user_id = ? AND chunk_type = 'weak_point'").get('user-a')?.count).toBe(0)
+  expect(await f.vectors.listProfileMemories({ userId: 'user-b', chunkTypes: ['weak_point'] })).toHaveLength(1)
+  expect((await f.profile.semanticHistory('user-a', 'python')).length).toBeGreaterThan(0)
 })

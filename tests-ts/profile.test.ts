@@ -182,7 +182,7 @@ describe('long-term profile loop', () => {
   test('creates a validated cross-topic consolidated pattern that accepts feedback', async () => {
     const extraction = JSON.stringify({ session_summary: '本次暴露 GIL 底层机制薄弱', weak_points: [{ point: 'GIL 底层机制说不清', topic: 'python' }], strong_points: [], behavior_signals: [], topic_mastery: { notes: '需要补强' }, avg_score: 3 })
     const consolidation = JSON.stringify({ patterns: [{ statement: '跨领域机制解释停留在表面', supporting_wp_indices: [0, 2, 4], topic: 'cross_cutting', confidence: 0.8 }] })
-    const { service, repository, sessions, vectors } = await fixture([extraction, consolidation])
+    const { service, repository, sessions, vectors, embeddingInputs } = await fixture([extraction, consolidation])
     const initial = defaultProfile()
     initial.weak_points.push(
       { point: '事务边界解释不清', topic: 'database', source: 'observed', times_seen: 2, improved: false },
@@ -196,6 +196,8 @@ describe('long-term profile loop', () => {
     let profile = await repository.load('user-a')
     expect(profile.weak_points.find((point) => point.source === 'consolidated')).toMatchObject({ point: '跨领域机制解释停留在表面', confidence: 0.8, user_acknowledged: false, consolidates: ['事务边界解释不清', '缓存一致性机制不清', 'GIL 底层机制说不清'] })
     expect(profile.weak_points.filter((point) => point.archived_reason === 'superseded_by_consolidation')).toHaveLength(3)
+    expect(embeddingInputs).toHaveLength(2)
+    expect(embeddingInputs.flat()).not.toContain('跨领域机制解释停留在表面')
     await service.feedback(context, '跨领域机制解释停留在表面', 'accurate')
     profile = await repository.load('user-a')
     expect(profile.weak_points.find((point) => point.source === 'consolidated')).toMatchObject({ point: '跨领域机制解释停留在表面', confidence: 0.9, user_acknowledged: true })

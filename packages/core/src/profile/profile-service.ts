@@ -451,16 +451,17 @@ export class ProfileService implements ProfileUseCases, CandidateProfilePort {
 
   private async projectSessionMemory(userId: string, sessionId: string, pending: PendingProfileMemory | undefined, context: RequestContext): Promise<void> {
     if (!pending) return
+    const entries = pending.entries.filter(entry => entry.chunkType !== 'weak_point')
     // Unlike optional semantic matching, this write must succeed as a whole or remain retryable.
-    const vectors = pending.entries.length ? await this.deps.embeddings.embed(this.context(userId, 'memory-write', context), pending.entries.map(entry => entry.content)) : []
+    const vectors = entries.length ? await this.deps.embeddings.embed(this.context(userId, 'memory-write', context), entries.map(entry => entry.content)) : []
     const dimension = vectors[0]?.length || 0
-    if (vectors.length !== pending.entries.length || vectors.some(vector => !dimension || vector.length !== dimension || !vector.every(Number.isFinite))) {
+    if (vectors.length !== entries.length || vectors.some(vector => !dimension || vector.length !== dimension || !vector.every(Number.isFinite))) {
       throw new Error('Invalid memory embeddings')
     }
     await assertContextActive(context)
     await this.deps.vectors.replaceSessionMemories({
       userId, sessionId,
-      entries: pending.entries.map((entry, index) => ({ ...entry, sessionId, embedding: vectors[index]!, createdAt: pending.createdAt })),
+      entries: entries.map((entry, index) => ({ ...entry, sessionId, embedding: vectors[index]!, createdAt: pending.createdAt })),
     })
     // A crash before this acknowledgement is safe: the next attempt replaces the same session.
     await this.deps.repository.update(userId, async profile => {

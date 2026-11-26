@@ -134,12 +134,16 @@ export class BunKnowledgeVectorRepository implements KnowledgeVectorRepository, 
 
   async listProfileMemories(input: { userId: string; chunkTypes?: readonly ProfileMemoryEntry['chunkType'][]; topic?: string }): Promise<ProfileMemoryEntry[]> {
     type Row = { chunk_type: ProfileMemoryEntry['chunkType']; content: string; topic: string | null; session_id: string | null; metadata: string | null; embedding: Uint8Array; created_at: string | null }
+    const allowedTypes: readonly ProfileMemoryEntry['chunkType'][] = ['session_summary', 'insight', 'weak_point']
+    const chunkTypes = input.chunkTypes?.length
+      ? allowedTypes.filter((type) => input.chunkTypes!.includes(type))
+      : allowedTypes
+    if (!chunkTypes.length) return []
+    const typeList = chunkTypes.map((type) => `'${type}'`).join(', ')
     const rows = input.topic === undefined
-      ? this.sqlite.query<Row, { $userId: string }>("SELECT chunk_type, content, topic, session_id, metadata, embedding, created_at FROM memory_vectors WHERE user_id = $userId AND chunk_type IN ('session_summary', 'insight', 'weak_point')").all({ $userId: input.userId })
-      : this.sqlite.query<Row, { $userId: string; $topic: string }>("SELECT chunk_type, content, topic, session_id, metadata, embedding, created_at FROM memory_vectors WHERE user_id = $userId AND topic = $topic AND chunk_type IN ('session_summary', 'insight', 'weak_point')").all({ $userId: input.userId, $topic: input.topic })
-    const allowed = input.chunkTypes?.length ? new Set(input.chunkTypes) : undefined
+      ? this.sqlite.query<Row, { $userId: string }>(`SELECT chunk_type, content, topic, session_id, metadata, embedding, created_at FROM memory_vectors WHERE user_id = $userId AND chunk_type IN (${typeList})`).all({ $userId: input.userId })
+      : this.sqlite.query<Row, { $userId: string; $topic: string }>(`SELECT chunk_type, content, topic, session_id, metadata, embedding, created_at FROM memory_vectors WHERE user_id = $userId AND topic = $topic AND chunk_type IN (${typeList})`).all({ $userId: input.userId, $topic: input.topic })
     return rows.flatMap((row) => {
-      if (allowed && !allowed.has(row.chunk_type)) return []
       const details = metadata(row.metadata)
       if (details.embedding_stale) return []
       return [{

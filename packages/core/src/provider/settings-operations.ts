@@ -6,7 +6,6 @@ import { finiteNumber, identifier, record, requiredText, uniqueIds, StructuredOu
 import type { RequestContext } from '../kernel/context.ts'
 import type { KnowledgeVectorRepository, KnowledgeStore, SessionMemoryChunk } from '../knowledge/ports.ts'
 import type { PersonalAgentUseCases } from '../personal-agent/ports.ts'
-import type { ProfileUseCases } from '../profile/ports.ts'
 import { embeddingModeOf, normalizeEmbeddingSettings } from './config.ts'
 import { USER_PROVIDER, type EmbeddingSettings, type LlmSettings } from './model.ts'
 import type { ChatDriverFactory, EmbeddingDriverFactory, ProviderSettingsRepository, SettingsOperationsUseCases, VectorIndexControl } from './ports.ts'
@@ -62,7 +61,6 @@ export class SettingsOperationsService implements SettingsOperationsUseCases {
     vectors: KnowledgeVectorRepository
     knowledge: KnowledgeStore
     personal: PersonalAgentUseCases
-    profile: ProfileUseCases
     settings: ProviderSettingsRepository
   }) {}
 
