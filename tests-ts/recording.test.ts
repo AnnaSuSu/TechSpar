@@ -77,6 +77,28 @@ describe('recording review', () => {
     } finally { sessions.close() }
   })
 
+  test.each([true, false])('retries malformed scoring JSON once and preserves extracted questions (recovery=%s)', async (recover) => {
+    const sessions = new BunInterviewSessionRepository(await databasePath())
+    sessions.initialize()
+    const tasks: PersistentTaskDispatcher = { async enqueue(input) { return task(input.taskId) }, async get() { return undefined } }
+    const profile: CandidateProfilePort = { async summary() { return '' }, async targetRole() { return '' }, async updateTargetRole() {} }
+    const evaluation = { scores: [{ question_id: 1, score: 8 }], overall: { avg_score: 8 } }
+    const ai = new Replies([JSON.stringify({ qa_pairs: [pair] }), '{"scores":', recover ? JSON.stringify(evaluation) : 'not json'])
+    const service = new RecordingService({ sessions, tasks, ids: { next: () => 'retry' }, ai, profile, transcription: { async transcribe() { return '' } } })
+    try {
+      await service.analyze(context, { transcript: '面试官：解释事件循环。候选人：任务队列。', recording_mode: 'dual' })
+      const result = service.runAnalysisTask(task('retry'))
+      if (recover) await result
+      else await expect(result).rejects.toThrow('模型未返回有效 JSON')
+      const saved = await sessions.get('retry', 'user-a')
+      expect(saved?.status).toBe(recover ? 'reviewed' : 'review_failed')
+      expect(saved?.questions).toHaveLength(1)
+      expect(saved?.scores).toHaveLength(recover ? 1 : 0)
+      expect(ai.calls).toHaveLength(3)
+      expect(ai.calls[2]![1]).toEqual(ai.calls[1]![1])
+    } finally { sessions.close() }
+  })
+
   test('fails truncated JSON without changing a recording task into a completed review', async () => {
     const sessions = new BunInterviewSessionRepository(await databasePath()); sessions.initialize()
     const tasks: PersistentTaskDispatcher = { async enqueue(input) { return task(input.taskId) }, async get() { return undefined } }

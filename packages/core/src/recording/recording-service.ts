@@ -1,6 +1,6 @@
 import type { InterviewAnswer, InterviewQuestion, InterviewSession, TaskRecord } from '../interview/model.ts'
 import { fill } from '../interview/prompts.ts'
-import { AppError, AuthenticationError } from '../kernel/errors.ts'
+import { AppError, AuthenticationError, ProviderResponseError } from '../kernel/errors.ts'
 import { parseJsonResponse } from '../kernel/json.ts'
 import { finiteNumber, identifier, record, requiredText, stringArray, StructuredOutputError, uniqueIds } from '../kernel/structured-output.ts'
 import { validateOverall, validateScoreDetails } from '../interview/structured-review.ts'
@@ -116,6 +116,22 @@ export class RecordingService implements RecordingUseCases {
     return { session_id: sessionId, status: 'pending' }
   }
 
+  private async evaluate(request: RequestContext, instruction: string, prompt: string) {
+    const complete = (system: string) => this.deps.ai.complete(request, [
+      { role: 'system', content: system },
+      { role: 'user', content: prompt },
+    ], STRUCTURED_CHAT_OPTIONS)
+    const response = await complete(instruction)
+    try {
+      return parseJsonResponse(response)
+    } catch (error) {
+      if (!(error instanceof ProviderResponseError)) throw error
+      await assertContextActive(request)
+      const retry = await complete(instruction + ' 上一次评分结果无法解析。请精简点评，并输出一个完整、符合示例结构的 JSON 对象。')
+      return parseJsonResponse(retry)
+    }
+  }
+
   async runAnalysisTask(task: TaskRecord): Promise<Record<string, unknown>> {
     const session = await this.deps.sessions.get(task.task_id, task.user_id)
     if (!session) throw new Error('Session not found.')
@@ -145,20 +161,20 @@ export class RecordingService implements RecordingUseCases {
         await this.deps.sessions.saveQuestions(session.session_id, session.user_id, questions)
         await this.deps.sessions.saveAnswers(session.session_id, session.user_id, answers)
         const qa = questions.map((question, index) => `### Q${question.id} (${question.focus_area || ''})\n**题目**: ${question.question}\n**回答**: ${answers[index]?.answer || ''}`).join('\n\n')
-        const evaluated = parseJsonResponse(await this.deps.ai.complete(request, [
-          { role: 'system', content: '你是面试评估引擎。只返回 JSON，不要其他内容。' },
-          { role: 'user', content: fill(RECORDING_DUAL_EVAL_PROMPT, { qa_pairs: qa, profile_summary: await this.deps.profile.summary(session.user_id) }) + contextSuffix(session.meta.company, session.meta.position) },
-        ], STRUCTURED_CHAT_OPTIONS))
+        const evaluated = await this.evaluate(
+          request, '你是面试评估引擎。只返回 JSON，不要其他内容。',
+          fill(RECORDING_DUAL_EVAL_PROMPT, { qa_pairs: qa, profile_summary: await this.deps.profile.summary(session.user_id) }) + contextSuffix(session.meta.company, session.meta.position),
+        )
         const validated = validateDualEvaluation(evaluated, new Set(questions.map((question) => String(question.id))))
         scores = validated.scores
         for (const score of scores) if (score.difficulty === undefined) score.difficulty = 3
         overall = validated.overall
         review = formatDualReview(questions, answers, scores, overall)
       } else {
-        const evaluated = parseJsonResponse(await this.deps.ai.complete(request, [
-          { role: 'system', content: '你是录音评估引擎。只返回 JSON，不要其他内容。' },
-          { role: 'user', content: fill(RECORDING_SOLO_EVAL_PROMPT, { transcript, profile_summary: await this.deps.profile.summary(session.user_id) }) + contextSuffix(session.meta.company, session.meta.position) },
-        ], STRUCTURED_CHAT_OPTIONS))
+        const evaluated = await this.evaluate(
+          request, '你是录音评估引擎。只返回 JSON，不要其他内容。',
+          fill(RECORDING_SOLO_EVAL_PROMPT, { transcript, profile_summary: await this.deps.profile.summary(session.user_id) }) + contextSuffix(session.meta.company, session.meta.position),
+        )
         const validated = validateSoloEvaluation(evaluated)
         const topics = validated.topics
         overall = validated.overall
